@@ -1,0 +1,147 @@
+import { useState } from "react";
+import { useLocation } from "wouter";
+import { Plus, X, Search, Pin, Layout, Lightbulb, Activity, Sparkles, Bookmark } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Dialog, DialogContent, DialogTitle, DialogDescription, DialogHeader } from "@/components/ui/dialog";
+import { useToast } from "@/hooks/use-toast";
+
+interface CreateExperienceModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onCreatePost: () => void;
+}
+
+export function CreateExperienceModal({ isOpen, onClose, onCreatePost }: CreateExperienceModalProps) {
+  const [searchQuery, setSearchQuery] = useState("");
+  const [, setLocation] = useLocation();
+  const { toast } = useToast();
+
+  const popularIdeas = [
+    { title: "Neuroscience Hacks", icon: Sparkles },
+    { title: "UI Inspiration", icon: Layout },
+    { title: "Workout Plans", icon: Activity },
+    { title: "Saved Ideas", icon: Bookmark },
+  ];
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="sm:max-w-[500px] p-0 overflow-hidden border-none shadow-2xl rounded-3xl bg-card">
+        <DialogHeader className="sr-only">
+          <DialogTitle>Create Experience</DialogTitle>
+          <DialogDescription>Create a new pin or board.</DialogDescription>
+        </DialogHeader>
+        
+        <div className="p-6 pb-8 bg-gradient-to-br from-card to-accent/20">
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-2xl font-bold tracking-tight">Start Creating</h2>
+            <Button variant="ghost" size="icon" className="rounded-full" onClick={onClose} aria-label="Close create dialog">
+              <X className="w-5 h-5" aria-hidden />
+            </Button>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4 mb-8">
+            <button
+              onClick={() => {
+                onClose();
+                onCreatePost();
+              }}
+              className="flex flex-col items-center justify-center p-6 bg-background rounded-[16px] border shadow-sm hover:border-primary/50 hover:shadow-md transition-all group"
+            >
+              <div className="w-12 h-12 flex items-center justify-center mb-3 text-primary group-hover:text-primary-foreground transition-colors">
+                <Pin className="w-6 h-6" />
+              </div>
+              <span className="font-semibold">Create Pin</span>
+              <span className="text-xs text-muted-foreground mt-1">Share an idea</span>
+            </button>
+
+            <button
+              onClick={() => {
+                onClose();
+                toast({
+                  title: "Product decision needed",
+                  description: "Board creation needs an approved data model before it is wired deeper.",
+                });
+              }}
+              className="flex flex-col items-center justify-center p-6 bg-background rounded-[16px] border shadow-sm hover:border-primary/50 hover:shadow-md transition-all group"
+            >
+              <div className="w-12 h-12 flex items-center justify-center mb-3 text-foreground group-hover:text-secondary-foreground transition-colors">
+                <Layout className="w-6 h-6" />
+              </div>
+              <span className="font-semibold">Create Board</span>
+              <span className="text-xs text-muted-foreground mt-1">Organize ideas</span>
+            </button>
+          </div>
+
+          <div className="space-y-4">
+            <h3 className="font-semibold text-lg flex items-center gap-2">
+              <Lightbulb className="w-5 h-5 text-yellow-500" />
+              Inspiration Search
+            </h3>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input 
+                placeholder="Search ideas, topics, inspiration..." 
+                className="pl-10 rounded-[16px] bg-background border-muted-foreground/20"
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter' && searchQuery.trim()) {
+                    onClose();
+                    setLocation(`/search?q=${encodeURIComponent(searchQuery)}`);
+                  }
+                }}
+              />
+            </div>
+            
+            <div className="grid grid-cols-2 gap-2 mt-4">
+              {popularIdeas.map((idea, i) => (
+                <button 
+                  key={i} 
+                  className="flex items-center gap-2 p-3 rounded-[16px] hover:bg-background/80 transition-colors text-sm font-medium text-left"
+                  onClick={() => {
+                    onClose();
+                    setLocation(`/search?q=${encodeURIComponent(idea.title)}`);
+                  }}
+                >
+                  <div className="p-2 rounded-[16px] bg-background shadow-sm border border-border/50">
+                    <idea.icon className="w-4 h-4 text-muted-foreground" />
+                  </div>
+                  {idea.title}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+export function FloatingCreateButton({ onCreatePost }: { onCreatePost: () => void }) {
+  const [isOpen, setIsOpen] = useState(false);
+
+  return (
+    <>
+      <div className="fixed bottom-[calc(5.5rem+env(safe-area-inset-bottom))] right-4 sm:bottom-8 sm:right-8 z-50">
+        <Button
+          size="icon"
+          aria-label="Create new post"
+          // Task 6: no-default-hover-elevate suppresses the ::after pseudo-element
+          // circle that every Button inherits from the hover-elevate class. On a
+          // round FAB this appeared as a smaller nested circle overlapping the +.
+          className="w-14 h-14 rounded-full bg-primary hover:bg-primary/90 text-primary-foreground hover:scale-105 active:scale-95 transition-transform duration-100 touch-manipulation no-default-hover-elevate no-default-active-elevate"
+          onClick={() => setIsOpen(true)}
+        >
+          <Plus className="w-6 h-6" aria-hidden />
+        </Button>
+      </div>
+
+      <CreateExperienceModal
+        isOpen={isOpen}
+        onClose={() => setIsOpen(false)}
+        onCreatePost={onCreatePost}
+      />
+    </>
+  );
+}

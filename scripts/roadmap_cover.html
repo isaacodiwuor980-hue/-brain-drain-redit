@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Brain Drain — Production Roadmap Cover</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;700;900&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  /* Template 01: HUD Data Terminal
+     - Left thick vertical anchor line (6pt steel-blue)
+     - Full-page faint grid background (2% opacity)
+     - Title left of the line, meta bottom of page
+     A4 = 794px x 1123px @96dpi */
+  @page {
+    size: 794px 1123px;
+    margin: 0;
+  }
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: #ffffff;
+    overflow: hidden;
+    width: 794px;
+    height: 1123px;
+  }
+  .cover {
+    position: relative;
+    width: 794px;
+    height: 1123px;
+    background: #ffffff;
+    font-family: 'Inter', sans-serif;
+    color: #151717;
+    overflow: hidden;
+  }
+
+  /* Layer 1: Background grid (2% opacity steel-blue) */
+  .grid-bg {
+    position: absolute;
+    inset: 0;
+    background-image:
+      linear-gradient(to right, rgba(71, 91, 101, 0.04) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(71, 91, 101, 0.04) 1px, transparent 1px);
+    background-size: 50px 50px;
+    z-index: 1;
+  }
+
+  /* Layer 2: Left vertical anchor line (6pt = 8px @96dpi) */
+  .anchor-line {
+    position: absolute;
+    left: 95px;  /* 0.12 * 794 ≈ 95 */
+    top: 112px;  /* 0.10 * 1123 ≈ 112 */
+    width: 8px;
+    height: 899px;  /* 0.80 * 1123 ≈ 899 (from 0.10 to 0.90) */
+    background: #475b65;
+    z-index: 2;
+  }
+
+  /* Layer 3: Content (left edge = 95 + 8 + 40 gap = 143px) */
+  .content {
+    position: absolute;
+    left: 145px;
+    top: 0;
+    width: 560px;  /* leaves ~89px right padding */
+    height: 1123px;
+    z-index: 3;
+  }
+
+  /* Drawer A — Kicker (Y ≈ 168px = 0.15 * 1123) */
+  .kicker {
+    position: absolute;
+    top: 168px;
+    left: 0;
+    font-size: 14px;
+    font-weight: 400;
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    color: #70777a;
+    opacity: 0.95;
+  }
+
+  /* Drawer B — Hero Title (Y ≈ 337px = 0.30 * 1123) */
+  .hero {
+    position: absolute;
+    top: 285px;
+    left: 0;
+    font-size: 64px;
+    font-weight: 900;
+    line-height: 1.05;
+    color: #151717;
+    letter-spacing: -1.5px;
+    max-width: 580px;
+  }
+
+  .hero-sub {
+    position: absolute;
+    top: 460px;
+    left: 0;
+    font-size: 38px;
+    font-weight: 500;
+    line-height: 1.15;
+    color: #475b65;
+    letter-spacing: -0.5px;
+    max-width: 580px;
+  }
+
+  /* Drawer C — Summary (Y ≈ 561px = 0.50 * 1123) */
+  .summary {
+    position: absolute;
+    top: 590px;
+    left: 0;
+    font-size: 15.5px;
+    font-weight: 400;
+    line-height: 1.65;
+    color: #2a2d2d;
+    max-width: 440px;  /* deliberately narrower than content area for visual breathing room */
+    opacity: 0.92;
+  }
+
+  /* Mid-page stat strip (between summary and meta) */
+  .stats {
+    position: absolute;
+    top: 780px;
+    left: 0;
+    display: flex;
+    gap: 36px;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .stat {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .stat-num {
+    font-size: 28px;
+    font-weight: 700;
+    color: #367fa4;
+    line-height: 1;
+  }
+  .stat-label {
+    font-size: 10px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: #70777a;
+  }
+
+  /* Drawer D — Meta (Y ≈ 842px = 0.75 * 1123) */
+  .meta {
+    position: absolute;
+    top: 905px;
+    left: 0;
+    font-size: 14px;
+    font-weight: 400;
+    line-height: 1.8;
+    color: #2a2d2d;
+  }
+  .meta-label {
+    color: #70777a;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    font-size: 10px;
+    font-weight: 500;
+    margin-bottom: 4px;
+  }
+  .meta-row {
+    margin-bottom: 14px;
+  }
+  .meta-value {
+    font-size: 14px;
+    font-weight: 500;
+    color: #151717;
+  }
+
+  /* Bottom-right corner mark */
+  .corner-mark {
+    position: absolute;
+    bottom: 60px;
+    right: 60px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    font-weight: 500;
+    color: #70777a;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    text-align: right;
+    line-height: 1.6;
+    z-index: 4;
+  }
+  .corner-mark .doc-id {
+    color: #475b65;
+    font-weight: 700;
+  }
+
+  /* Top-right small horizontal anchor echo */
+  .top-mark {
+    position: absolute;
+    top: 60px;
+    right: 60px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    font-weight: 500;
+    color: #70777a;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    text-align: right;
+    line-height: 1.6;
+    z-index: 4;
+  }
+</style>
+</head>
+<body>
+  <div class="cover">
+    <div class="grid-bg"></div>
+    <div class="anchor-line"></div>
+
+    <div class="top-mark">
+      ENGINEERING PLAN<br>
+      <span style="color:#475b65;font-weight:700">v1.0</span>
+    </div>
+
+    <div class="content">
+      <div class="kicker">PRODUCTION ROADMAP &middot; 2026</div>
+
+      <div class="hero">Brain<br>Drain</div>
+      <div class="hero-sub">Zero-to-Launch<br>Roadmap</div>
+
+      <div class="summary">
+        An 8-phase engineering plan taking Brain Drain from a working local-first
+        app to a live, scalable public service. Covers Supabase deployment,
+        production authentication, five zero-cost user-discovery methods, codebase
+        cleanup, and production hardening. Each phase is independently shippable.
+      </div>
+
+      <div class="stats">
+        <div class="stat">
+          <div class="stat-num">8</div>
+          <div class="stat-label">Phases</div>
+        </div>
+        <div class="stat">
+          <div class="stat-num">12d</div>
+          <div class="stat-label">Total Effort</div>
+        </div>
+        <div class="stat">
+          <div class="stat-num">6d</div>
+          <div class="stat-label">Critical Path</div>
+        </div>
+        <div class="stat">
+          <div class="stat-num">5</div>
+          <div class="stat-label">Discovery Modes</div>
+        </div>
+      </div>
+
+      <div class="meta">
+        <div class="meta-row">
+          <div class="meta-label">Prepared by</div>
+          <div class="meta-value">Z.ai &middot; Principal Engineering</div>
+        </div>
+        <div class="meta-row">
+          <div class="meta-label">Date</div>
+          <div class="meta-value">27 October 2026</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="corner-mark">
+      <span class="doc-id">BD-RMP-001</span><br>
+      CONFIDENTIAL<br>
+      INTERNAL ENGINEERING
+    </div>
+  </div>
+</body>
+</html>

@@ -1,0 +1,21 @@
+# Files excluded from the Docker build context to keep image builds fast.
+node_modules
+dist
+build
+coverage
+.git
+.gitignore
+*.log
+.env*
+!.env.example
+backups
+tool-results
+mockup-sandbox
+api-server/node_modules
+functions/node_modules
+.DS_Store
+*.md
+scripts/backup-supabase.sh
+scripts/load-test.js
+scripts/simulate-20k-users.mjs
+scripts/capture-screenshots.mjs

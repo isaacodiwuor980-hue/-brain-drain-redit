@@ -1,0 +1,43 @@
+# ═══════════════════════════════════════════════════════════════════════════
+# Brain Drain — docker-compose for local production-like runs
+# ═══════════════════════════════════════════════════════════════════════════
+# Usage:
+#   docker compose up --build
+#   docker compose up --build --scale app=3   # horizontal scaling test
+#
+# The app reads env vars from .env (same file used for local dev).
+# Supabase is external (managed), so no database container is needed.
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "${PORT:-3000}:3000"
+    env_file:
+      - path: .env
+        required: false   # fresh clones without .env still boot (local-only mode)
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: "1.0"
+        reservations:
+          memory: 256M
+          cpus: "0.25"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

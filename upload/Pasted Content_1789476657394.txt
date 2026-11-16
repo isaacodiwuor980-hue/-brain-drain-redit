@@ -1,0 +1,1714 @@
+# BRAIN DRAIN — PRECISION FEATURE ENHANCEMENT, ACCURACY & SAFE EVOLUTION MASTER INSTRUCTION
+
+## ROLE
+
+You are a Principal Product Engineer, Full-Stack Engineer, UX Architect, Systems Designer, and QA Engineer working on the EXISTING Brain Drain application.
+
+Your responsibility is to inspect, understand, test, and improve the CURRENT application before making changes.
+
+This is NOT a rebuild.
+
+This is NOT permission to redesign the application from scratch.
+
+This is NOT permission to remove existing systems.
+
+Your mission is:
+
+> **PRESERVE → INSPECT → UNDERSTAND → PATCH → ACTIVATE → ENHANCE → TEST**
+
+Every requested change must integrate into the existing application architecture and existing user experience without breaking unrelated features.
+
+---
+
+# 1. ABSOLUTE PRESERVATION RULE
+
+Before editing anything:
+
+1. Inspect the complete existing codebase.
+2. Identify the current architecture, routes, components, state management, database models, APIs, authentication, Brain system, social system, sharing system, notification system, and existing feature dependencies.
+3. Locate the existing Brain/GitHub-style control system and understand how:
+
+   * brains are created
+   * brains are edited
+   * versions are stored
+   * branches are created
+   * branches are merged
+   * contributors are tracked
+   * changes are compared
+   * main branches are maintained
+   * conflicts are handled
+4. Identify existing reusable components before creating replacements.
+5. Reuse existing data structures whenever possible.
+6. Do not create duplicate systems when an existing implementation can be extended.
+
+## NON-NEGOTIABLE
+
+DO NOT:
+
+* rewrite the entire application
+* replace the existing architecture unnecessarily
+* remove existing working features
+* rename unrelated database collections
+* delete existing user data
+* change authentication
+* break existing routes
+* replace existing Brain functionality
+* replace existing social functionality unless explicitly instructed below
+* introduce unnecessary dependencies
+* create mock functionality where real functionality already exists
+* leave buttons non-functional
+* create decorative UI that does not perform an actual action
+* silently remove functionality because it is difficult to integrate
+
+When a requested feature conflicts with an existing implementation, inspect the implementation first and make the smallest safe modification required.
+
+---
+
+# 2. FIRST PHASE — CODEBASE AUDIT
+
+Before modifying code, perform an internal audit.
+
+Create an understanding of:
+
+### Application structure
+
+* frontend framework
+* routing
+* component hierarchy
+* state management
+* backend
+* database
+* authentication
+* storage
+* offline/cache mechanisms
+* notification mechanisms
+* existing AI functionality
+* existing social graph
+* existing Brain system
+
+### Feature map
+
+Locate and understand:
+
+* Home
+* Ask the Community
+* Brain creation
+* Brain attachment
+* Brain editing
+* Brain branches
+* Brain merging
+* Posts
+* Share
+* Circles
+* Messaging
+* People/community discovery
+* Bookmarks/saved content
+* Profiles
+* Notifications
+* Search
+* Existing recommendation systems
+* Existing profile metrics
+* Existing skill systems
+* Existing badges/gamification
+
+### Dependency audit
+
+Before changing a component, determine:
+
+* What depends on it?
+* Which routes use it?
+* Which database records use it?
+* Which APIs use it?
+* Which notifications depend on it?
+* Which offline states depend on it?
+* Which other components consume its data?
+
+Only then implement modifications.
+
+---
+
+# 3. HOMEPAGE CLEANUP
+
+On the Homepage, locate the feature/category elements that currently display labels such as:
+
+* "All"
+* "# Engineering"
+* or equivalent unnecessary category/filter chips that are currently occupying the homepage.
+
+REMOVE ONLY THESE UNNECESSARY HOMEPAGE LABELS/FILTERS.
+
+Do not remove the underlying content, posts, feed, search, filtering engine, category taxonomy, or other functionality.
+
+The objective is to make the homepage cleaner and more purposeful.
+
+### Important
+
+If the "# Engineering" or similar elements are generated from a reusable component, do not destroy the component.
+
+Instead:
+
+* remove them from the Homepage presentation where requested
+* preserve the underlying taxonomy
+* preserve the taxonomy for other areas that legitimately require it
+
+Do not globally delete engineering/domain categories from the application.
+
+---
+
+# 4. ASK THE COMMUNITY → ATTACH BRAIN DECISION
+
+There is an existing feature in:
+
+## Ask the Community
+
+with an option similar to:
+
+> Attach Brain Decision
+
+This feature must become significantly more powerful without interfering with the existing Brain system.
+
+The attached Brain should become a **collaborative problem-solving workspace embedded inside the question**.
+
+---
+
+# 5. ATTACHED BRAIN — CORE CONCEPT
+
+A user asking a question should be able to attach a Brain representing the problem they are trying to solve.
+
+The Brain may be:
+
+* complete
+* partially complete
+* incomplete
+* missing evidence
+* missing decisions
+* missing implementation
+* uncertain
+* divided into unresolved sections
+
+For example:
+
+```text
+Problem
+   ↓
+Context
+   ↓
+Known Evidence
+   ↓
+Possible Causes
+   ↓
+Possible Solutions
+   ↓
+Decision
+   ↓
+Implementation
+   ↓
+Outcome
+```
+
+Some nodes/sections may intentionally remain empty or unresolved.
+
+Do NOT force the asker to complete the Brain before publishing the question.
+
+---
+
+# 6. ANSWERING THROUGH THE ATTACHED BRAIN
+
+When another user opens a question containing an attached Brain, they should be able to interact with the Brain directly.
+
+The responder should be able to:
+
+* inspect the Brain
+* identify incomplete sections
+* add missing information
+* propose alternatives
+* add evidence
+* challenge assumptions
+* improve reasoning
+* complete missing nodes
+* propose a solution
+* create a branch
+* compare their approach against other approaches
+* submit their contribution back to the Brain workflow
+
+The responder should NOT automatically overwrite the questioner's main Brain.
+
+---
+
+# 7. GITHUB-STYLE BRAIN COLLABORATION
+
+IMPORTANT:
+
+The existing application ALREADY contains a Brain control system inspired by GitHub.
+
+You MUST inspect and reuse that implementation.
+
+Do NOT create a second independent branch/merge system.
+
+The attached Brain should use the existing Brain version-control architecture wherever technically appropriate.
+
+Conceptually:
+
+```text
+QUESTIONER'S MAIN BRAIN
+        │
+        ├── Branch A — User 1 solution
+        │
+        ├── Branch B — User 2 solution
+        │
+        ├── Branch C — Alternative reasoning
+        │
+        └── Branch D — Evidence correction
+```
+
+Each contributor should be able to work on a branch rather than destroying the main version.
+
+---
+
+# 8. BRAIN BRANCH CONTRIBUTION WORKFLOW
+
+Recommended workflow:
+
+```text
+Question created
+       ↓
+Brain attached
+       ↓
+Community opens Brain
+       ↓
+Contributor selects:
+"Contribute to Brain"
+       ↓
+Create/continue branch
+       ↓
+Modify relevant sections
+       ↓
+Explain contribution
+       ↓
+Submit contribution
+       ↓
+Question owner reviews
+       ↓
+Compare with main Brain
+       ↓
+Accept / partially accept / reject
+       ↓
+Merge accepted contribution
+       ↓
+Main Brain becomes stronger
+```
+
+The exact implementation MUST follow the existing Brain control system after codebase inspection.
+
+---
+
+# 9. MERGE SYSTEM
+
+The person who originally asked the question owns the decision regarding the main Brain unless existing permissions define a different authority model.
+
+Provide a clear review experience.
+
+The owner should be able to see:
+
+### Contribution
+
+* contributor
+* branch
+* changed sections
+* original content
+* proposed content
+* evidence
+* reasoning
+* comments
+* confidence
+* timestamp
+
+### Actions
+
+* Merge
+* Merge selected changes
+* Request clarification
+* Reject
+* Continue discussion
+
+Never silently merge external changes into the main Brain.
+
+---
+
+# 10. PARTIAL BRAIN SUPPORT
+
+The Brain engine must support incomplete structures.
+
+For example:
+
+```text
+Problem              ✓
+Context              ✓
+Evidence              ✓
+Root Cause            ?
+Possible Solutions    ?
+Decision              ?
+Implementation        —
+Outcome               —
+```
+
+Use clear visual states such as:
+
+* Complete
+* Incomplete
+* Needs Evidence
+* Under Review
+* Proposed
+* Conflicting
+* Unresolved
+
+Do not treat incomplete Brain sections as errors.
+
+An incomplete Brain is a valid state because the purpose of community collaboration is to help complete it.
+
+---
+
+# 11. QUESTION SOLUTION STATE
+
+When the main Brain reaches a sufficiently complete state, the question should be able to communicate that progress.
+
+Possible states:
+
+```text
+Open
+Investigating
+Multiple Solutions Proposed
+Solution Under Review
+Solution Accepted
+Implemented
+Outcome Verified
+```
+
+Do not invent arbitrary AI certainty.
+
+A question should only become "Solved" according to explicit system/user criteria.
+
+---
+
+# 12. PRESERVE THE EXISTING BRAIN SYSTEM
+
+This section is extremely important.
+
+The attached Brain feature must NOT:
+
+* replace Brain Studio
+* replace existing Brain collections
+* replace existing Brain editing
+* replace existing Brain version control
+* replace existing branch management
+* replace existing merge functionality
+* duplicate Brain storage
+* create an incompatible Brain schema
+
+Instead, create a safe integration layer between:
+
+```text
+Ask the Community
+        ↕
+Attached Brain
+        ↕
+Existing Brain Engine
+        ↕
+Existing Branch / Version Control
+```
+
+---
+
+# 13. SHARE POST — ACTIVATE EXISTING FEATURES
+
+The existing Share Post functionality contains or should contain sharing options.
+
+ACTIVATE and make functional:
+
+### Share as Your Post
+
+Facebook-style behavior.
+
+When selected:
+
+```text
+Original Post
+      ↓
+Create new post
+      ↓
+Attach original attribution/reference
+      ↓
+User may add commentary
+      ↓
+Publish
+```
+
+The repost must preserve attribution to the original creator.
+
+Do not duplicate the original post as if the current user created the original content.
+
+---
+
+# 14. SHARE TO CIRCLES
+
+Activate:
+
+> Share to Circles
+
+The user should be able to select one or more Circles they have permission to post into.
+
+The system should respect existing:
+
+* Circle permissions
+* privacy rules
+* membership rules
+* moderation
+* notifications
+
+After publishing, the shared content should appear inside the selected Circle(s).
+
+---
+
+# 15. SEND TO PEOPLE WHO FOLLOW YOU
+
+The application may already contain a social relationship system.
+
+IMPORTANT:
+
+Do not blindly create a traditional follower system if the existing architecture intentionally uses the platform's cognitive connection model.
+
+Instead, map the UI action:
+
+> Send to people who follow you
+
+onto the existing relationship/recipient system.
+
+Where a user has followers under the existing implementation, allow selecting:
+
+* individual people
+* multiple people
+* relevant recipient groups if already supported
+
+The user must have a confirmation step before sending to many recipients.
+
+Prevent accidental mass sending.
+
+---
+
+# 16. SHARE PRIVACY
+
+Every sharing action must respect the original content's privacy rules.
+
+Never allow:
+
+```text
+Private Post → Public Repost
+Private Circle Post → Public Feed
+Restricted Brain → Unauthorized User
+```
+
+unless the owner explicitly has permission to change visibility.
+
+---
+
+# 17. BOOKMARK / SAVE SYSTEM — FACEBOOK-STYLE ENHANCEMENT
+
+Activate the existing Bookmark / Save feature.
+
+Do not leave it as a simple dead bookmark button.
+
+The user should be able to:
+
+```text
+Save
+   ↓
+Choose collection
+   ↓
+Existing collection OR New custom bookmark
+```
+
+Example:
+
+```text
+Saved
+├── AI Ideas
+├── Kenya Education
+├── Brain Research
+├── Business Ideas
+└── Build Later
+```
+
+---
+
+# 18. CUSTOM BOOKMARK COLLECTIONS
+
+Users should be able to create custom bookmark collections.
+
+Example:
+
+```text
+Create Bookmark Collection
+
+Name:
+"Apps I Want to Build"
+
+Description:
+Optional
+
+Visibility:
+Private
+Shared
+```
+
+Each saved item should retain a reference to the original content rather than creating an unnecessary duplicate.
+
+---
+
+# 19. SHARED BOOKMARK COLLECTIONS
+
+A user should be able to collaborate on a bookmark collection with selected people.
+
+Example:
+
+```text
+Collection:
+"AI Startup Research"
+
+Owner:
+Isaac
+
+Collaborators:
+Person A
+Person B
+Person C
+```
+
+Collaborators can see the collection according to its visibility and permission rules.
+
+Where appropriate, collaborators should be able to:
+
+* save content
+* remove content if permitted
+* add notes
+* organize items
+* create subcategories if supported
+
+Use explicit permissions.
+
+Do not expose private saved content accidentally.
+
+---
+
+# 20. BOOKMARK COLLECTION PERMISSIONS
+
+Implement or integrate with existing permission architecture:
+
+```text
+Private
+Only me
+
+Shared
+People I select
+
+Collaborative
+Selected people can contribute
+
+Public
+Anyone can view
+```
+
+Do not automatically make collections public.
+
+---
+
+# 21. PROFILE — REPLACE "BIO"
+
+Replace the traditional:
+
+> Bio
+
+with:
+
+# Mind Map Summary
+
+This should NOT be a simple free-text biography.
+
+It should be structured.
+
+### Core Domains
+
+Display domains with strength levels.
+
+Example:
+
+```text
+Agriculture — Advanced
+Education — Intermediate
+Data Science — Foundational
+```
+
+### Signature Problems They Solve
+
+Display approximately two to four concrete problem statements.
+
+Example:
+
+```text
+• Designing low-cost irrigation for smallholder farms
+• Turning exam data into targeted tutoring plans
+```
+
+### Evidence Links
+
+Show links to:
+
+* posts
+* Brain collections
+* projects
+* Knowledge Artifacts
+* external work
+* verified contributions
+
+The system should prioritize evidence over self-promotion.
+
+---
+
+# 22. MIND MAP SUMMARY AI
+
+Where AI generation is available, use the existing AI infrastructure.
+
+Conceptual instruction:
+
+```text
+Analyze the user's legitimate available contributions, projects,
+knowledge artifacts, and verified evidence.
+
+Infer:
+
+1. Core Domains
+2. Approximate capability level
+3. Signature Problems
+4. Strongest Evidence Links
+
+Do not fabricate expertise.
+
+Do not infer professional qualifications without evidence.
+
+Clearly distinguish:
+verified evidence
+system inference
+user-provided claims
+```
+
+The user should be able to review/edit AI-generated information.
+
+---
+
+# 23. REPLACE FOLLOWERS / FOLLOWING PROFILE METRICS
+
+Do not simply show traditional vanity metrics as the primary profile identity.
+
+Introduce:
+
+# Impact Graph
+
+Represent meaningful outcomes associated with a user's contributions.
+
+Conceptually:
+
+```text
+User
+ ↓
+Idea / Artifact / Contribution
+ ↓
+Decision / Project / Implementation
+ ↓
+Beneficiaries
+```
+
+Possible examples:
+
+```text
+Curriculum improved
+        ↓
+School adopted it
+        ↓
+Students benefited
+```
+
+or:
+
+```text
+Technical recommendation
+        ↓
+Project changed
+        ↓
+Implementation improved
+```
+
+Only use credible signals.
+
+---
+
+# 24. IMPACT DATA INTEGRITY
+
+Do NOT claim an impact merely because:
+
+* someone liked a post
+* someone viewed a post
+* someone followed the user
+* someone opened an artifact
+
+Impact should come from:
+
+* user self-report
+* explicit attribution
+* project records
+* community confirmation
+* system evidence
+* deployment evidence
+* verified outcomes
+
+Clearly label the source of impact.
+
+---
+
+# 25. RESONANCE SCORE
+
+Create a transparent metric representing how frequently ideas/contributions are:
+
+* reused
+* adapted
+* implemented
+* referenced
+* integrated into projects
+* associated with measurable outcomes
+
+Do not make it a mysterious AI-generated popularity number.
+
+Show enough explanation that the user understands why the score exists.
+
+Example conceptual weighting:
+
+```text
+View                    = very low
+Save                    = low
+Reuse/reference         = medium
+Adaptation              = medium/high
+Project implementation  = high
+Verified real-world     = very high
+```
+
+The actual scoring system should be configurable and documented in code.
+
+Avoid pretending that the score is scientifically perfect.
+
+---
+
+# 26. KNOWLEDGE ARTIFACTS
+
+Where the existing profile/feed structure allows it, evolve content toward:
+
+# Knowledge Artifacts
+
+A major contribution can contain:
+
+```text
+Problem
+Solution / Framework
+Evidence
+Implementation
+Outcome
+```
+
+Do not destroy the normal post system.
+
+This should be an enhancement layer over existing content.
+
+Existing posts should continue working.
+
+---
+
+# 27. DECISION TRAILS
+
+For significant Brain/problem-solving activity, support:
+
+```text
+Problem
+↓
+Options considered
+↓
+Evidence
+↓
+Contributions
+↓
+Decision
+↓
+Implementation
+↓
+Outcome
+```
+
+Where data exists, connect relevant Knowledge Artifacts and Brain branches to the Decision Trail.
+
+Do not fabricate missing outcomes.
+
+---
+
+# 28. VERIFIED CAPABILITY MATRIX
+
+Replace the concept of random skill endorsements with an evidence-oriented:
+
+# Verified Capability Matrix
+
+Conceptual structure:
+
+| Capability   | Posts | Projects | Peer Review | Deployment | Confidence |
+| ------------ | ----: | -------: | ----------: | ---------: | ---------- |
+| Capability A |     ✓ |        ✓ |           ✓ |          ✓ | High       |
+| Capability B |     ✓ |        — |           ✓ |          — | Medium     |
+
+Confidence should be based on:
+
+* evidence quantity
+* evidence quality
+* independent verification
+* actual usage
+* consistency over time
+
+Use:
+
+```text
+Low
+Medium
+High
+```
+
+Do not call something "verified" merely because the user typed it into their profile.
+
+---
+
+# 29. TRANSFORMATION MILESTONES
+
+Do not make generic gamification badges the primary representation of achievement.
+
+Introduce:
+
+# Transformation Milestones
+
+Examples:
+
+```text
+First curriculum adopted by multiple schools
+First project deployed in multiple communities
+First AI tool used by a substantial user population
+```
+
+Every milestone must have objective criteria.
+
+Each milestone should optionally contain:
+
+* achievement date
+* evidence
+* affected project
+* beneficiaries
+* supporting artifacts
+
+Do not award milestones using arbitrary engagement counts.
+
+---
+
+# 30. COLLABORATION INTERFACE
+
+Instead of treating profile links as the primary collaboration mechanism, create an enhanced:
+
+# Collaboration Interface
+
+Allow users to communicate:
+
+### Open to
+
+* co-building projects
+* mentoring
+* advising
+* research
+* data collaboration
+* community projects
+* technical collaboration
+
+### Preferred mode
+
+* asynchronous text
+* calls
+* workshops
+* in-person
+* project workspace
+
+### Capacity
+
+Example:
+
+```text
+Mentoring:
+Up to 5 hours/week
+```
+
+All availability must remain user-controlled.
+
+Do not infer sensitive personal characteristics.
+
+---
+
+# 31. LEGACY PROJECTION — OPTIONAL
+
+If implemented, provide:
+
+# Legacy Path
+
+A forward-looking projection based on:
+
+* demonstrated capabilities
+* actual contributions
+* interests
+* impact
+* current projects
+
+It should suggest:
+
+* high-leverage future problems
+* possible directions
+* relevant ecosystems
+* potential collaboration opportunities
+
+Clearly label this as a projection, not a prediction.
+
+Never present speculative AI output as fact.
+
+---
+
+# 32. COGNITIVE CONNECTION ENGINE
+
+The application has a concept of cognitive connections rather than simply copying conventional social-media following.
+
+Preserve this architecture.
+
+The recommendation engine should identify potentially valuable connections using:
+
+### 1. Complementary Expertise
+
+Find people whose expertise fills gaps in the user's active Brain collections.
+
+### 2. Conceptual Overlap
+
+Find people whose frameworks and knowledge structures overlap with the user's learning/problem-solving trajectory.
+
+### 3. Network Depth
+
+Prioritize contributors with dense, actionable knowledge rather than shallow engagement.
+
+Use terminology such as:
+
+> Establish Synapse
+
+or:
+
+> Sync Brain Collections
+
+where this terminology already fits the application's UX.
+
+Avoid replacing the entire existing social graph merely to introduce new wording.
+
+---
+
+# 33. RECOMMENDATION ENGINE SAFETY
+
+Do not recommend people using:
+
+* sensitive personal characteristics
+* protected characteristics
+* private information
+* speculative psychological diagnosis
+* unsupported claims
+
+Do not imply certainty.
+
+Recommendations should be explainable.
+
+Example:
+
+```text
+Why this connection?
+
+Your active Brain is focused on:
+Education + AI
+
+This contributor has:
+AI tutoring systems + education deployment
+
+Connection reason:
+Complementary expertise
+```
+
+---
+
+# 34. USERNAME ENGINE
+
+Create or integrate a permanent taxonomic username system ONLY where it does not break existing authentication, identity references, URLs, mentions, or historical records.
+
+Format:
+
+```text
+country[.city].domain.namestem.disambiguator
+```
+
+Examples:
+
+```text
+ke.nbo.ai.isaac.r1
+ke.ksm.edu.real.r2
+```
+
+Rules:
+
+* country = two-letter country code
+* city = optional short city code
+* domain = application taxonomy
+* namestem = one or two lowercase name components
+* disambiguator = uniqueness suffix
+
+Use only:
+
+```text
+lowercase letters
+digits
+dots
+```
+
+in the primary handle.
+
+---
+
+# 35. TRAIT CORE
+
+If the application already has a legitimate behavioral-analysis system, the username may have a trait core.
+
+Format:
+
+```text
+handle#G?.Bxx.Sxx
+```
+
+or when legitimate genetic data is explicitly available and properly handled:
+
+```text
+handle#Gxx.Bxx.Sxx
+```
+
+However:
+
+## CRITICAL SAFETY / ACCURACY RULE
+
+Do NOT invent genetic information.
+
+Do NOT infer genetic traits from ordinary behavior.
+
+If no legitimate genetic data exists:
+
+```text
+G?
+```
+
+or omit the genetic field according to the existing implementation.
+
+Behavioral scores must be treated as approximate system-derived indicators, NOT medical or psychological diagnoses.
+
+---
+
+# 36. BEHAVIOR SCORE
+
+Conceptually:
+
+```text
+Bxx = behavioral interaction tendency
+0–100
+```
+
+Use only appropriate non-sensitive interaction signals.
+
+Do not label users psychologically based on weak evidence.
+
+The score should be:
+
+* explainable
+* recalculable
+* stable enough to avoid constant identity changes
+
+---
+
+# 37. STABILITY SCORE
+
+Conceptually:
+
+```text
+Sxx = consistency/data confidence
+0–100
+```
+
+This should measure confidence in the stability of the available profile signals.
+
+It must NOT represent human worth.
+
+---
+
+# 38. USERNAME JSON ENGINE OUTPUT
+
+Where the username engine is implemented as an API/internal service, its output should follow:
+
+```json
+{
+  "handle": "ke.nbo.ai.isaac.r1",
+  "G": "?",
+  "B": 72,
+  "S": 84,
+  "full_id": "ke.nbo.ai.isaac.r1#G?.B72.S84"
+}
+```
+
+The exact handle must be generated from actual user data and uniqueness constraints.
+
+Never use fake values in production.
+
+---
+
+# 39. DATABASE SAFETY
+
+Before modifying database structures:
+
+1. Inspect current schema.
+2. Reuse existing fields where possible.
+3. Add fields rather than destroying old ones.
+4. Maintain backward compatibility.
+5. Provide safe defaults.
+6. Handle old users who do not have the new fields.
+7. Do not delete historical records.
+8. Do not perform destructive migrations unless absolutely necessary and explicitly justified.
+
+Existing data must remain readable.
+
+---
+
+# 40. BACKWARD COMPATIBILITY
+
+All existing users must continue to work.
+
+Test:
+
+* existing accounts
+* new accounts
+* old posts
+* new posts
+* old Brains
+* new Brains
+* old Circles
+* existing bookmarks
+* existing shares
+* existing notifications
+* offline data
+* restored sessions
+
+---
+
+# 41. BUTTON AND INTERACTION AUDIT
+
+Every modified UI action must be tested.
+
+Specifically test:
+
+### Ask Community
+
+* Create question
+* Attach Brain
+* Open Brain
+* Edit permitted section
+* Create branch
+* Submit contribution
+* Review contribution
+* Merge
+* Reject
+* Resolve
+
+### Share
+
+* Share as post
+* Share to Circle
+* Send to people
+* Cancel
+* Privacy enforcement
+
+### Save
+
+* Save
+* Choose collection
+* Create collection
+* Save into collection
+* Remove
+* Share collection
+* Add collaborator
+* Permission enforcement
+
+### Profile
+
+* Mind Map Summary
+* Impact Graph
+* Resonance Score
+* Knowledge Artifacts
+* Capability Matrix
+* Transformation Milestones
+* Collaboration Interface
+
+No dead buttons.
+
+---
+
+# 42. UX REQUIREMENT
+
+The new features must feel like one coherent application.
+
+Do not create:
+
+* random dashboard cards
+* disconnected pages
+* duplicated controls
+* unnecessary popups
+* confusing terminology
+* excessive badges
+* fake AI recommendations
+
+Reuse the existing:
+
+* design system
+* typography
+* spacing
+* cards
+* navigation
+* modal patterns
+* icons
+* interaction patterns
+* responsive behavior
+
+---
+
+# 43. MOBILE RESPONSIVENESS
+
+Every modified feature must work on:
+
+* desktop
+* tablet
+* mobile
+
+Especially:
+
+* Brain branch review
+* merge comparison
+* Share menu
+* bookmark collections
+* collaborative collections
+* profile graphs
+* capability matrix
+
+On mobile, use appropriate sheets, tabs, collapsible sections, or stacked layouts rather than forcing desktop tables.
+
+---
+
+# 44. ACCESS CONTROL
+
+Every new feature must respect authorization.
+
+Examples:
+
+A user cannot:
+
+* merge into another person's main Brain without permission
+* edit private Brains
+* view private bookmark collections
+* modify another person's collection without permission
+* send content to unauthorized recipients
+* expose private posts through reposting
+
+Use the application's existing authentication and authorization architecture.
+
+---
+
+# 45. NOTIFICATION INTEGRATION
+
+Integrate notifications with the existing notification engine.
+
+Relevant events include:
+
+```text
+Someone contributed to your Brain
+Someone created a Brain branch
+Someone requested clarification
+Your contribution was merged
+Your contribution was rejected
+Someone shared your post
+Someone added your post to a collaborative collection
+Someone invited you to a bookmark collection
+```
+
+Do not create a second notification architecture.
+
+---
+
+# 46. SEARCH INTEGRATION
+
+Where the application has search, make newly structured entities discoverable where appropriate:
+
+* Brains
+* Knowledge Artifacts
+* public bookmark collections
+* capabilities
+* projects
+* collaboration interests
+
+Respect privacy.
+
+---
+
+# 47. OFFLINE SUPPORT
+
+If the existing application supports offline operation:
+
+Do not break it.
+
+Any newly introduced user actions should either:
+
+* work offline through the existing queue/cache system, or
+* clearly indicate that an internet connection is required.
+
+Do not silently lose:
+
+* Brain contributions
+* bookmark actions
+* post shares
+* comments
+* edits
+
+---
+
+# 48. ERROR HANDLING
+
+Every new workflow must have:
+
+* loading state
+* empty state
+* error state
+* retry
+* success confirmation
+* permission-denied state
+
+Never leave the user wondering whether an operation succeeded.
+
+---
+
+# 49. DATA VALIDATION
+
+Validate:
+
+* Brain branch IDs
+* Brain ownership
+* merge targets
+* collection permissions
+* recipient permissions
+* post visibility
+* unique usernames
+* trait-core formatting
+* profile evidence references
+
+Do not trust client-side validation alone where security matters.
+
+---
+
+# 50. AI HALLUCINATION PREVENTION
+
+AI must NEVER fabricate:
+
+* skills
+* projects
+* evidence
+* impact
+* beneficiaries
+* deployments
+* credentials
+* genetic information
+* psychological conclusions
+
+Use:
+
+```text
+Verified
+User-provided
+System-inferred
+Unverified
+```
+
+where appropriate.
+
+---
+
+# 51. TESTING REQUIREMENT
+
+After implementation, perform a full regression review.
+
+Test:
+
+### Core application
+
+* authentication
+* navigation
+* homepage
+* feed
+* posts
+* comments
+* profiles
+* Circles
+* messaging
+* notifications
+
+### Brain
+
+* creation
+* editing
+* versions
+* branches
+* merging
+* permissions
+* attached Brain
+* community contributions
+
+### Social
+
+* share
+* repost
+* Circle sharing
+* direct sending
+* bookmarks
+* collections
+
+### Profile
+
+* Mind Map Summary
+* Impact Graph
+* Resonance Score
+* Knowledge Artifacts
+* Capability Matrix
+* Transformation Milestones
+* Collaboration Interface
+
+### Identity
+
+* username generation
+* uniqueness
+* legacy identity compatibility
+* mentions
+* profile URLs
+
+---
+
+# 52. REGRESSION PROTECTION
+
+Before declaring the work complete, compare the application behavior before and after the changes.
+
+Verify:
+
+```text
+Existing feature before
+        ↓
+Still exists
+        ↓
+Still accessible
+        ↓
+Still receives correct data
+        ↓
+Still performs its original function
+```
+
+If a new feature causes an unrelated regression, fix the regression before continuing.
+
+---
+
+# 53. IMPLEMENTATION PRIORITY
+
+Implement in this order:
+
+## Phase 1 — Inspect
+
+Understand current architecture.
+
+## Phase 2 — Safe cleanup
+
+Remove only the unnecessary Homepage labels.
+
+## Phase 3 — Attached Brain
+
+Integrate Ask the Community with the existing Brain control system.
+
+## Phase 4 — Branch collaboration
+
+Enable community Brain contributions using the existing GitHub-style branch architecture.
+
+## Phase 5 — Share
+
+Activate Share as Post, Share to Circles, and sending.
+
+## Phase 6 — Bookmarks
+
+Activate custom bookmark collections and collaboration.
+
+## Phase 7 — Profile evolution
+
+Implement Mind Map Summary, Impact Graph, Resonance Score, Knowledge Artifacts, Capability Matrix, and Transformation Milestones.
+
+## Phase 8 — Collaboration
+
+Implement the Collaboration Interface.
+
+## Phase 9 — Cognitive recommendations
+
+Improve Minds/Synapse recommendations without destroying the existing social graph.
+
+## Phase 10 — Identity
+
+Implement the taxonomic username system only after verifying compatibility with the current identity architecture.
+
+## Phase 11 — QA
+
+Run regression and interaction testing.
+
+---
+
+# 54. IMPORTANT DECISION RULE
+
+When there are two possible implementations:
+
+### Option A
+
+Create a new system.
+
+### Option B
+
+Extend the existing system.
+
+ALWAYS choose Option B when the existing system can safely support the requirement.
+
+The application should have:
+
+> ONE Brain engine
+> ONE branch/version system
+> ONE merge system
+> ONE notification system
+> ONE authentication system
+> ONE permission model
+> ONE social graph
+> ONE bookmark architecture
+
+Do not fragment the application.
+
+---
+
+# 55. FINAL ACCEPTANCE CRITERIA
+
+The implementation is successful only when:
+
+1. Existing features remain functional.
+2. Existing data remains intact.
+3. Homepage unnecessary labels are removed without destroying taxonomy.
+4. Ask Community can attach an incomplete Brain.
+5. Community members can work on Brain branches.
+6. The question owner can review and merge useful branches into the main Brain.
+7. Existing Brain version control remains the source of truth.
+8. Share as Post works.
+9. Share to Circles works.
+10. Send/share to people works.
+11. Bookmarks work.
+12. Custom bookmark collections work.
+13. Collaborative bookmark collections work with permissions.
+14. Profile identity becomes evidence-oriented.
+15. Mind Map Summary works.
+16. Impact Graph does not fabricate impact.
+17. Resonance Score is transparent.
+18. Knowledge Artifacts coexist with existing posts.
+19. Capability Matrix is evidence-based.
+20. Transformation Milestones use objective criteria.
+21. Collaboration Interface works.
+22. Cognitive recommendations use existing platform architecture.
+23. Username generation is unique and backward-compatible.
+24. No unsupported genetic/psychological claims are generated.
+25. Mobile and desktop interfaces work.
+26. No dead buttons remain in modified areas.
+27. Errors are handled gracefully.
+28. Privacy and authorization are preserved.
+29. Offline behavior is preserved where applicable.
+30. No unrelated feature has been removed or altered.
+
+---
+
+# 56. FINAL INSTRUCTION TO GLM
+
+DO NOT START BY WRITING NEW CODE.
+
+FIRST:
+
+```text
+INSPECT
+↓
+MAP
+↓
+UNDERSTAND
+↓
+IDENTIFY REUSABLE SYSTEMS
+↓
+IDENTIFY DEPENDENCIES
+↓
+PLAN MINIMAL CHANGES
+↓
+IMPLEMENT
+↓
+TEST
+↓
+FIX REGRESSIONS
+↓
+VERIFY
+```
+
+When inspecting the current application, pay SPECIAL ATTENTION to the existing Brain system because it already contains GitHub-like control functionality.
+
+The new Ask Community → Attach Brain feature must be an integration with that system, not a replacement.
+
+The central product principle is:
+
+> **A question should be able to contain an incomplete Brain, the community should be able to contribute competing solutions through branches, and the question owner should be able to merge the strongest verified contribution into the main Brain.**
+
+The final result should make Brain Drain feel like a genuine **collaborative knowledge and decision-building network**, while preserving everything that already works.
+
+Do not remove features merely because they are unconventional.
+
+Do not replace existing systems merely because a newer architecture is possible.
+
+Make changes only where this instruction explicitly requires them or where a technical change is strictly necessary to make the requested functionality work correctly.
+
+## BEFORE COMPLETION
+
+Report internally/visibly:
+
+1. What existing systems were discovered.
+2. Which existing components were reused.
+3. Which components were modified.
+4. Which new components were necessary.
+5. Which database changes were made.
+6. Which existing features were deliberately preserved.
+7. What tests were performed.
+8. What bugs were discovered and fixed.
+9. What remains intentionally unchanged.
+
+Do not claim a feature is working unless it has actually been implemented and tested.

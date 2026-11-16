@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=5.0" />
+    <meta name="theme-color" content="#101010" />
+    <meta name="color-scheme" content="dark light" />
+    <!-- Version marker — if you see this in the HTML source, you have the latest build -->
+    <meta name="build-version" content="2026-11-07-phase3-audit-fixes" />
+    <title>Brain Drain — The Next Human LLM</title>
+    <!--
+      PERMANENT PREVIEW FIX v3 (EXTERNAL SW-KILLER — CSP-compliant).
+      Why: the old inline SW-killer was blocked by the strict CSP
+      (`script-src 'self'` disallows inline scripts), so in strict-CSP
+      browsers it silently did nothing → stale SW served cached JS chunks
+      → version mismatch → blank page. Moving it to an external same-origin
+      file (`/sw-killer.js`) makes it CSP-compliant while keeping the
+      synchronous load (the parser blocks on this <script> before reaching
+      the module script at the bottom of <body>).
+    -->
+    <script src="/sw-killer.js"></script>
+    <!-- crypto.randomUUID polyfill — loaded SYNCHRONOUSLY in <head>, before
+         the app module bundle, so feed cold-start seeding / analytics /
+         share-as-post / brain creation never throw on HTTP preview domains.
+         crypto.randomUUID requires a secure context (HTTPS/localhost); on
+         HTTP Chrome/Opera Mini leave it undefined → TypeError → feed never
+         renders (Firefox is more lenient, which is why it worked there).
+         No-op where the native method exists. See /crypto-polyfill.js. -->
+    <script src="/crypto-polyfill.js"></script>
+    <meta
+      name="description"
+      content="Brain Drain is a human knowledge engine where experts drain their reasoning into structured decision brains. Readers vote every comment up or down and classify it House or Mouth; the strongest reasoning rises into a living consensus library. This is not a social feed — it's a library of expert knowledge."
+    />
+    <meta name="robots" content="index, follow" />
+    <meta name="application-name" content="Brain Drain" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Brain Drain" />
+
+    <!-- PWA manifest — enables Add to Home Screen + installability -->
+    <link rel="manifest" href="/manifest.webmanifest" />
+
+    <meta property="og:title" content="Brain Drain — The Next Human LLM" />
+    <meta
+      property="og:description"
+      content="A human knowledge engine where experts drain their reasoning into structured decision brains. Readers vote evidence up or down and classify it House or Mouth. Not a social feed — a living library of expert knowledge."
+    />
+    <meta property="og:type" content="website" />
+    <meta property="og:image" content="/opengraph.jpg" />
+
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Brain Drain — The Next Human LLM" />
+    <meta
+      name="twitter:description"
+      content="A human knowledge engine where experts drain their reasoning into structured decision brains. Not a social feed — a living library of expert knowledge."
+    />
+
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png" />
+    <link rel="apple-touch-icon" href="/apple-icon.png" />
+    <link rel="apple-touch-icon" sizes="192x192" href="/icon-192.png" />
+    <!-- Load high-clarity sans font (Inter / Roboto) with system fallbacks
+         WITHOUT blocking first paint and WITHOUT an inline event handler
+         (the CSP `script-src 'self'` blocks inline handlers, which silently
+         disabled the previous media="print"→all switch and logged a CSP
+         violation on every load). The external /font-loader.js injects the
+         stylesheet after first paint. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <script src="/font-loader.js" defer></script>
+    <noscript>
+      <!-- No-JS fallback: load fonts directly (a <link> is not a script —
+           CSP script-src does not block it). -->
+      <link
+        rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Roboto:wght@400;500;600;700;800&display=swap"
+      />
+    </noscript>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/main.tsx"></script>
+  </body>
+</html>
