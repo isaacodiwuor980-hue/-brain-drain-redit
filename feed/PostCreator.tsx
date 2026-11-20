@@ -840,8 +840,8 @@ export function PostCreator({
                         </SelectItem>
                         <SelectItem value="verified-experts">
                           <div className="flex flex-col">
-                            <span className="text-sm font-medium">Verified experts</span>
-                            <span className="text-[10px] text-muted-foreground">Credential-verified users can propose edits</span>
+                            <span className="text-sm font-medium">Expert proposals</span>
+                            <span className="text-[10px] text-muted-foreground">Expert proposals (review availability varies)</span>
                           </div>
                         </SelectItem>
                         <SelectItem value="public">

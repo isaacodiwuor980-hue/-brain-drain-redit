@@ -17,9 +17,11 @@ import {
   type CloudPost,
 } from "../lib/api/feed";
 import { ApiError } from "../lib/api-client";
-import { getAuthToken } from "../lib/auth-token";
+import { getAuthSession, getAuthToken } from "../lib/auth-token";
 import { env } from "../lib/env";
 import { queueOfflineAction } from "../lib/offline-sync";
+import { orderFeed } from "../lib/tsrg/feed";
+import { useTsrgStatus } from "./use-tsrg-status";
 
 /** Posts fetched per page. Matches the server max (feed.ts limit.max = 50). */
 const PAGE_SIZE = 30;
@@ -87,6 +89,7 @@ export function shouldSurfaceFeedError(error: unknown): boolean {
 
 export function useSocial(mode: "foryou" | "following" = "foryou", topicId: string | null = null) {
   const queryClient = useQueryClient();
+  const tsrgAvailable = useTsrgStatus(mode === "foryou" && env.features.experimentalTsrgFeed);
 
   // Tracks whether the LAST cloud fetch failed with a non-auth error.
   // React Query's isError stays false because queryFn returns cached/seed
@@ -200,8 +203,8 @@ export function useSocial(mode: "foryou" | "following" = "foryou", topicId: stri
         out.push(post);
       }
     }
-    return out.sort((a, b) => b.createdAt - a.createdAt);
-  }, [query.data]);
+    return orderFeed(out, mode, tsrgAvailable, query.dataUpdatedAt);
+  }, [query.data, query.dataUpdatedAt, mode, tsrgAvailable]);
 
   const addPostMutation = useMutation({
     // Optimistic UI: pre-write the new post into the React Query cache so it
@@ -237,7 +240,7 @@ export function useSocial(mode: "foryou" | "following" = "foryou", topicId: stri
     mutationFn: async (post: Post) => {
       // Persist to IDB so the post survives reloads. The optimistic cache
       // update already happened in onMutate; this just confirms it.
-      await idb.put("posts", post);
+      await idb.putStrict("posts", post);
       await trackEvent("post_created", {
         postId: post.id,
         topicId: post.topicId,
@@ -251,13 +254,18 @@ export function useSocial(mode: "foryou" | "following" = "foryou", topicId: stri
       // Same-origin API when VITE_API_BASE_URL is empty — see lib/env.ts.
       if (!env.apiEnabled) return;
 
-      const token = await getAuthToken();
+      const session = await getAuthSession();
+      const token = session?.token;
       // GUEST FIX: without a Firebase session there is nothing to sync to —
       // post creation is local-only by design. Previously the guest seed
       // flow still called POST /api/posts → 401 → the offline queue retried
       // every seed 5× → saturated the server rate limiter → ALL /api/feed
       // requests started returning 429 (the "app is down" cascade).
-      if (!token) return;
+      if (!session) return;
+      if (!token) {
+        queueOfflineAction("create_post", { postId: post.id }, session.uid);
+        return;
+      }
       try {
         await createPostApi(
           {
@@ -274,7 +282,7 @@ export function useSocial(mode: "foryou" | "following" = "foryou", topicId: stri
         );
       } catch (error) {
         // Keep the local copy and queue for auto-sync when connection returns.
-        queueOfflineAction("create_post", { postId: post.id });
+        queueOfflineAction("create_post", { postId: post.id }, session?.uid);
         // Message only — no stack dump for an expected offline/auth deferral.
         console.warn(
           "Post created locally, cloud sync deferred:",
@@ -354,7 +362,7 @@ export function useSocial(mode: "foryou" | "following" = "foryou", topicId: stri
       const result = togglePostReaction(post, reactionType);
 
       try {
-        await idb.put("posts", result.post);
+        await idb.putStrict("posts", result.post);
       } catch (idbErr) {
         // APEX-OMEGA R2: IDB write failed — local state is unknown. Tag
         // the error so onError rolls back. The UI must NOT show "voted"
@@ -379,10 +387,15 @@ export function useSocial(mode: "foryou" | "following" = "foryou", topicId: stri
       // Same-origin API when VITE_API_BASE_URL is empty — see lib/env.ts.
       if (!env.apiEnabled) return;
 
-      const token = await getAuthToken();
+      const session = await getAuthSession();
+      const token = session?.token;
       // GUEST FIX: same contract as addPost — no session, no cloud write,
       // no offline-queue entry. The vote stays in IDB either way.
-      if (!token) return;
+      if (!session) return;
+      if (!token) {
+        queueOfflineAction("post_reaction", { postId, reactionType }, session.uid);
+        return;
+      }
       try {
         if (reactionType === "upvote" || reactionType === "downvote" || reactionType === "repost") {
           const server = await reactToPostApi(postId, reactionType, token);
@@ -399,7 +412,7 @@ export function useSocial(mode: "foryou" | "following" = "foryou", topicId: stri
       } catch (error) {
         // Network/API failure — vote IS saved locally. Queue for sync.
         // Do NOT rethrow — onError must not see this.
-        queueOfflineAction("post_reaction", { postId, reactionType });
+        queueOfflineAction("post_reaction", { postId, reactionType }, session?.uid);
         console.warn("Reaction saved locally, cloud sync deferred", error);
       }
     },

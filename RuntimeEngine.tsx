@@ -1,9 +1,15 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
+import { useLocation } from "wouter";
 import { Brain, Node } from "@/lib/types";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { idb } from "@/lib/db";
-import { RotateCcw, AlertTriangle, CheckCircle2, Activity, Copy, Check, Share2 } from "lucide-react";
+import { loadBrainData } from "@/lib/load-brain-data";
+import { RotateCcw, AlertTriangle, CheckCircle2, Activity, Copy, Check, Share2, Network, ListOrdered, PlayCircle } from "lucide-react";
+import { ReasoningTree } from "@/components/ui/reasoning-tree";
+import { ReasoningWalkthrough } from "@/components/ui/reasoning-walkthrough";
+import { ConfidenceBadge } from "@/components/ui/confidence-badge";
+import { computeConfidence, type ReasoningMode } from "@/lib/reasoning-view";
+import { ViewErrorBoundary } from "@/components/ui/view-error-boundary";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
 import { trackEvent } from "@/lib/analytics";
@@ -16,42 +22,70 @@ interface RuntimeEngineProps {
 }
 
 export function RuntimeEngine({ brain, isOpen, onClose }: RuntimeEngineProps) {
+  const [, setLocation] = useLocation();
   const [nodes, setNodes] = useState<Node[]>([]);
+  const [loadState, setLoadState] = useState<{ id: string; error?: string } | null>(null);
+  const [loadAttempt, setLoadAttempt] = useState(0);
   const [currentNodeId, setCurrentNodeId] = useState<string | null>(null);
   const [path, setPath] = useState<{ node: Node; decision?: boolean }[]>([]);
   const [isCopied, setIsCopied] = useState(false);
+  /**
+   * PHASE 3: three presentations of the SAME reasoning.
+   *   focus       — one question at a time (the interactive runtime)
+   *   tree        — the visual reasoning tree
+   *   walkthrough — the whole logic as a readable, numbered document
+   * Persisted so a reader who prefers the walkthrough keeps it between runs.
+   */
+  const [mode, setMode] = useState<ReasoningMode>(() => {
+    try {
+      const saved = localStorage.getItem("brain-drain-reasoning-mode");
+      if (saved === "tree" || saved === "walkthrough" || saved === "focus") return saved;
+    } catch {
+      /* storage blocked — fall through to the default */
+    }
+    return "focus";
+  });
+  const confidence = useMemo(
+    () => (brain ? computeConfidence(brain, nodes) : null),
+    [brain, nodes],
+  );
   const { toast } = useToast();
 
+
+  const handleRestart = useCallback(() => {
+    triggerHaptic("light");
+    // BUG FIX: use the same fallback chain as the useEffect so restart
+    // doesn't re-introduce the null-root bug. If root_node_id is null
+    // (incomplete brain), fall back to the first question node, then
+    // the first node of any type, then null only if the brain is empty.
+    const fallbackStart =
+      brain?.root_node_id ||
+      nodes.find(n => n.node_type === "question")?.id ||
+      nodes[0]?.id ||
+      null;
+    setCurrentNodeId(fallbackStart);
+    setPath([]);
+  }, [brain?.root_node_id, nodes]);
+
   useEffect(() => {
-    if (brain && isOpen) {
-      // Guard: if the IDB read fails (e.g. the brain_id index isn't ready
-      // on a fresh DB upgrade, or the browser is in private mode and IDB
-      // is unavailable), don't crash the engine — show the empty state
-      // instead so the user gets a helpful message.
-      idb.getAllByIndex<Node>("nodes", "brain_id", brain.id).then(loadedNodes => {
-        setNodes(loadedNodes);
-        // Bug fix: previously this set currentNodeId to brain.root_node_id,
-        // which can be null for a newly-created or incomplete brain. That
-        // made currentNode undefined → the engine showed "Engine Halted /
-        // Incomplete logic path detected" and the user could never run the
-        // brain. Now we fall back to: (1) the declared root, (2) the first
-        // question node, (3) the first node of any type, (4) null only if
-        // the brain has zero nodes.
-        const fallbackStart =
-          brain.root_node_id ||
-          loadedNodes.find(n => n.node_type === "question")?.id ||
-          loadedNodes[0]?.id ||
-          null;
-        setCurrentNodeId(fallbackStart);
-        setPath([]);
-      }).catch((err) => {
-        console.error("RuntimeEngine: failed to load nodes", err);
-        setNodes([]);
-        setCurrentNodeId(null);
-        setPath([]);
-      });
-    }
-  }, [brain, isOpen]);
+    if (!brain || !isOpen) return;
+    let cancelled = false;
+    loadBrainData(brain.id).then((data) => {
+      if (cancelled) return;
+      if (!data) throw new Error("Brain data is unavailable on this device.");
+      setNodes(data.nodes);
+      setCurrentNodeId(data.brain.root_node_id || data.nodes.find((n) => n.node_type === "question")?.id || data.nodes[0]?.id || null);
+      setPath([]);
+      setLoadState({ id: brain.id });
+    }).catch((error: unknown) => {
+      if (cancelled) return;
+      setNodes([]);
+      setCurrentNodeId(null);
+      setPath([]);
+      setLoadState({ id: brain.id, error: error instanceof Error ? error.message : "Could not load brain data." });
+    });
+    return () => { cancelled = true; };
+  }, [brain, isOpen, loadAttempt]);
 
   const currentNode = nodes.find(n => n.id === currentNodeId);
   // Detect the "brain has no nodes at all" case so we can show a helpful
@@ -59,7 +93,7 @@ export function RuntimeEngine({ brain, isOpen, onClose }: RuntimeEngineProps) {
   // instead of leaving them stuck.
   const brainIsEmpty = nodes.length === 0;
 
-  const handleDecision = (decision: boolean) => {
+  const handleDecision = useCallback((decision: boolean) => {
     if (!currentNode) return;
 
     setPath(prev => [...prev, { node: currentNode, decision }]);
@@ -100,24 +134,59 @@ export function RuntimeEngine({ brain, isOpen, onClose }: RuntimeEngineProps) {
         duration: 5000,
       });
     }
-  };
+  }, [currentNode, nodes, toast]);
 
-  const handleRestart = () => {
-    triggerHaptic("light");
-    // BUG FIX: use the same fallback chain as the useEffect so restart
-    // doesn't re-introduce the null-root bug. If root_node_id is null
-    // (incomplete brain), fall back to the first question node, then
-    // the first node of any type, then null only if the brain is empty.
-    const fallbackStart =
-      brain?.root_node_id ||
-      nodes.find(n => n.node_type === "question")?.id ||
-      nodes[0]?.id ||
-      null;
-    setCurrentNodeId(fallbackStart);
-    setPath([]);
-  };
+  const changeMode = useCallback((next: ReasoningMode) => {
+    setMode(next);
+    triggerHaptic("selection");
+    try {
+      localStorage.setItem("brain-drain-reasoning-mode", next);
+    } catch {
+      /* storage blocked — in-memory only */
+    }
+    void trackEvent("reasoning_view_changed", { mode: next, brainId: brain?.id ?? null });
+  }, [brain?.id]);
+
+  /**
+   * PHASE 3 — instant keyboard navigation. In focus mode: Y/ArrowLeft = YES,
+   * N/ArrowRight = NO, R = restart, 1/2/3 = switch view. Deliberately ignored
+   * while the user is typing in a field so it can never hijack a text input.
+   */
+  useEffect(() => {
+    if (!isOpen) return undefined;
+    const onKey = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (
+        target instanceof HTMLInputElement ||
+        target instanceof HTMLTextAreaElement ||
+        target?.isContentEditable
+      ) {
+        return;
+      }
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      const key = e.key.toLowerCase();
+      if (key === "1") return changeMode("focus");
+      if (key === "2") return changeMode("tree");
+      if (key === "3") return changeMode("walkthrough");
+      if (key === "r") return handleRestart();
+      if (mode !== "focus") return;
+      // Only answer when the current step is actually a question.
+      if (currentNode?.node_type === "question") {
+        if (key === "y" || e.key === "ArrowLeft") return handleDecision(true);
+        if (key === "n" || e.key === "ArrowRight") return handleDecision(false);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+    // KEYBOARD FIX: this listener used to read three module-style refs that
+    // were written DURING RENDER (a React correctness violation — refs must
+    // not be read/written in the render phase). Re-subscribing with the real
+    // handlers is one cheap addEventListener per open/step change.
+  }, [isOpen, mode, currentNode?.node_type, handleDecision, handleRestart, changeMode]);
+
 
   if (!brain) return null;
+  const dataReady = loadState?.id === brain.id && !loadState.error;
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
@@ -127,19 +196,96 @@ export function RuntimeEngine({ brain, isOpen, onClose }: RuntimeEngineProps) {
             <div className="w-8 h-8 rounded bg-primary/20 flex items-center justify-center">
               <Activity className="w-4 h-4 text-primary animate-pulse" />
             </div>
-            <div>
-              <h2 className="text-sm font-bold text-foreground leading-none">{brain.title}</h2>
-              <span className="text-[10px] font-mono text-muted-foreground uppercase tracking-wider">Edit & Repair Running</span>
+            <div className="min-w-0">
+              <h2 className="text-sm font-bold text-foreground leading-none truncate">{brain.title}</h2>
+              <div className="mt-1 flex items-center gap-2">
+                <span className="text-[10px] font-mono text-muted-foreground uppercase tracking-wider">
+                  {mode === "focus" ? "Interactive run" : mode === "tree" ? "Reasoning tree" : "Walkthrough"}
+                </span>
+                {confidence && <ConfidenceBadge confidence={confidence} />}
+              </div>
             </div>
           </div>
-          <Button variant="ghost" size="sm" onClick={handleRestart} className="h-8">
-            <RotateCcw className="w-4 h-4 mr-2" /> Restart
-          </Button>
+          <div className="flex items-center gap-1.5">
+            {/* PHASE 3: visual tree ⇄ clean walkthrough ⇄ interactive run.
+                Three views of one brain, one tap apart — no more wall of
+                text, and no forced "graph only" mode. Keys 1/2/3. */}
+            <div
+              role="tablist"
+              aria-label="Reasoning view"
+              className="flex items-center rounded-full border border-border/60 bg-muted/40 p-0.5"
+            >
+              {([
+                { id: "focus", label: "Run", icon: PlayCircle, hint: "1" },
+                { id: "tree", label: "Tree", icon: Network, hint: "2" },
+                { id: "walkthrough", label: "Steps", icon: ListOrdered, hint: "3" },
+              ] as const).map(({ id, label, icon: Icon, hint }) => (
+                <button
+                  key={id}
+                  type="button"
+                  role="tab"
+                  aria-selected={mode === id}
+                  onClick={() => changeMode(id)}
+                  title={`${label} view (${hint})`}
+                  className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors ${
+                    mode === id
+                      ? "bg-background text-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  <Icon className="w-3.5 h-3.5" aria-hidden />
+                  <span className="hidden sm:inline">{label}</span>
+                </button>
+              ))}
+            </div>
+            <Button variant="ghost" size="sm" onClick={handleRestart} className="h-8" aria-label="Restart run">
+              <RotateCcw className="w-4 h-4 sm:mr-2" /> <span className="hidden sm:inline">Restart</span>
+            </Button>
+          </div>
         </div>
 
-        <div className="flex-1 flex overflow-hidden">
+        <div className="flex-1 flex flex-col md:flex-row overflow-hidden min-h-0">
           {/* Main Stage */}
-          <div className="flex-1 flex flex-col items-center justify-center p-8 overflow-y-auto relative">
+          <div className={`flex-1 min-w-0 flex flex-col overflow-y-auto p-4 sm:p-8 relative ${
+            mode === "focus" ? "items-center justify-center" : "items-stretch justify-start"
+          }`}>
+            {!dataReady && (
+              <div role={loadState?.id === brain.id && loadState.error ? "alert" : "status"} className="text-sm text-muted-foreground">
+                {loadState?.id === brain.id && loadState.error ? (
+                  <>{loadState.error} <Button size="sm" variant="outline" onClick={() => setLoadAttempt((n) => n + 1)}>Retry</Button></>
+                ) : "Loading brain data…"}
+              </div>
+            )}
+            {dataReady && mode === "tree" && (
+              <ViewErrorBoundary label="reasoning tree">
+              <ReasoningTree
+                brain={brain}
+                nodes={nodes}
+                activeNodeId={currentNodeId}
+                onNodeClick={(node) => {
+                  setCurrentNodeId(node.id);
+                  changeMode("focus");
+                }}
+                className="w-full"
+              />
+              </ViewErrorBoundary>
+            )}
+
+            {dataReady && mode === "walkthrough" && (
+              <ViewErrorBoundary label="walkthrough">
+              <ReasoningWalkthrough
+                brain={brain}
+                nodes={nodes}
+                onJumpToNode={(node) => {
+                  setCurrentNodeId(node.id);
+                  changeMode("focus");
+                }}
+                className="w-full max-w-3xl mx-auto"
+              />
+              </ViewErrorBoundary>
+            )}
+
+            {dataReady && mode === "focus" && (
             <AnimatePresence mode="wait">
               {currentNode ? (
                 <motion.div
@@ -188,9 +334,10 @@ export function RuntimeEngine({ brain, isOpen, onClose }: RuntimeEngineProps) {
                             triggerHaptic("selection");
                             const shareText = `🧠 Brain Diagnostic Result: ${brain.title}\n✅ Result: ${currentNode.result_text}\n📋 Next Steps: ${currentNode.next_steps}\n\nRan with Brain Builder: ${window.location.origin}`;
                             try {
-                              if (navigator.clipboard && navigator.clipboard.writeText) {
-                                await navigator.clipboard.writeText(shareText);
+                              if (!navigator.clipboard?.writeText) {
+                                throw new Error("Clipboard access is unavailable in this browser.");
                               }
+                              await navigator.clipboard.writeText(shareText);
                               setIsCopied(true);
                               setTimeout(() => setIsCopied(false), 2500);
                               toast({
@@ -199,7 +346,11 @@ export function RuntimeEngine({ brain, isOpen, onClose }: RuntimeEngineProps) {
                               });
                               void trackEvent("puzzle_score_copied", { type: "diagnostic_engine", brainId: brain.id });
                             } catch (e) {
-                              console.error(e);
+                              toast({
+                                title: "Could not copy result",
+                                description: e instanceof Error ? e.message : "Clipboard access failed.",
+                                variant: "destructive",
+                              });
                             }
                           }}
                         >
@@ -253,10 +404,14 @@ export function RuntimeEngine({ brain, isOpen, onClose }: RuntimeEngineProps) {
                         className="rounded-full text-xs"
                         onClick={() => {
                           onClose();
-                          // Route to the library with this brain pre-selected
-                          // so the user lands in the editor.
+                          // BUG FIX #15: this was a full `window.location.href`
+                          // assignment — a hard page reload that re-downloaded
+                          // the whole bundle, re-hydrated every IndexedDB store
+                          // and dumped the user on a white screen for ~1-2s
+                          // just to move one route. SPA navigation keeps all
+                          // state (and the offline queue) intact.
                           try {
-                            window.location.href = `${window.location.origin}/library?brainId=${encodeURIComponent(brain.id)}`;
+                            setLocation(`/library?brainId=${encodeURIComponent(brain.id)}`);
                           } catch {
                             toast({ title: "Open the Library", description: "Find this brain and tap Edit to add nodes." });
                           }
@@ -285,10 +440,15 @@ export function RuntimeEngine({ brain, isOpen, onClose }: RuntimeEngineProps) {
                 </div>
               )}
             </AnimatePresence>
+            )}
           </div>
 
-          {/* Right Panel: Path history */}
-          <div className="w-64 border-l border-border/50 bg-card/30 flex flex-col">
+          {/* Right Panel: Path history — only meaningful while running. */}
+          <div
+            className={`w-full md:w-64 shrink-0 border-t md:border-t-0 md:border-l border-border/50 bg-card/30 flex-col max-h-48 md:max-h-none ${
+              mode === "focus" ? "flex" : "hidden md:hidden"
+            }`}
+          >
             <div className="p-3 border-b border-border/50">
               <span className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">Traversal History</span>
             </div>

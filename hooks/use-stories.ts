@@ -65,7 +65,7 @@ export function useStories() {
       expiresAt: Date.now() + 24 * 60 * 60 * 1000, // 24 hours
       isViewed: false
     };
-    await idb.put("stories", newStory);
+    await idb.putStrict("stories", newStory);
     await loadStories();
   };
 

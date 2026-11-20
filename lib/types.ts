@@ -677,7 +677,7 @@ export interface Story {
 export interface StoryAttachment {
   id: string;
   /** "video" is additive — a small muted preview plays in the story tray. */
-  kind: "image" | "file" | "html" | "video";
+  kind: "image" | "file" | "html" | "video" | "link" | "text";
   /** Data URL (image) or external URL (file/html). */
   url: string;
   /** Original filename for files, or title for HTML snippets. */

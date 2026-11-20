@@ -1,8 +1,10 @@
+import { useEffect, useRef } from "react";
 import { Link } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { isNavActive } from "@/lib/navigation";
 
 interface NavItem {
   href: string;
@@ -35,6 +37,60 @@ export function MobileNavDrawer({
   currentPath,
   onLinkClick,
 }: MobileNavDrawerProps) {
+  const panelRef = useRef<HTMLDivElement | null>(null);
+  const closeButtonRef = useRef<HTMLButtonElement | null>(null);
+
+  /**
+   * BUG FIX (drawer was a keyboard trap-ish dead end): the sheet had
+   * aria-modal="true" but never handled Escape, never locked background
+   * scrolling (the feed scrolled underneath the sheet on iOS), and never
+   * moved focus into the panel — so keyboard/screen-reader users could
+   * tab into the page behind the overlay. Now: Escape closes, body scroll
+   * is locked while open, focus lands on the close button, and focus is
+   * restored to the trigger on unmount/close.
+   */
+  useEffect(() => {
+    if (!open) return undefined;
+
+    const previouslyFocused = document.activeElement as HTMLElement | null;
+    // rAF so the spring animation's first frame doesn't eat the focus call.
+    const focusTimer = setTimeout(() => closeButtonRef.current?.focus(), 60);
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.stopPropagation();
+        onClose();
+        return;
+      }
+      // Minimal focus containment: cycle Tab within the panel.
+      if (e.key !== "Tab" || !panelRef.current) return;
+      const focusable = panelRef.current.querySelectorAll<HTMLElement>(
+        'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      );
+      if (focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    document.addEventListener("keydown", onKeyDown);
+
+    return () => {
+      clearTimeout(focusTimer);
+      document.removeEventListener("keydown", onKeyDown);
+      document.body.style.overflow = previousOverflow;
+      previouslyFocused?.focus?.();
+    };
+  }, [open, onClose]);
+
   return (
     <AnimatePresence>
       {open && (
@@ -48,6 +104,7 @@ export function MobileNavDrawer({
             aria-hidden
           />
           <motion.div
+            ref={panelRef}
             className="md:hidden fixed bottom-0 left-0 right-0 z-[70] bg-card rounded-t-3xl border-t border-border/50 p-6 pb-[calc(2.5rem+env(safe-area-inset-bottom))] max-h-[85vh] overflow-y-auto"
             initial={{ y: "100%" }}
             animate={{ y: 0 }}
@@ -61,6 +118,7 @@ export function MobileNavDrawer({
             <div className="flex items-center justify-between mb-4">
               <span className="font-bold text-lg">More</span>
               <Button
+                ref={closeButtonRef}
                 variant="ghost"
                 size="icon"
                 className="rounded-full"
@@ -77,9 +135,9 @@ export function MobileNavDrawer({
                   <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground px-2 mb-2">
                     {section.label}
                   </h2>
-                  <div className="grid grid-cols-3 gap-3">
+                  <div className="grid grid-cols-2 min-[360px]:grid-cols-3 gap-2 sm:gap-3">
                     {section.items.map((item) => {
-                      const isActive = currentPath === item.href;
+                      const isActive = isNavActive(item.href, currentPath);
                       return (
                         <Link
                           key={item.href}

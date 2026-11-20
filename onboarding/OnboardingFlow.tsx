@@ -392,7 +392,7 @@ function ExpertsStep({ scratch, setScratch, phase, onBack, onNext }: ExpertsStep
   return (
     <Card>
       <CardContent className="p-6 space-y-4">
-        <h2 className="text-xl font-bold">Become a verified expert</h2>
+        <h2 className="text-xl font-bold">Apply to the expert directory</h2>
         <p className="text-sm text-muted-foreground">
           If you have professional credentials (ORCID, license, etc.), you can
           apply to be listed in our expert directory and mentor others.

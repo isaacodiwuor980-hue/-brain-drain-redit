@@ -1,0 +1,37 @@
+# P0 safety readiness ledger
+
+Status: **incomplete, not production-ready**. These are staging-only scaffolds; no database migration was applied to staging or production in this session. Existing API behavior is not protected by the new scaffolds until it is migrated and tested end-to-end.
+
+| Area | Evidence / remaining work |
+| --- | --- |
+| Baseline | 195 tests passed, typecheck/build passed, ESLint 0 errors and 2 warnings before P0 changes. |
+| Identity | Firebase token subject is currently passed directly to endpoints, while Supabase ownership uses UUID `auth.users` keys and API service-role access bypasses RLS. Migration 0007 and `requireMappedIdentity` provide one-to-one mapping and fail-closed lookup scaffolding, but are **not wired to endpoints**. Establish verified provisioning, migrate and isolate all relevant endpoints before enabling. Do not infer identity mappings from email. |
+| RLS | Static review: 0001 defines RLS policies but several reads are public; 0002 creates `skills` without enabling RLS, so private/in-review records can be exposed if grants permit direct access; 0003 adds hashes to publicly readable profiles, with potential privacy exposure; 0004 enables RLS on its six tables, including public expert reads; 0005 is an RPC and must be reviewed for definer privileges; 0006 and 0007 restrict their new tables. Effective grants, deployed schema, view/function privileges, service-role routes and real two-user isolation are **not verified**. Audit/fix before production. |
+| Reactions | 0007 adds a service-only transaction and per-user/post advisory lock, with PGlite rollback testing on simplified schema. It is **not wired to the route**. Concurrency with other writers, cross-user count snapshots, existing data, actual grants, and deployed schema need real PostgreSQL staging tests. Existing route still performs non-atomic writes. |
+| Flags | 0007 seeds default-off server records and `requireServerFeature` fails closed, with mocked tests. Neither is wired into routes or the existing client-only experimental feed. Client flag is advisory; do not treat it as authorization or a server kill switch. |
+| Export/delete | Not implemented. Data spans Supabase, Firebase/Firestore and browser IndexedDB; partial exports must not be presented as complete. Account deletion must remain dry-run-only until identity, ownership, retention and backup procedures are established. |
+| Content security | Existing Node server sends a restrictive CSP without unsafe-inline scripts, but deployment paths, third-party services and browser behavior were not verified. Story HTML is displayed as React-escaped text; a rendering test checks a script payload. This is not a full browser CSP test. |
+| Product claims | Three visible labels were softened; this is not a complete product-wide claim audit. |
+| Release gates | Final local suite 203/203, typecheck/build passed, ESLint 0 errors/2 pre-existing warnings, `git diff --check` passed. PGlite is not a substitute for actual Supabase RLS/grants or concurrency tests. No real staging, production or Android device validation performed. |
+
+Before any database operation: verify backups, assess existing deployed migrations and privileges, use a controlled isolated staging environment, test rollback and secure identity provisioning, and obtain authorization. The rollback in 0007 drops data and itself requires backup and explicit authorization.
+
+## Focused follow-up
+
+- No reaction RPC shadow was activated: `toggle_post_reaction_atomic` **writes** and would apply a second toggle to the same account/post. A safe shadow must be read-only or run in an isolated rollback/snapshot; comparisons must use the pre-write state and account for concurrent changes. It is not equivalent to calling the existing RPC. Seven-day divergence and 100% active staging identity coverage remain future release criteria, not achieved results.
+- The existing opt-in experimental feed runs in the client on already-fetched posts. There is no TSRG-specific server feed or stake endpoint to gate, and the server flag middleware is still unwired; it is not a kill switch. A genuinely server-enforced ranking requires architecture and offline behavior decisions. Ordinary reactions and chronological/following feeds were not changed. Mock HTTP tests cover one ordinary upvote and degraded feed, not real database or end-to-end behavior.
+- Claims search covered TSX UI text, API response strings and the data-quality SSR template. This follow-up qualified the public data-quality page's metadata, operational, provenance, score, licensing, endpoint status and accuracy claims. The existing `/api/v1/datasets` metadata still contains unsupported claims (including verification, licensing and raw PII); it was not altered because the session excludes corpus/API work. It is a release blocker, not a verified dataset or licensing service. Search terms alone cannot establish a complete claims audit.
+
+
+## Desired-state reaction and metadata follow-up
+
+- `0008` adds a separate service-only `set_post_reaction_atomic` desired-state setter, leaving the existing toggle RPC and user-facing route unchanged. Its PGlite tests use simplified tables. A stale delayed setter can overwrite a newer action, and ordinary toggle-off is not represented; it is not suitable for live shadow writes. No migration was deployed.
+- `GET /api/me` is a new authenticated read-only endpoint using the existing mapping lookup. It returns the mapped UUID only on success, 401 for unmapped identity and 503 on lookup errors. It does not integrate mapping into existing endpoints. HTTP tests mock auth and database.
+- `/api/v1/datasets` metadata now marks all categories and licensing unavailable and replaces unsupported verification, provenance, confidence, licensing, pricing, trial, access, privacy and availability claims with non-assertive descriptions. This is a metadata correction, not a corpus implementation. The separate `/api/v1/search` placeholder contract was not altered.
+
+## Read-only preview and online-client status follow-up
+
+- Migration `0009_reaction_preview.sql` adds a service-role-only, stable read-only preview of the `0008` desired-state setter, not the ordinary toggle route. It is unwired and was not applied outside isolated PGlite. The current reaction schema has no tier or updated-at field: tier transitions and a reliable concurrency token are not implemented (the response explicitly gives a null token). A snapshot is not a lock; this cannot establish safe live shadow comparisons.
+- `/api/tsrg/status` reads the existing `experimental_tsrg_feed` flag from `0007` (not the similarly named, unseeded `tsrg_experimental_feed`); missing configuration, row or DB failure yields false. The opt-in browser feed polls it, defaults to chronological while awaiting a response or after failure/timeout, and resets on offline events. Default and Following paths do not request the status.
+- This is a **soft kill switch for cooperating online clients only**, not an absolute control: older app versions and offline clients can still use local ranking. Polling, suspended tabs, networks and intermediary behavior limit propagation. It is not an authorization boundary. Previous ledger statements that no online check exists describe the earlier state, not the current code.
+- Tested in isolated PGlite, mocked HTTP and happy-dom only. No production/staging verification, deployment, identity provisioning or concurrency tests performed.

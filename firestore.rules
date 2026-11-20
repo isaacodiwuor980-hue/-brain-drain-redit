@@ -69,20 +69,31 @@ service cloud.firestore {
     match /realtime_sessions/{sessionId} {
       allow read: if request.auth != null;
       allow create: if request.auth != null && request.resource.data.hostUserId == request.auth.uid;
-      allow update: if request.auth != null && (
-        request.auth.uid == resource.data.hostUserId || 
-        request.auth.uid in resource.data.participants
-      );
+      // No Firestore-backed collaboration client exists in this repository.
+      // Until a field-level collaboration protocol is defined and tested,
+      // participants must not be able to replace the entire session or host.
+      allow update: if isOwner(resource.data.hostUserId) &&
+                       request.resource.data.hostUserId == resource.data.hostUserId;
     }
     
     // Boards & Pins
     match /boards/{boardId} {
-      allow read: if isSignedIn();
-      allow create, update, delete: if isOwner(request.resource.data.ownerId);
+      allow read: if isOwner(resource.data.ownerId);
+      allow create: if isOwner(request.resource.data.ownerId);
+      // Check the existing owner, not just the proposed owner; otherwise an
+      // attacker can replace ownerId with their own and take over the board.
+      allow update: if isOwner(resource.data.ownerId) &&
+                       request.resource.data.ownerId == resource.data.ownerId;
+      allow delete: if isOwner(resource.data.ownerId);
     }
     match /pins/{pinId} {
-      allow read: if isSignedIn();
-      allow create, update, delete: if isSignedIn();
+      allow read: if isOwner(resource.data.ownerId);
+      allow create: if isOwner(request.resource.data.ownerId) &&
+                       get(/databases/$(database)/documents/boards/$(request.resource.data.boardId)).data.ownerId == request.auth.uid;
+      allow update: if isOwner(resource.data.ownerId) &&
+                       request.resource.data.ownerId == resource.data.ownerId &&
+                       request.resource.data.boardId == resource.data.boardId;
+      allow delete: if isOwner(resource.data.ownerId);
     }
   }
 }

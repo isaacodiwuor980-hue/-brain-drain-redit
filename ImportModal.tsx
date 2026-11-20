@@ -73,6 +73,10 @@ export function ImportModal({ isOpen, onClose, onImport }: ImportModalProps) {
 
   const handleImport = async () => {
     if (!parsedData || selectedIds.size === 0) return;
+    // DOUBLE-CLICK GUARD: disabled={isImporting} only takes effect on the next
+    // render, so two clicks in the same tick both ran the import (duplicate
+    // brains in the library). The state check is synchronous and authoritative.
+    if (isImporting) return;
     setIsImporting(true);
     
     try {

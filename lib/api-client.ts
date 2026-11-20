@@ -25,6 +25,38 @@ export interface RequestOptions extends Omit<RequestInit, "signal"> {
   signal?: AbortSignal;
   /** JSON body — serialized automatically. */
   json?: unknown;
+  /**
+   * On a 401, force-refresh the Firebase ID token once and retry. This is
+   * what keeps long-lived sessions alive: an expired token used to fail the
+   * write permanently (the user saw "could not save" and the queued offline
+   * action was retried with the SAME dead token forever).
+   */
+  refreshAuthOn401?: boolean;
+  /** Coalesce concurrent identical GETs into one network request. */
+  dedupe?: boolean;
+}
+
+/**
+ * Exponential backoff with FULL JITTER.
+ *
+ * Why full jitter: after an outage every client retries on the same
+ * schedule (200ms, 400ms, 800ms…), which re-creates the exact thundering
+ * herd that caused the outage. Spreading each retry uniformly across
+ * [0, cap] de-synchronises the fleet — the standard AWS "full jitter"
+ * recipe. Exported so the policy is unit-tested rather than assumed.
+ */
+export function computeBackoffMs(attempt: number, capMs = 8_000, baseMs = 250): number {
+  const exponential = Math.min(capMs, baseMs * 2 ** Math.max(0, attempt));
+  // random() in [0,1) → [0, exponential]
+  return Math.round(Math.random() * exponential);
+}
+
+/** True when a failed attempt is worth repeating. */
+export function isRetryableStatus(status: number): boolean {
+  // 429 = rate limited, 408 = timeout, 5xx = server/upstream. Never retry
+  // other 4xx: they are deterministic (bad input) and retrying just burns
+  // battery and rate-limit budget.
+  return status === 408 || status === 429 || status >= 500;
 }
 
 interface ApiClient {
@@ -55,11 +87,28 @@ async function parseResponseBody(response: Response): Promise<unknown> {
   return response.text().catch(() => "");
 }
 
-function shouldRetry(response: Response | null, attempt: number, retries: number): boolean {
+function shouldRetry(
+  response: Response | null,
+  attempt: number,
+  retries: number,
+  isOnline: boolean,
+): boolean {
   if (attempt >= retries) return false;
-  if (!response) return true; // network error
-  // Retry on rate limiting and server errors only.
-  return response.status === 429 || response.status >= 500;
+  // Offline: a retry can only succeed if the network came back. Allow one
+  // attempt to re-check connectivity rather than hammering a dead link.
+  if (!response) return isOnline || attempt === 0;
+  return isRetryableStatus(response.status);
+}
+
+/** In-flight GET coalescing (identical URL+method share one request). */
+const inflightGets = new Map<string, Promise<unknown>>();
+
+function isOffline(): boolean {
+  try {
+    return typeof navigator !== "undefined" && navigator.onLine === false;
+  } catch {
+    return false;
+  }
 }
 
 function createClient(): ApiClient {
@@ -71,10 +120,29 @@ function createClient(): ApiClient {
       json,
       headers,
       body,
+      refreshAuthOn401 = false,
+      dedupe = false,
       ...init
     } = options;
 
     const url = buildUrl(path);
+    const method = (init.method || "GET").toUpperCase();
+    const dedupeKey = `${method} ${url}`;
+
+    // Requests with explicit headers may represent different users or content
+    // negotiation. Never share their responses based only on URL.
+    if (dedupe && method === "GET" && !externalSignal && !headers && !init.credentials) {
+      const existing = inflightGets.get(dedupeKey);
+      if (existing) return existing as Promise<T>;
+      const promise = request<T>(path, { ...options, dedupe: false });
+      inflightGets.set(dedupeKey, promise);
+      try {
+        return await promise;
+      } finally {
+        inflightGets.delete(dedupeKey);
+      }
+    }
+
     const controller = new AbortController();
     const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
 
@@ -100,6 +168,7 @@ function createClient(): ApiClient {
         try {
           response = await fetch(url, {
             ...init,
+            method,
             headers: finalHeaders,
             body: finalBody,
             signal: controller.signal,
@@ -110,7 +179,26 @@ function createClient(): ApiClient {
             return (await parseResponseBody(response)) as T;
           }
 
-          if (!shouldRetry(response, attempt, retries)) {
+          // EXPIRED TOKEN RECOVERY: refresh the Firebase ID token once and
+          // retry immediately. Without this, a session that outlived its
+          // 1-hour token failed every write with 401 until a page reload.
+          if (response.status === 401 && refreshAuthOn401 && !finalHeaders.has("x-token-refreshed")) {
+            try {
+              const { auth } = await import("./firebase-auth");
+              const user = auth.currentUser;
+              const fresh = user ? await user.getIdToken(true) : null;
+              if (fresh) {
+                finalHeaders.set("Authorization", `Bearer ${fresh}`);
+                finalHeaders.set("x-token-refreshed", "1");
+                continue; // same attempt, one extra round trip
+              }
+            } catch {
+              // Refresh failed (offline / revoked) — fall through to the
+              // normal error path so callers can queue for later.
+            }
+          }
+
+          if (!shouldRetry(response, attempt, retries, !isOffline())) {
             const parsed = await parseResponseBody(response);
             const message =
               (parsed as { error?: string } | null)?.error ||
@@ -118,19 +206,20 @@ function createClient(): ApiClient {
             throw new ApiError(message, response.status, parsed);
           }
 
-          // Honor Retry-After when present, otherwise exponential backoff.
+          // Honor Retry-After when present, otherwise jittered backoff.
           const retryAfter = Number(response.headers.get("retry-after"));
           const backoff = Number.isFinite(retryAfter) && retryAfter > 0
             ? retryAfter * 1000
-            : Math.min(200 * 2 ** attempt, 2000);
+            : computeBackoffMs(attempt);
           await delay(backoff);
         } catch (error) {
           lastError = error;
           if (controller.signal.aborted) {
             throw new ApiError("Request timed out or was aborted", 0);
           }
-          if (!shouldRetry(null, attempt, retries)) throw error;
-          await delay(Math.min(200 * 2 ** attempt, 2000));
+          if (error instanceof ApiError) throw error;
+          if (!shouldRetry(null, attempt, retries, !isOffline())) throw error;
+          await delay(computeBackoffMs(attempt));
         }
       }
 
@@ -149,7 +238,7 @@ function createClient(): ApiClient {
 
   return {
     get<T>(path: string, options?: RequestOptions) {
-      return request<T>(path, { ...options, method: "GET" });
+      return request<T>(path, { dedupe: true, ...options, method: "GET" });
     },
     post<T>(path: string, body?: unknown, options?: RequestOptions) {
       return request<T>(path, { ...options, method: "POST", json: body });

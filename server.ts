@@ -147,7 +147,35 @@ ${urls.map((u) => `  <url>\n    <loc>${origin}${u.loc}</loc>\n    <lastmod>${u.l
     // dotfiles: "allow" — required so /.well-known/assetlinks.json is served
     // (Express defaults to "ignore" for dotfiles, which would 404 and fall
     // through to the SPA catch-all, breaking TWA verification).
-    app.use(express.static(distPath, { maxAge: "1y", immutable: true, index: false, dotfiles: "allow" }));
+    //
+    // BUG #2 FIX — `immutable, max-age=1y` was applied to EVERYTHING under
+    // dist/, including un-hashed files copied verbatim from public/
+    // (manifest.webmanifest, favicon.svg, icon-*.png, sw-killer.js,
+    // crypto-polyfill.js, robots.txt). Those names are stable across deploys,
+    // so browsers/CDNs would serve a year-old manifest, a stale icon, or — far
+    // worse — an OLD sw-killer.js that no longer unregisters a stale service
+    // worker. Only Vite's content-hashed output (assets/<name>-<hash>.js) is
+    // safe to pin forever; everything else must revalidate.
+    app.use(
+      express.static(distPath, {
+        index: false,
+        dotfiles: "allow",
+        setHeaders(res, filePath) {
+          const relative = path.relative(distPath, filePath).split(path.sep).join("/");
+          const isHashedAsset =
+            relative.startsWith("assets/") && /-[A-Za-z0-9_-]{8,}\.(?:js|css|woff2?|png|svg|jpg|jpeg|webp|avif)$/.test(relative);
+          if (isHashedAsset) {
+            res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+          } else if (relative.endsWith(".html")) {
+            res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+          } else {
+            // Stable filenames: let the browser keep a copy but always
+            // revalidate, so a deploy is picked up on the next load.
+            res.setHeader("Cache-Control", "public, max-age=0, must-revalidate");
+          }
+        },
+      }),
+    );
     // HTML must never be cached (fresh preview)
     app.get("/", (_req, res) => {
       res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");

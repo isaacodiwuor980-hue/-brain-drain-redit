@@ -147,6 +147,19 @@ gunzip -c backups/backup-20251008-030000.sql.gz | psql "$SUPABASE_DB_URL"
 
 ---
 
+## Atomic brain-save rollout (migration 0005)
+
+The API now requires `public.save_brain_atomic` from `supabase/migrations/0005_atomic_brain_save.sql`. **Apply the reviewed migration before deploying this API build**; without it, cloud brain saves fail closed with a 502. Local saves are a separate path.
+
+1. Back up the database and verify a restore procedure. Check that the deployed schema matches the migration and that Firebase subjects map to Supabase `auth.users` UUIDs; this migration does not create that mapping.
+2. In an isolated staging project, apply the migration and exercise valid saves, malformed references, two users with colliding brain/node IDs, simultaneous updates, and failure rollback. Confirm that `anon` and `authenticated` cannot execute the function and that the API's service role can.
+3. After review, deploy the migration, then the API. Monitor 4xx/5xx responses and verify a disposable authenticated save and read.
+4. Roll back the API first. Only after no API instances call the function, remove it with `DROP FUNCTION public.save_brain_atomic(uuid, jsonb, jsonb);` if required. Rolling back restores the previous non-atomic write behavior, so restrict untrusted writes until a safe replacement is available.
+
+The repository's PGlite tests are useful regression checks but do not replace staged multi-session/PostgREST and identity integration testing. No database migration was applied by the agent.
+
+---
+
 ## Contact
 
 - **Repo:** [GitHub URL]

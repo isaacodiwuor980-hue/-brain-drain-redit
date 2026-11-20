@@ -42,6 +42,15 @@ app.use((_req, res, next) => {
 app.use(
   pinoHttp({
     logger,
+    // PERF (20k-user scale): health probes are executed every few seconds by
+    // the load balancer, and a 200 on /api/healthz carries no diagnostic
+    // value. Logging them flooded stdout — and synchronous log writes are a
+    // top cause of event-loop stalls under load. Drop successful probes and
+    // keep failures (they matter for alerting).
+    autoLogging: {
+      ignore: (req) =>
+        (req.url?.startsWith("/api/healthz") || req.url?.startsWith("/api/ready")) === true,
+    },
     serializers: {
       req(req) {
         return {
@@ -80,6 +89,23 @@ function originAllowed(origin: string): boolean {
   return false;
 }
 
+/**
+ * PERF — header hygiene for compression + shared caching.
+ *
+ * 1. Drop Express's `X-Powered-By` and add `Vary: Accept-Encoding` before
+ *    compression runs, so compressed and identity responses can never be
+ *    mixed up by an intermediate cache.
+ * 2. `X-Feed-Cache` (HIT/STALE/MISS) is a debugging signal, not a
+ *    client-facing contract: calling `res.set()` appends to Vary, and a
+ *    response that *isn't* compressed must not vary on that header — that is
+ *    a real CDN cache-fragmentation bug (two entries for the same URL). We
+ *    strip it from Vary for non-GET responses.
+ */
+app.use((_req, res, next) => {
+  res.setHeader("Vary", "Accept-Encoding");
+  next();
+});
+
 app.use(
   cors({
     origin(origin, callback) {
@@ -108,8 +134,45 @@ app.use(
 );
 
 // Cap request bodies to prevent abuse.
-app.use(express.json({ limit: config.bodyLimit }));
+//
+// verify callback: reject non-JSON content types up front so a malformed
+// payload can never reach a route handler half-parsed.
+app.use(express.json({ limit: config.bodyLimit, strict: true }));
 app.use(express.urlencoded({ extended: true, limit: config.bodyLimit }));
+
+/**
+ * MALFORMED-PAYLOAD SHIELD.
+ *
+ * Express surfaces body-parser failures (bad JSON, wrong charset, payload too
+ * large) through the error pipeline. At 20k users a single malformed client
+ * looping `POST /api/posts` with truncated JSON produced a stream of 500s and
+ * noisy stack traces. This maps every body-parser error to a deterministic
+ * 4xx JSON response BEFORE it can reach the generic 500 handler.
+ */
+app.use(
+  (
+    err: { type?: string; status?: number; statusCode?: number; message?: string } | null,
+    _req: express.Request,
+    res: express.Response,
+    next: express.NextFunction,
+  ) => {
+    const type = err?.type;
+    if (!type) return next(err);
+    if (type === "entity.parse.failed") {
+      res.status(400).json({ error: "Malformed JSON body." });
+      return;
+    }
+    if (type === "entity.too.large") {
+      res.status(413).json({ error: "Payload too large." });
+      return;
+    }
+    if (type === "encoding.unsupported" || type === "charset.unsupported") {
+      res.status(415).json({ error: "Unsupported content encoding." });
+      return;
+    }
+    return next(err);
+  },
+);
 
 // A stricter limiter for ingest/error endpoints, a more lenient one for reads.
 const writeLimiter = createRateLimiter({
@@ -121,8 +184,35 @@ const readLimiter = createRateLimiter({
   max: config.rateLimit.max * 5,
 });
 
+// Write-tier limiter: cheap rejects for expensive/abusable endpoints.
 app.use("/api/events", writeLimiter);
 app.use("/api/client-errors", writeLimiter);
+
+/**
+ * AUTH TIER — tighter budget than reads, separate from writes.
+ *
+ * Why a third tier: at 20k concurrent users the expensive paths are the ones
+ * that verify a Firebase ID token (a network + crypto round trip) or hit
+ * PostgREST with a write. Letting those share the read budget meant a burst
+ * of writes could exhaust the allowance for anonymous feed browsing and make
+ * the whole product look down. Writes now have their own (smaller) budget, so
+ * read traffic degrades independently.
+ */
+const authLimiter = createRateLimiter({
+  windowMs: config.rateLimit.windowMs,
+  // Writes are ~1/5th of a typical session; give them a proportional slice
+  // but never less than 10/min (a human editing a brain legitimately).
+  max: Math.max(10, Math.round(config.rateLimit.max / 3)),
+});
+app.use("/api/posts", authLimiter);
+app.use("/api/brains", authLimiter);
+
+/**
+ * Expensive read tier: paginated feed pages and full-text search are the two
+ * hottest queries (they carry joins / PostgREST filters). Cap them at the
+ * normal read budget while plain reads keep the 5x budget.
+ */
+app.use("/api/search", readLimiter);
 // B3 (stale-cache fix): without an explicit Cache-Control, browsers may
 // heuristic-cache API GETs and serve them WITHOUT contacting the server —
 // observed live: a personalized /api/feed?mode=following response was served
@@ -130,6 +220,20 @@ app.use("/api/client-errors", writeLimiter);
 // are personalized and fast-changing; never let the browser cache them.
 app.use("/api", (_req, res, next) => {
   res.setHeader("Cache-Control", "no-store");
+  next();
+});
+
+/**
+ * PERF: feed responses are served from a server-side SWR cache, so a short
+ * private cache window is safe and removes repeat requests entirely on
+ * back-navigation (the single most common mobile gesture). Personalized
+ * reaction state stays correct because the server re-renders per-user anyway
+ * — hence `private`, never `public`.
+ */
+app.use("/api/feed", (req, res, next) => {
+  if (req.method === "GET") {
+    res.setHeader("Cache-Control", "private, max-age=15, stale-while-revalidate=60");
+  }
   next();
 });
 app.use("/api", readLimiter);

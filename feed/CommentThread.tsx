@@ -484,7 +484,7 @@ export function CommentThread({
         <div className="mb-4 p-4 rounded-xl border-2 border-amber-500/30 bg-gradient-to-br from-amber-500/5 to-amber-500/2">
           <div className="flex items-center gap-2 mb-3">
             <span className="text-amber-500 text-lg">🔒</span>
-            <h3 className="text-sm font-bold text-amber-600 dark:text-amber-400 tracking-wide uppercase">Verified Community Wiki</h3>
+            <h3 className="text-sm font-bold text-amber-600 dark:text-amber-400 tracking-wide uppercase">Community Wiki</h3>
             <span className="text-[11px] text-muted-foreground">Consensus Summary Block · {fossilized.length} entries</span>
           </div>
           <div className="space-y-2">
@@ -492,7 +492,7 @@ export function CommentThread({
               return (
                 <div key={c.id} className="hive-fossilized p-3 rounded-lg">
                   <div className="flex items-center gap-2 mb-1">
-                    <span className="text-[11px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">Verified</span>
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">Community highlight</span>
                     <span className="text-[11px] text-muted-foreground">· {c.authorName}</span>
                     {(c.sourceLinks ?? 0) > 0 && (
                       <span className="text-[11px] text-blue-500 font-semibold inline-flex items-center gap-0.5"><LinkIcon className="w-2.5 h-2.5" />{c.sourceLinks}</span>

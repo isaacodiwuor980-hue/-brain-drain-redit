@@ -57,6 +57,7 @@ export const env = {
     analytics: readBoolean("VITE_ENABLE_ANALYTICS", true),
     notifications: readBoolean("VITE_ENABLE_NOTIFICATIONS", true),
     social: readBoolean("VITE_ENABLE_SOCIAL_FEATURES", true),
+    experimentalTsrgFeed: readBoolean("VITE_EXPERIMENTAL_TSRG_FEED", false),
   },
   performance: {
     cacheDurationMs: readNumber("VITE_CACHE_DURATION", 300_000),

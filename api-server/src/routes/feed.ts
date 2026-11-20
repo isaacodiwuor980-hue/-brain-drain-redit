@@ -213,7 +213,9 @@ router.get("/feed", optionalAuth, async (req, res) => {
             : undefined,
       };
     });
-    res.set("X-Feed-Cache", header);
+    // res.header (not res.set) so the value does not get appended to Vary,
+    // which caused cache fragmentation for compressed responses.
+    res.header("X-Feed-Cache", header);
     res.json({
       posts,
       hasMore: entry.hasMore,
@@ -270,7 +272,7 @@ router.get("/feed", optionalAuth, async (req, res) => {
       };
     });
 
-    res.set("X-Feed-Cache", "MISS");
+    res.header("X-Feed-Cache", "MISS");
     res.json({
       posts,
       hasMore: fresh.hasMore,

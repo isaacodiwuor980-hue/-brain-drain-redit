@@ -22,60 +22,61 @@ const router: IRouter = Router();
 // ── /api/v1/datasets ─────────────────────────────────────────────
 
 router.get("/v1/datasets", (_req, res) => {
-  // The datasets endpoint describes WHAT data is available, not the
-  // data itself. AI labs use this to decide whether to license.
-  // When the server-side store lands, these counts will be real.
+  // Existing metadata endpoint; it is not a dataset or corpus access API.
+  // Metadata describes ideas only, not datasets for sale or live metrics.
   res.json({
     platform: "Brain Drain",
-    description: "Human-verified knowledge with provenance chains, confidence scores, and per-record licensing.",
+    status: "not yet available",
+    description: "Conceptual dataset categories only; availability, verification, provenance and licensing are not established.",
     datasets: [
       {
         id: "drain-entries",
-        name: "Drained expert brains",
-        description: "Lifelong timeline of expert techniques, secrets, and mentorship lessons. Each entry has a SHA-256 provenance chain and a legacy/will status.",
-        recordCount: "dynamic",
-        license: "per-record (CC0 / CC-BY / CC-BY-SA / CC-BY-NC / proprietary)",
+        name: "Expert knowledge entries (concept)",
+        status: "not yet available",
+        description: "Proposed collection of knowledge entries; coverage and provenance have not been established.",
+        recordCount: "not available",
+        license: "not established",
         quality: {
-          provenance: "SHA-256 chained hashes, per-record linked list",
-          verification: "3 tiers (anonymous / identity / credential)",
-          confidence: "0-100 score, transparent formula",
-          disputes: "public moderation log, 5-state workflow",
+          provenance: "not established",
+          verification: "not established",
+          confidence: "not established",
+          disputes: "not established",
         },
-        access: "API key required for bulk access. Single-record access via /verify/record/:id.",
+        access: "Dataset access is not available.",
       },
       {
         id: "qa-answers",
-        name: "Q&A answers with confidence scores",
-        description: "Every answer has a 0-100 confidence score computed from confirmations, citations, contributor reputation, disputes, and provenance integrity.",
-        recordCount: "dynamic",
-        license: "per-record",
+        name: "Q&A answers (concept)",
+        status: "not yet available",
+        description: "Proposed collection of answers; scores and provenance are not established for every answer.",
+        recordCount: "not available",
+        license: "not established",
         quality: {
-          provenance: "SHA-256 chained hashes",
-          confidence: "transparent 5-component formula (confirmations 40 + citations 20 + reputation 20 + disputes -30 + provenance 5)",
-          ranking: "gravity formula: (UserTopicScore * 12 + NetVotes * 2 + SourceLinks * 25) / ((DaysOld + 1) ^ 0.55)",
+          provenance: "not established",
+          confidence: "not established",
+          ranking: "not established",
         },
-        access: "API key required. Search via /api/v1/search?q=...",
+        access: "Dataset access is not available.",
       },
       {
         id: "verification-records",
-        name: "Contributor verification records",
-        description: "Public verification status for every contributor — tier, credentials, proof history. PII is hashed (SHA-256), never stored raw.",
-        recordCount: "dynamic",
-        license: "public (no license required for verification status)",
+        name: "Contributor verification records (concept)",
+        status: "not yet available",
+        description: "A public verification dataset and its privacy protections have not been established.",
+        recordCount: "not available",
+        license: "not established",
         quality: {
-          tiers: "anonymous / identity / credential",
-          sybilResistance: "proof-hash deduplication detects same-human-multiple-accounts",
+          tiers: "not established",
+          sybilResistance: "not established",
         },
-        // B-13 fix: removed reference to /api/v1/verify/:userId (501 stub).
-        // Verification status will be queryable here once the verify route
-        // is implemented; until then, the dataset description is the contract.
-        access: "Public via this API (endpoint pending implementation).",
+        access: "Dataset access is not available.",
       },
     ],
     licensing: {
-      portal: "Contact licensing@braindrain.app for API keys",
-      pricing: "Per-dataset, based on record count + license terms",
-      trial: "Free tier: 100 API calls/day for evaluation",
+      status: "not yet available",
+      portal: "not established",
+      pricing: "not established",
+      trial: "not established",
     },
     generatedAt: new Date().toISOString(),
   });

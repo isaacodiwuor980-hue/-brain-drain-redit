@@ -65,6 +65,38 @@ export function Dashboard() {
     return () => window.removeEventListener("bd:open-brain-wizard", openWizardFromMenu);
   }, []);
 
+  /**
+   * BUG FIX (404-ish dead end): RuntimeEngine's "Open in editor" button sent
+   * the user to `/library?brainId=<id>`, but nothing in the library read that
+   * param — the click landed on the generic Brains grid with the brain
+   * nowhere in sight, looking like a broken link. Open that brain's drawer
+   * (or launch it if the brain has no nodes to edit) once data is loaded.
+   */
+  useEffect(() => {
+    if (brains.length === 0) return;
+    let targetId: string | null = null;
+    try {
+      targetId = new URLSearchParams(window.location.search).get("brainId");
+    } catch {
+      targetId = null;
+    }
+    if (!targetId) return;
+    const match = brains.find((b) => b.id === targetId);
+    // Consume the param either way so a stale id can't re-open later.
+    window.history.replaceState({}, "", window.location.pathname);
+    if (match) {
+      setSelectedBrain(match);
+      setIsDrawerOpen(true);
+    } else {
+      toast({
+        title: "Brain not found",
+        description: "That brain isn't in your library on this device anymore.",
+        variant: "destructive",
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- one-shot deep-link consumption keyed on brains arriving; including toast would re-run on identity churn.
+  }, [brains]);
+
   const filteredBrains = brains.filter(b => 
     (b.title || "").toLowerCase().includes((searchQuery || "").toLowerCase()) || 
     (b.category || "").toLowerCase().includes((searchQuery || "").toLowerCase())

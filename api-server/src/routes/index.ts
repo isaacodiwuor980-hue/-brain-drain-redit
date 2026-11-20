@@ -17,10 +17,14 @@ import personalityRouter from "./personality";
 import expertsRouter from "./experts";
 import mentorsRouter from "./mentors";
 import recallRouter from "./recall";
+import meRouter from "./me";
+import tsrgStatusRouter from "./tsrg-status";
 
 const router: IRouter = Router();
 
 router.use(healthRouter);
+router.use(meRouter);
+router.use(tsrgStatusRouter);
 router.use(eventsRouter);
 // Phase 3: intelligence router removed (uncalled /intelligence/summary endpoint).
 // The analytics-store helpers it used are still available for internal callers.

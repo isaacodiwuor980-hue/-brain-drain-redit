@@ -7,7 +7,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { trackEvent } from "@/lib/analytics";
 import { idb } from "@/lib/db";
 import { Brain, Topic, Post, getPostUpvoteCount } from "@/lib/types";
-import { useLocation } from "wouter";
+import { useLocation, useSearch } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { RuntimeEngine } from "@/components/RuntimeEngine";
@@ -15,6 +15,7 @@ import { BrainDrawer } from "@/components/BrainDrawer";
 import { useSkills } from "@/hooks/use-skills";
 import { useUserSearch, useFollowUser } from "@/hooks/use-discover";
 import { safeStorage } from "@/lib/safe-storage";
+import { useDatabase } from "@/hooks/use-database";
 
 export function SearchPage() {
   // Lazy init from URL `q` param + persisted recent searches — both are
@@ -42,7 +43,27 @@ export function SearchPage() {
   const [activeTab, setActiveTab] = useState("all");
   const inputRef = useRef<HTMLInputElement>(null);
   const [, setLocation] = useLocation();
+  const search = useSearch();
   const { toast } = useToast();
+  const { deleteBrain: deleteStoredBrain } = useDatabase();
+
+  /**
+   * BUG FIX (dead query param): /profile?userId=<id> was accepted by the
+   * router but ProfilePage only ever reads the CURRENT user from auth — the
+   * "Active Contributors" rail linked to it and every click landed on your
+   * own profile. Those links now point here with a `q` param, so the search
+   * box must follow wouter location changes: wouter does not remount a page
+   * for a search-only change, so a mount-time initializer alone would leave
+   * a stale query when the user clicks a second contributor.
+   */
+  useEffect(() => {
+    try {
+      const q = new URLSearchParams(search).get("q");
+      if (q !== null) setQuery(q);
+    } catch {
+      /* malformed URL — keep the current query */
+    }
+  }, [search]);
 
   // Search Results State
   const [brains, setBrains] = useState<Brain[]>([]);
@@ -134,9 +155,9 @@ export function SearchPage() {
   };
 
   const deleteBrain = async (brainId: string) => {
-    await idb.delete("brains", brainId);
+    const result = await deleteStoredBrain(brainId);
     setBrains(prev => prev.filter(b => b.id !== brainId));
-    setIsDrawerOpen(false);
+    return result;
   };
 
   // Filtered collections

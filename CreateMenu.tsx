@@ -34,9 +34,10 @@ interface CreateMenuProps {
    * "compact": icon-only square button (mobile bottom bar slot).
    */
   variant?: "sidebar" | "compact";
+  placement?: "top" | "bottom";
 }
 
-export function CreateMenu({ variant = "sidebar" }: CreateMenuProps) {
+export function CreateMenu({ variant = "sidebar", placement = "top" }: CreateMenuProps) {
   const [, setLocation] = useLocation();
 
   /**
@@ -68,14 +69,14 @@ export function CreateMenu({ variant = "sidebar" }: CreateMenuProps) {
         ) : (
           <Button
             size="icon"
-            className="w-10 h-10 rounded-full shadow-sm"
+            className="w-11 h-11 rounded-full shadow-sm"
             aria-label="Create"
           >
             <Plus className="w-5 h-5 stroke-[2.5]" aria-hidden />
           </Button>
         )}
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" side="top" className="w-56">
+      <DropdownMenuContent align={placement === "bottom" ? "end" : "start"} side={placement} className="w-56">
         <DropdownMenuLabel className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
           Create
         </DropdownMenuLabel>

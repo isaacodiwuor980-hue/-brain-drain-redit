@@ -43,6 +43,8 @@ export type AnalyticsEventType =
   | "live_session_started"
   | "live_session_joined"
   | "live_session_mic_granted"
+  | "reasoning_view_changed"
+  | "brain_forked"
   | "brain_branch_proposed"
   | "brain_branch_merged"
   | "vote_reward";

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Brain, Node } from "@/lib/types";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
@@ -6,9 +6,12 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Network, Play, Link2, Activity, GitCommit, Target, MessageSquare, GitBranch, GitPullRequest, GitMerge, FileArchive, BrainCircuit, Star, ChevronDown, Plus, Tag as TagIcon, Code, Download, Laptop, MoreHorizontal, Settings } from "lucide-react";
 import { idb } from "@/lib/db";
+import { loadBrainData } from "@/lib/load-brain-data";
+import type { BrainDeletionResult } from "@/lib/delete-brain";
 import { triggerHaptic } from "@/lib/device";
 import { trackEvent } from "@/lib/analytics";
 import { format } from "date-fns";
+import { buildShareUrl, SHARE_URL_WARN_LENGTH } from "@/lib/share-link";
 import { useToast } from "@/hooks/use-toast";
 import { useBrainRepo } from "@/hooks/use-brain-repo";
 import { BrainChatRuntime } from "./runtime/BrainChatRuntime";
@@ -28,7 +31,7 @@ interface BrainDrawerProps {
   isOpen: boolean;
   onClose: () => void;
   onLaunch: (brain: Brain) => void;
-  onDelete: (brainId: string) => void;
+  onDelete: (brainId: string) => Promise<BrainDeletionResult>;
   onExport: (brain: Brain) => void;
   onFork?: (brain: Brain) => void;
   onUpdated?: () => void;
@@ -36,6 +39,9 @@ interface BrainDrawerProps {
 
 export function BrainDrawer({ brain, isOpen, onClose, onLaunch, onDelete, onExport, onUpdated }: BrainDrawerProps) {
   const [nodes, setNodes] = useState<Node[]>([]);
+  const deleteInProgress = useRef(false);
+  const [loadState, setLoadState] = useState<{ id: string; error?: string } | null>(null);
+  const [loadAttempt, setLoadAttempt] = useState(0);
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [isBranchManagerOpen, setIsBranchManagerOpen] = useState(false);
   const [isStarred, setIsStarred] = useState(false);
@@ -57,31 +63,65 @@ export function BrainDrawer({ brain, isOpen, onClose, onLaunch, onDelete, onExpo
   const { branches, versions, pullRequests, activeBranch, createBranch, switchBranch, deleteBranch, createTag } = useBrainRepo(brain?.id || "");
 
   useEffect(() => {
-    if (brain && isOpen) {
-      idb.getAllByIndex<Node>("nodes", "brain_id", brain.id).then(setNodes);
-    }
-  }, [brain, isOpen]);
+    if (!brain || !isOpen) return;
+    let cancelled = false;
+    loadBrainData(brain.id).then((data) => {
+      if (cancelled) return;
+      if (!data) throw new Error("Brain data is unavailable on this device.");
+      setNodes(data.nodes);
+      setLoadState({ id: brain.id });
+    }).catch((error: unknown) => {
+      if (!cancelled) setLoadState({ id: brain.id, error: error instanceof Error ? error.message : "Could not load brain data." });
+    });
+    return () => { cancelled = true; };
+  }, [brain, isOpen, loadAttempt]);
 
   if (!brain) return null;
+  const dataReady = loadState?.id === brain.id && !loadState.error;
 
   const tags = (brain.category || "").split(",").map(t => t.trim()).filter(Boolean);
   const qNodes = nodes.filter(n => n.node_type === "question").length;
   const oNodes = nodes.filter(n => n.node_type === "outcome").length;
 
-  const handleDeleteConfirm = () => {
+  const handleDeleteConfirm = async () => {
+    if (deleteInProgress.current) return;
+    deleteInProgress.current = true;
     triggerHaptic("warning");
-    onDelete(brain.id);
-    onClose();
-    toast({ title: "Brain Deleted", description: "The repository has been permanently deleted." });
+    try {
+      const result = await onDelete(brain.id);
+      onClose();
+      toast(result.cloud === "unconfirmed" ? {
+        title: "Brain and nodes removed locally",
+        description: "Cloud deletion could not be confirmed and was not queued. A cloud copy may reappear.",
+        variant: "destructive",
+      } : {
+        title: "Brain deleted",
+        description: result.cloud === "deleted" ? "Brain and nodes deleted locally and from the cloud." : "Brain and nodes deleted locally; no cloud copy was found.",
+      });
+    } catch (error) {
+      toast({ title: "Could not delete brain", description: error instanceof Error ? error.message : "Please try again.", variant: "destructive" });
+    } finally {
+      deleteInProgress.current = false;
+    }
   };
 
   const handleShareLink = async () => {
     triggerHaptic("selection");
     const currentNodes = await idb.getAllByIndex<Node>("nodes", "brain_id", brain.id);
-    const payload = JSON.stringify({ brain, nodes: currentNodes });
-    const encoded = btoa(encodeURIComponent(payload));
-    const base = window.location.origin + window.location.pathname;
-    const url = `${base}#share=${encoded}`;
+    // Was: btoa(encodeURIComponent(JSON)) — ~33 % larger than necessary, which
+    // pushed realistic brains past the length where chat apps truncate links.
+    // Now a compact base64url payload built by the shared encoder (the decoder
+    // still accepts the old format, see lib/share-link.ts).
+    const url = buildShareUrl(window.location.origin, window.location.pathname, {
+      brain,
+      nodes: currentNodes,
+    });
+    if (url.length > SHARE_URL_WARN_LENGTH) {
+      toast({
+        title: "Large brain — link is long",
+        description: `This link is ${Math.round(url.length / 1024)} KB. If a chat app truncates it, export a JSON file instead.`,
+      });
+    }
     try {
       await navigator.clipboard.writeText(url);
       toast({ title: "Link Copied!", description: "Share this link — anyone who opens it can import the brain instantly." });
@@ -253,6 +293,13 @@ export function BrainDrawer({ brain, isOpen, onClose, onLaunch, onDelete, onExpo
           </div>
         </div>
 
+        {!dataReady && (
+          <div role={loadState?.id === brain.id && loadState.error ? "alert" : "status"} className="px-6 py-3 text-sm text-muted-foreground">
+            {loadState?.id === brain.id && loadState.error ? (
+              <>{loadState.error} <Button size="sm" variant="outline" onClick={() => setLoadAttempt((n) => n + 1)}>Retry</Button></>
+            ) : "Loading brain data…"}
+          </div>
+        )}
         <Tabs defaultValue="overview" className="flex-1 flex flex-col overflow-hidden">
           <TabsList className="w-full rounded-none justify-start px-2 border-b bg-transparent h-12 overflow-x-auto flex-nowrap hide-scrollbar">
             <TabsTrigger value="overview" className="data-[state=active]:bg-muted/50 data-[state=active]:shadow-none h-9 whitespace-nowrap">Overview</TabsTrigger>
@@ -359,7 +406,7 @@ export function BrainDrawer({ brain, isOpen, onClose, onLaunch, onDelete, onExpo
                         </div>
                       </div>
                       <DropdownMenuSeparator />
-                      <Button variant="ghost" size="sm" className="w-full justify-start h-8 text-xs gap-2" onClick={() => onExport(brain)}>
+                      <Button variant="ghost" size="sm" disabled={!dataReady} className="w-full justify-start h-8 text-xs gap-2" onClick={() => onExport(brain)}>
                         <Download className="w-3.5 h-3.5" /> Export JSON
                       </Button>
                     </TabsContent>
@@ -425,14 +472,14 @@ export function BrainDrawer({ brain, isOpen, onClose, onLaunch, onDelete, onExpo
             </div>
             
             <div className="flex flex-col gap-3 py-4 sm:justify-start">
-              <Button onClick={() => { triggerHaptic("success"); void trackEvent("brain_launch", { brainId: brain.id, source: "brain_drawer" }); onLaunch(brain); }} className="w-full h-12 text-base font-semibold shadow-primary/20 shadow-lg">
+              <Button disabled={!dataReady} onClick={() => { triggerHaptic("success"); void trackEvent("brain_launch", { brainId: brain.id, source: "brain_drawer" }); onLaunch(brain); }} className="w-full h-12 text-base font-semibold shadow-primary/20 shadow-lg">
                 <Play className="w-5 h-5 mr-2 fill-current" /> Edit & Repair Brain
               </Button>
               <div className="grid grid-cols-2 gap-2 w-full">
-                <Button onClick={() => setIsChatOpen(true)} className="w-full h-10 text-sm font-semibold border-primary/50 text-primary hover:bg-primary/10" variant="outline">
+                <Button disabled={!dataReady} onClick={() => setIsChatOpen(true)} className="w-full h-10 text-sm font-semibold border-primary/50 text-primary hover:bg-primary/10" variant="outline">
                   <MessageSquare className="w-4 h-4 mr-2" /> Chat Mode
                 </Button>
-                <Button variant="outline" onClick={handleShareLink} className="w-full h-10 text-sm border-primary/30 text-primary hover:bg-primary/10">
+                <Button variant="outline" disabled={!dataReady} onClick={handleShareLink} className="w-full h-10 text-sm border-primary/30 text-primary hover:bg-primary/10">
                   <Link2 className="w-4 h-4 mr-2" /> Share Link
                 </Button>
               </div>
