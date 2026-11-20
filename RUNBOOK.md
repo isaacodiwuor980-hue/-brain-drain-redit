@@ -158,6 +158,16 @@ The API now requires `public.save_brain_atomic` from `supabase/migrations/0005_a
 
 The repository's PGlite tests are useful regression checks but do not replace staged multi-session/PostgREST and identity integration testing. No database migration was applied by the agent.
 
+
+---
+
+## Reaction preview and online status (local scaffolding)
+
+- `0007_identity_reactions_flags.sql` adds `reactions.reaction_tier_source` (source marker, not a tier value), `user_identity_map`, default-off `server_feature_flags`, and a service-role toggle function. `0008_set_post_reaction.sql` adds a separate desired-state setter. Their real deployment status, schema compatibility and effective grants must be verified before any use.
+- `0009_reaction_preview.sql` adds `preview_reaction_state(uuid,text,text)`, a read-only preview of the 0008 setter. It is **not wired** to the API and is not a preview of the existing toggle route. It has no usable concurrency token or tier semantics. Do not use it for live shadow testing. After removing any future consumers, rollback is `DROP FUNCTION public.preview_reaction_state(uuid,text,text);` — review dependencies and obtain authorization first. No row data is modified by creating or dropping this function.
+- `GET /api/tsrg/status` returns a boolean using the `experimental_tsrg_feed` database flag, defaults to false on missing configuration, row or errors, and sends `Cache-Control: no-store`. The client polls when its opt-in is enabled. This is **only a soft switch for cooperating online clients**; older and offline clients, suspended tabs and polling latency prevent an absolute kill switch. It is not an authorization control.
+- Before applying any migration: require an isolated staging project, verified backups and restore plan, explicit approval, deployed-schema and permissions inspection, and staged tests; no migration has been applied by this session. Reverting 0007 tables/column deletes data and requires a separately authorized backup and rollback plan. Avoid production deployment until all dependencies, including brain-save migration 0005 and identity mapping, are verified.
+
 ---
 
 ## Contact

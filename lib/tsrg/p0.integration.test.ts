@@ -27,6 +27,27 @@ describe("P0 isolated database scaffolding", () => {
     await expect(db.query("INSERT INTO public.user_identity_map(firebase_subject,supabase_uid) VALUES ($1,$2)", ["firebase-other", uid])).rejects.toMatchObject({ code: "23505" });
     expect((await db.query("SELECT supabase_uid FROM public.user_identity_map WHERE firebase_subject=$1", ["firebase-alice"])).rows).toEqual([{ supabase_uid: uid }]);
   });
+  it("adds the source marker to reactions but not a tier value or update timestamp", async () => {
+    const columns = await db.query<{ column_name: string; is_nullable: string; column_default: string | null }>("SELECT column_name, is_nullable, column_default FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'reactions'");
+    const source = columns.rows.find(row => row.column_name === "reaction_tier_source");
+    expect(source).toMatchObject({ is_nullable: "NO" });
+    expect(source?.column_default).toContain("legacy_default");
+    expect(columns.rows.some(row => row.column_name === "reaction_tier")).toBe(false);
+    expect(columns.rows.some(row => row.column_name === "updated_at")).toBe(false);
+    await expect(db.query("INSERT INTO public.reactions(target_type,target_id,user_id,reaction_type,reaction_tier_source) VALUES ('post','post-1',$1,'repost','invalid')", [uid])).rejects.toMatchObject({ code: "23514" });
+  });
+  it("new 0007 tables have RLS enabled and no permissive policies", async () => {
+    const rows = await db.query("SELECT c.relname, c.relrowsecurity, (SELECT count(*)::int FROM pg_policies p WHERE p.schemaname = 'public' AND p.tablename = c.relname) AS policy_count FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace WHERE n.nspname = 'public' AND c.relname IN ('user_identity_map', 'server_feature_flags') ORDER BY c.relname");
+    expect(rows.rows).toEqual([{ relname: "server_feature_flags", relrowsecurity: true, policy_count: 0 }, { relname: "user_identity_map", relrowsecurity: true, policy_count: 0 }]);
+  });
+  it("restricts 0007 tables and toggle RPC to the service role in the isolated schema", async () => {
+    for (const table of ["user_identity_map", "server_feature_flags"]) {
+      const result = await db.query("SELECT has_table_privilege('anon', $1, 'select') AS anon, has_table_privilege('authenticated', $1, 'select') AS auth, has_table_privilege('service_role', $1, 'select') AS service", [`public.${table}`]);
+      expect(result.rows[0]).toEqual({ anon: false, auth: false, service: true });
+    }
+    const rpc = await db.query("SELECT has_function_privilege('anon','public.toggle_post_reaction_atomic(text,text,text)','execute') AS anon, has_function_privilege('authenticated','public.toggle_post_reaction_atomic(text,text,text)','execute') AS auth, has_function_privilege('service_role','public.toggle_post_reaction_atomic(text,text,text)','execute') AS service");
+    expect(rpc.rows[0]).toEqual({ anon: false, auth: false, service: true });
+  });
   it("rejects unmapped users and rolls back deletion if an insertion fails", async () => {
     await expect(db.query("SELECT public.toggle_post_reaction_atomic($1,$2,$3)", ["unknown", "post-1", "downvote"])).rejects.toMatchObject({ code: "42501" });
     await db.exec("ALTER TABLE public.reactions ADD CONSTRAINT simulate_failure CHECK (reaction_type <> 'downvote')");

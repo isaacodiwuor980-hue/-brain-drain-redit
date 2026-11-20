@@ -35,3 +35,35 @@ Before any database operation: verify backups, assess existing deployed migratio
 - `/api/tsrg/status` reads the existing `experimental_tsrg_feed` flag from `0007` (not the similarly named, unseeded `tsrg_experimental_feed`); missing configuration, row or DB failure yields false. The opt-in browser feed polls it, defaults to chronological while awaiting a response or after failure/timeout, and resets on offline events. Default and Following paths do not request the status.
 - This is a **soft kill switch for cooperating online clients only**, not an absolute control: older app versions and offline clients can still use local ranking. Polling, suspended tabs, networks and intermediary behavior limit propagation. It is not an authorization boundary. Previous ledger statements that no online check exists describe the earlier state, not the current code.
 - Tested in isolated PGlite, mocked HTTP and happy-dom only. No production/staging verification, deployment, identity provisioning or concurrency tests performed.
+
+## Schema and permission audit (local)
+
+Migration 0001 defines `reactions` with `id`, `target_type`, `target_id`, `user_id`, `reaction_type`, and `created_at`. Migration 0007 adds `reaction_tier_source`, a non-null provenance marker defaulting to `legacy_default`, with `explicit_choice` as the other allowed value. It does **not** add a tier value or an `updated_at` field. The PGlite reaction harness does load 0007, on simplified tables, and now directly checks the marker, default and constraint. Earlier wording saying “no reaction-tier field” meant no field storing the actual tier; it should not have implied that the source marker was absent. Deployed schema is unknown. `IF NOT EXISTS` does not repair a pre-existing incompatible column or constraint.
+
+`created_at` does not change when 0008 updates a vote. A content hash can repeat after an A→B→A change and does not detect intervening events. Neither is a safe concurrency token. The 0009 preview stays unwired with a null token; safe shadow comparisons need an appropriately designed version/snapshot protocol and staging validation.
+
+| Migration | Local permission review |
+| --- | --- |
+| 0005 | Creates no tables. `save_brain_atomic(uuid,jsonb,jsonb)` revokes PUBLIC/anon/authenticated execution and grants service_role; PGlite grant test passes. Security invoker; service-role access still requires application-level authorization. |
+| 0007 | New `user_identity_map` and `server_feature_flags` have RLS enabled, no policies (default deny for roles subject to RLS), PUBLIC/anon/authenticated table privileges revoked, service_role CRUD granted. The toggle RPC is revoked from PUBLIC/anon/authenticated and granted to service_role. PGlite checks do not establish deployed role inheritance, ownership or service-role routes. |
+| 0009 | Creates no tables. Preview RPC revokes PUBLIC/anon/authenticated execution and grants service_role; PGlite grant test passes. |
+
+No 0010 schema fix or 0011 RLS fix was created: the observed source marker and local grant declarations match 0007's stated source-marker scope. Actual tier semantics and a concurrency version are separate unresolved design decisions. No migration was applied to a live database.
+
+## READY (verified locally)
+
+- 229 tests passed in 44 files; typecheck and build passed; ESLint had zero errors and two existing warnings. Tests use local mocks and PGlite where indicated, not live services.
+- Identity lookup middleware and `/api/me`, default-off server-flag records, online-client status check, reaction setter and read-only preview exist as scaffolds. They are not evidence of a deployed or secure integrated system.
+- Keep experimental, stake, slashing and corpus functionality disabled; ordinary local functionality is not contingent on enabling these scaffolds. No blanket offline safety claim is made.
+
+## BLOCKED ON STAGING
+
+- Real PostgreSQL/Supabase RLS and effective privilege verification, including bypass/ownership behavior and service-role API paths.
+- Test identity provisioning and mapping lifecycle, then validate separately for real users; staging tests cannot prove all production mappings exist.
+- Concurrent writers, reaction ordering and rollback; realistic multi-user isolation and adversarial testing.
+- Migration 0005 compatibility and deployment planning, and reviewed validation of 0006–0009; no deployment is authorized by this ledger. Brain-save API depends on 0005 and valid identity mapping.
+- Any TSRG user-facing rollout requires staging validation and further safety review; browser/device and product validation also remain open.
+
+## BLOCKED ON DECISIONS
+
+See `DECISIONS_NEEDED.md` for safe defaults and all eight questions: staging access/backups, identity provisioning, experimental-feed soft-switch scope, shadow comparison design, stake/slashing/corpus policy, data rights/deletion/retention, actual tier schema, and reliable concurrency-version semantics. The existing source-marker column does not settle what the tier value should be. No decision is marked approved without the user's explicit answer.
