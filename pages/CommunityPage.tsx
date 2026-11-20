@@ -8,6 +8,7 @@ import { userIdOr, displayNameOr } from "@/lib/user-data";
 import { useMessages } from "@/hooks/use-messages";
 import { idb } from "@/lib/db";
 import { CircleCheckIn, Post, LibraryEntry } from "@/lib/types";
+import { getRoomRole, getRoomVisibility } from "@/lib/room-logic";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -111,27 +112,10 @@ function toggleCheckinVote(c: CircleCheckIn, direction: "up" | "down"): CircleCh
 }
 
 /**
- * Room migration (Phase 2, read-only): derive the Room role for display.
- * Stored `role` wins; otherwise members default to "contributor".
- * Returns null for non-members so no badge renders.
+ * Room migration: role + visibility derivation lives in lib/room-logic.ts
+ * so the core semantics are unit-testable without rendering React.
  */
-function getRoomRole(community: { role?: string; joinStatus?: string }): string | null {
-  if (community.role) return community.role;
-  if (community.joinStatus === "member") return "contributor";
-  return null;
-}
 
-/**
- * Room migration (Phase 2, read-only): derive Room visibility from the
- * stored `visibility` when present, else from legacy `privacy`.
- * public → open, restricted → gated, private → sealed (label only).
- */
-function getRoomVisibility(community: { visibility?: string; privacy?: string }): string {
-  if (community.visibility) return community.visibility;
-  if (community.privacy === "restricted") return "gated";
-  if (community.privacy === "private") return "sealed";
-  return "open";
-}
 
 
 /**

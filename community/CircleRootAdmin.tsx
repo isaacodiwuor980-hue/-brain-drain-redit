@@ -18,7 +18,7 @@ interface Props {
 export function CircleRootAdmin({ communityId, communityName }: Props) {
   const [open, setOpen] = useState(false);
   const { toast } = useToast();
-  const { communities, setRole, updateCharter, transferStewardship, promoteToCurator, demoteToContributor, makeObserver } = useCommunities();
+  const { communities, updateCharter, transferStewardship, promoteToCurator, demoteToContributor, makeObserver } = useCommunities();
   const community = communities.find((c) => c.id === communityId);
   const currentRole = community?.role ?? (community?.joinStatus === "member" ? "contributor" : null);
 
@@ -249,6 +249,9 @@ export function CircleRootAdmin({ communityId, communityName }: Props) {
                 </div>
                 <p className="text-xs text-muted-foreground">
                   Steward and Curator can manage the charter and promote Deposits into the Library. Observer is read-only.
+                </p>
+                <p className="text-[11px] text-muted-foreground/70">
+                  Role assignment is local to this device (the role lives on your membership record). Cross-user member management requires the cloud-sync phase.
                 </p>
                 <div className="flex flex-wrap gap-2">
                   <Button variant="outline" size="sm" disabled={currentRole === "steward"} onClick={() => { void transferStewardship(communityId); toast({ title: "Stewardship claimed", description: "You are now the Room steward." }); }}>
