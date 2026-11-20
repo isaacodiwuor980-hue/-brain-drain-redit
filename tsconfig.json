@@ -11,7 +11,8 @@
     "dist",
     "**/*.test.ts",
     "**/*.test.tsx",
-    "tests/e2e"
+    "tests/e2e",
+    "scripts/**"
   ],
   "compilerOptions": {
     "incremental": true,

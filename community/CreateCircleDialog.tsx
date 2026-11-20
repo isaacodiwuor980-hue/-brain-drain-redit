@@ -9,16 +9,23 @@ import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/ca
 import { Plus, Globe, Lock, ShieldAlert, Image as ImageIcon, X } from "lucide-react";
 import { useCommunities } from "@/hooks/use-communities";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/components/auth/AuthContext";
+import { userIdOr } from "@/lib/user-data";
 
 const MAX_IMAGE_BYTES = 1024 * 1024; // 1MB cap for circle images
 
 export function CreateCircleDialog() {
   const { addCommunity } = useCommunities();
   const { toast } = useToast();
+  const { user } = useAuth();
 
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
+  // Room migration (Phase 4): mission is required for new Rooms; scope is
+  // optional. These populate the `charter` field on the Community record.
+  const [mission, setMission] = useState("");
+  const [scope, setScope] = useState("");
   const [category, setCategory] = useState("");
   const [tags, setTags] = useState("");
   const [language, setLanguage] = useState("English");
@@ -66,16 +73,29 @@ export function CreateCircleDialog() {
 
   const handleCreate = async () => {
     if (!name.trim()) return;
+    if (!mission.trim()) {
+      toast({ title: "Mission required", description: "Describe this Room's mission before creating it.", variant: "destructive" });
+      return;
+    }
     if (isCreating) return; // guard against rapid double-click
     setIsCreating(true);
     try {
       // Persist ALL collected fields — previously privacy, category,
       // tags, language, location, allowMature were silently dropped.
       const tagsArray = tags.split(",").map(t => t.trim()).filter(Boolean);
+      const currentUserId = userIdOr(user);
       await addCommunity({
         id: crypto.randomUUID(),
         name: name.trim(),
         description: description.trim(),
+        // Room migration (Phase 4): store the charter.
+        charter: { mission: mission.trim(), scope: scope.trim() || description.trim() || "" },
+        // Room migration (Phase 4): the creator is a member + steward from
+        // the start so the Room is usable and has an owner to manage roles.
+        joinStatus: "member",
+        isJoined: true,
+        role: "steward",
+        createdBy: currentUserId,
         memberCount: 1,
         active: true,
         image: iconDataUrl || undefined,
@@ -93,6 +113,8 @@ export function CreateCircleDialog() {
       // next creation session.
       setName("");
       setDescription("");
+      setMission("");
+      setScope("");
       setCategory("");
       setTags("");
       setLanguage("English");
@@ -101,9 +123,9 @@ export function CreateCircleDialog() {
       setAllowMature(false);
       setIconDataUrl(null);
       setCoverDataUrl(null);
-      toast({ title: "Circle Created", description: "Your Accountability Circle is now live and rooting." });
+      toast({ title: "Room Created", description: "Your Room is now live and rooting." });
     } catch (error) {
-      toast({ title: "Couldn't create circle", description: error instanceof Error ? error.message : "Please try again.", variant: "destructive" });
+      toast({ title: "Couldn't create Room", description: error instanceof Error ? error.message : "Please try again.", variant: "destructive" });
     } finally {
       setIsCreating(false);
     }
@@ -119,7 +141,7 @@ export function CreateCircleDialog() {
       </DialogTrigger>
       <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="text-2xl">Create Accountability Circle</DialogTitle>
+          <DialogTitle className="text-2xl">Create Room</DialogTitle>
         </DialogHeader>
         
         <div className="space-y-6 pt-4">
@@ -127,12 +149,22 @@ export function CreateCircleDialog() {
             <h3 className="text-lg font-semibold">Basic Information</h3>
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2 sm:col-span-2">
-                <Label>Circle Name</Label>
+                <Label>Room Name</Label>
                 <Input value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Daily Hackers" />
               </div>
               <div className="space-y-2 sm:col-span-2">
                 <Label>Description</Label>
-                <Textarea value={description} onChange={e => setDescription(e.target.value)} placeholder="What is the focus of this circle?" />
+                <Textarea value={description} onChange={e => setDescription(e.target.value)} placeholder="What is the focus of this Room?" />
+              </div>
+              {/* Room migration (Phase 4): mission (required) + scope. These
+                  populate the Room's charter. */}
+              <div className="space-y-2 sm:col-span-2">
+                <Label>Mission <span className="text-destructive">*</span></Label>
+                <Textarea value={mission} onChange={e => setMission(e.target.value)} placeholder="One sentence: what does this Room exist to do? (e.g. Find a functional cure for HIV)" />
+              </div>
+              <div className="space-y-2 sm:col-span-2">
+                <Label>Scope (optional)</Label>
+                <Textarea value={scope} onChange={e => setScope(e.target.value)} placeholder="What's in-bounds vs out-of-bounds for this Room?" />
               </div>
               <div className="space-y-2 sm:col-span-2">
                 <Label>Cover Image &amp; Icon</Label>
@@ -216,30 +248,30 @@ export function CreateCircleDialog() {
               >
                 <CardHeader className="p-4">
                   <Globe className="w-6 h-6 mb-2 text-blue-500" />
-                  <CardTitle className="text-base">Public</CardTitle>
+                  <CardTitle className="text-base">Public · Open</CardTitle>
                   <CardDescription className="text-xs">Anyone can discover and join.</CardDescription>
                 </CardHeader>
               </Card>
-              
-              <Card 
+
+              <Card
                 className={`cursor-pointer transition-colors ${privacy === 'restricted' ? 'border-primary ring-1 ring-primary' : 'hover:border-primary/50'}`}
                 onClick={() => setPrivacy('restricted')}
               >
                 <CardHeader className="p-4">
                   <ShieldAlert className="w-6 h-6 mb-2 text-yellow-500" />
-                  <CardTitle className="text-base">Restricted</CardTitle>
+                  <CardTitle className="text-base">Restricted · Gated</CardTitle>
                   <CardDescription className="text-xs">Visible publicly. Joining requires approval.</CardDescription>
                 </CardHeader>
               </Card>
 
-              <Card 
+              <Card
                 className={`cursor-pointer transition-colors ${privacy === 'private' ? 'border-primary ring-1 ring-primary' : 'hover:border-primary/50'}`}
                 onClick={() => setPrivacy('private')}
               >
                 <CardHeader className="p-4">
                   <Lock className="w-6 h-6 mb-2 text-red-500" />
-                  <CardTitle className="text-base">Private</CardTitle>
-                  <CardDescription className="text-xs">Only invited members can view. Hidden from search.</CardDescription>
+                  <CardTitle className="text-base">Private · Sealed</CardTitle>
+                  <CardDescription className="text-xs">Only invited members can view. Hidden from search. (Sealed is label-only — content stays readable on-device.)</CardDescription>
                 </CardHeader>
               </Card>
             </div>
@@ -256,8 +288,8 @@ export function CreateCircleDialog() {
             </div>
           </div>
           
-          <Button className="w-full mt-4" size="lg" onClick={handleCreate} disabled={isCreating || !name.trim()}>
-            {isCreating ? "Creating…" : "Initialize Active Relay & Create Circle"}
+          <Button className="w-full mt-4" size="lg" onClick={handleCreate} disabled={isCreating || !name.trim() || !mission.trim()}>
+            {isCreating ? "Creating…" : "Initialize Active Relay & Create Room"}
           </Button>
         </div>
       </DialogContent>

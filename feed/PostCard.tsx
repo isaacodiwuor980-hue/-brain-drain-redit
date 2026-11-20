@@ -297,7 +297,7 @@ export function PostCard({
         answeredQuestionTitle: `Shared to ${communityName}`,
       };
       await addPost(shared);
-      toast({ title: `Shared to ${communityName}`, description: "The post is now visible in that circle." });
+      toast({ title: `Shared to ${communityName}`, description: "The post is now visible in that Room." });
       void trackEvent("post_share", { postId: post.id, method: "circle", communityId });
       setIsShareToOpen(false);
     } catch (error) {
@@ -779,9 +779,9 @@ export function PostCard({
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div>
-              <p className="text-sm font-semibold text-muted-foreground mb-2">Send to a circle</p>
+              <p className="text-sm font-semibold text-muted-foreground mb-2">Send to a Room</p>
               {communities.length === 0 ? (
-                <p className="text-sm text-muted-foreground italic">No circles yet. Create one in the Community page.</p>
+                <p className="text-sm text-muted-foreground italic">No Rooms yet. Create one in the Community page.</p>
               ) : (
                 <div className="space-y-1 max-h-40 overflow-y-auto">
                   {communities.map((c) => (
@@ -829,8 +829,8 @@ export function PostCard({
             <Button variant="outline" className="justify-start gap-3 h-12" onClick={() => { void handleCopyPostLink("Post link copied so you can share it as your own post."); setIsShareModalOpen(false); }}>
               <Share className="w-4 h-4" /> Share as your post
             </Button>
-            <Button variant="outline" className="justify-start gap-3 h-12" onClick={() => { void handleCopyPostLink("Post link copied for sharing to circles."); setIsShareModalOpen(false); }}>
-              <BrainCircuit className="w-4 h-4" /> Share to circles
+            <Button variant="outline" className="justify-start gap-3 h-12" onClick={() => { void handleCopyPostLink("Post link copied for sharing to Rooms."); setIsShareModalOpen(false); }}>
+              <BrainCircuit className="w-4 h-4" /> Share to Rooms
             </Button>
             <Button variant="outline" className="justify-start gap-3 h-12" onClick={() => { void handleCopyPostLink("Post link copied for sending to follows."); setIsShareModalOpen(false); }}>
               <MessageCircle className="w-4 h-4" /> Send to follows
