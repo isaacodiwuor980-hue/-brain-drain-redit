@@ -7,7 +7,7 @@ import { useAuth } from "@/components/auth/AuthContext";
 import { userIdOr, displayNameOr } from "@/lib/user-data";
 import { useMessages } from "@/hooks/use-messages";
 import { idb } from "@/lib/db";
-import { CircleCheckIn, Post } from "@/lib/types";
+import { CircleCheckIn, Post, LibraryEntry } from "@/lib/types";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -54,6 +54,31 @@ function useCheckins() {
 }
 
 /**
+ * Room migration (Phase 7): Library entries for a Room. Loads all entries
+ * for the given roomId via the library_entries index, and exposes a mutate
+ * to add a new synthesis entry (curated by a Curator / signed by Steward).
+ */
+function useRoomLibrary(roomId: string | undefined) {
+  const queryClient = useQueryClient();
+  const { data: entries = [] } = useQuery<LibraryEntry[]>({
+    queryKey: ["library_entries", roomId],
+    enabled: !!roomId,
+    queryFn: () => idb.getAllByIndex<LibraryEntry>("library_entries", "roomId", roomId as string),
+  });
+
+  const { mutateAsync: addLibraryEntry } = useMutation({
+    mutationFn: async (entry: LibraryEntry) => {
+      await idb.put("library_entries", entry);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["library_entries", roomId] });
+    },
+  });
+
+  return { entries, addLibraryEntry };
+}
+
+/**
  * Quora-style toggle vote for circle check-ins — replaces the old
  * always-increment buttons (every tap was +1, up/down stacked, no
  * un-vote). Mirrors togglePostReaction semantics: mutual exclusion,
@@ -83,6 +108,29 @@ function toggleCheckinVote(c: CircleCheckIn, direction: "up" | "down"): CircleCh
     upvotes: up ? Math.max(0, upvotes - 1) : upvotes,
     myUpvote: false,
   };
+}
+
+/**
+ * Room migration (Phase 2, read-only): derive the Room role for display.
+ * Stored `role` wins; otherwise members default to "contributor".
+ * Returns null for non-members so no badge renders.
+ */
+function getRoomRole(community: { role?: string; joinStatus?: string }): string | null {
+  if (community.role) return community.role;
+  if (community.joinStatus === "member") return "contributor";
+  return null;
+}
+
+/**
+ * Room migration (Phase 2, read-only): derive Room visibility from the
+ * stored `visibility` when present, else from legacy `privacy`.
+ * public → open, restricted → gated, private → sealed (label only).
+ */
+function getRoomVisibility(community: { visibility?: string; privacy?: string }): string {
+  if (community.visibility) return community.visibility;
+  if (community.privacy === "restricted") return "gated";
+  if (community.privacy === "private") return "sealed";
+  return "open";
 }
 
 
@@ -132,7 +180,7 @@ function MembershipButton({
           className="rounded-full text-muted-foreground hover:text-destructive text-xs px-2"
           disabled={busy || isLeaving}
           onClick={(e) => { stop(e); onLeave(); }}
-          title="Leave circle"
+          title="Leave room"
         >
           {isLeaving ? <Loader2 className="w-3 h-3 animate-spin" /> : "Leave"}
         </Button>
@@ -214,12 +262,20 @@ export function CommunityPage() {
   const currentDisplayName = displayNameOr(user);
 
   const [search, setSearch] = useState("");
+  // Phase 4: dismissible nudge prompting stewards/members to set a mission
+  // on Rooms created before the charter field existed. Local-only state.
+  const [missionNudgeDismissed, setMissionNudgeDismissed] = useState(false);
 
   const [selectedCommunity, setSelectedCommunity] = useState<string | null>(null);
   const [checkinMessage, setCheckinMessage] = useState("");
   const [moodScore, setMoodScore] = useState<number>(0);
   const [relayQuestion, setRelayQuestion] = useState("");
   const [relayStatus, setRelayStatus] = useState<"idle" | "orbiting" | "found">("idle");
+  // Phase 7: Library entry composer state (curators/stewards promote Deposits).
+  const [libraryTitle, setLibraryTitle] = useState("");
+  const [librarySummary, setLibrarySummary] = useState("");
+  const [libraryDissent, setLibraryDissent] = useState("");
+  const [libraryDepositIds, setLibraryDepositIds] = useState("");
 
   // DM composer state — reused by the Connections "Message" buttons, the
   // Purpose-Based Networking "Invite" buttons, and the Mentor tab's
@@ -377,8 +433,8 @@ export function CommunityPage() {
         createdAt: Date.now()
       });
 
-      await addXPEvent("check_in", 25, "Circle Check-In");
-      toast({ title: "Checked in to circle!", description: "+25 XP earned." });
+      await addXPEvent("check_in", 25, "Room Check-In");
+      toast({ title: "Checked in to Room!", description: "+25 XP earned." });
       setCheckinMessage("");
       setMoodScore(0);
     } catch (error) {
@@ -393,6 +449,8 @@ export function CommunityPage() {
   ).length;
 
   const activeComm = communities.find(c => c.id === selectedCommunity);
+  // Phase 7: this Room's curated Library entries (versioned synthesis).
+  const { entries: libraryEntries, addLibraryEntry } = useRoomLibrary(activeComm?.id);
   const commCheckins = checkins
     .filter(c => c.circleId === selectedCommunity)
     .sort((a, b) => {
@@ -469,7 +527,7 @@ export function CommunityPage() {
 
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div>
-              <h1 className="text-3xl font-bold tracking-tight">Civilization Circles</h1>
+              <h1 className="text-3xl font-bold tracking-tight">Rooms</h1>
               <p className="text-muted-foreground mt-1">Join specialized domains, track shared goals, and collaborate.</p>
             </div>
             <div className="flex items-center gap-3">
@@ -485,6 +543,15 @@ export function CommunityPage() {
               <CreateCircleDialog />
             </div>
           </div>
+
+          {!missionNudgeDismissed && filtered.some(c => c.joinStatus === "member" && !c.charter?.mission) && (
+            <div className="flex items-center justify-between gap-4 rounded-[16px] border border-amber-500/30 bg-amber-500/10 px-4 py-3">
+              <p className="text-sm text-amber-700 dark:text-amber-400">
+                Some of your Rooms don't have a mission yet. Set one to give members a clear charter.
+              </p>
+              <Button variant="ghost" size="sm" onClick={() => setMissionNudgeDismissed(true)}>Dismiss</Button>
+            </div>
+          )}
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filtered.map(community => {
@@ -513,7 +580,9 @@ export function CommunityPage() {
                       )}
                     </div>
                     <CardTitle>{community.name}</CardTitle>
-                    <CardDescription className="line-clamp-2">{community.description}</CardDescription>
+                    {/* Phase 2: show the Room mission as the subtitle when
+                        set; old circles fall back to description. */}
+                    <CardDescription className="line-clamp-2">{community.charter?.mission || community.description}</CardDescription>
                     {/* A: Show relevant tags on the card */}
                     {community.tags && community.tags.length > 0 && (
                       <div className="flex flex-wrap gap-1 mt-2">
@@ -535,7 +604,7 @@ export function CommunityPage() {
                         toast({ title: community.privacy === "restricted" ? "Request sent" : "Joined!", description: community.privacy === "restricted" ? `Your request to join ${community.name} is pending approval.` : `You joined ${community.name}.` });
                       }).catch((e) => toast({ title: "Couldn't join", description: e instanceof Error ? e.message : "Try again.", variant: "destructive" }))}
                       onLeave={() => void leaveCommunity(community.id).then(() => {
-                        toast({ title: "Left circle", description: `You left ${community.name}. Your posts are preserved.` });
+                        toast({ title: "Left room", description: `You left ${community.name}. Your posts are preserved.` });
                       }).catch((e) => toast({ title: "Couldn't leave", description: e instanceof Error ? e.message : "Try again.", variant: "destructive" }))}
                       onCancelRequest={() => void cancelJoinRequest(community.id).then(() => {
                         toast({ title: "Request cancelled", description: `Your join request for ${community.name} was withdrawn.` });
@@ -570,7 +639,7 @@ export function CommunityPage() {
           {/* B: Joined circles quick-access section */}
           {communities.some(c => c.joinStatus === "member") && (
             <div className="mt-8">
-              <h3 className="text-lg font-bold mb-3">Your Circles</h3>
+              <h3 className="text-lg font-bold mb-3">Your Rooms</h3>
               <div className="flex gap-2 flex-wrap">
                 {communities.filter(c => c.joinStatus === "member").map(c => (
                   <Button
@@ -585,7 +654,7 @@ export function CommunityPage() {
                       role="button"
                       tabIndex={0}
                       className="text-xs text-muted-foreground hover:text-destructive ml-1"
-                      onClick={(e) => { e.stopPropagation(); void leaveCommunity(c.id); toast({ title: "Left circle", description: `You left ${c.name}` }); }}
+                      onClick={(e) => { e.stopPropagation(); void leaveCommunity(c.id); toast({ title: "Left room", description: `You left ${c.name}` }); }}
                       onKeyDown={(e) => { if (e.key === "Enter") { e.stopPropagation(); void leaveCommunity(c.id); } }}
                     >
                       ✕
@@ -878,15 +947,56 @@ export function CommunityPage() {
                       {activeComm.joinStatus === "pending" && (
                         <span className="text-[10px] uppercase font-bold px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-600">Pending</span>
                       )}
+                      {/* Phase 2: Room role badge (read-only). Derived from
+                          stored role, else contributor for members. */}
+                      {(() => {
+                        const roomRole = getRoomRole(activeComm);
+                        if (!roomRole) return null;
+                        const roleStyles: Record<string, string> = {
+                          steward: "bg-purple-500/15 text-purple-600",
+                          curator: "bg-sky-500/15 text-sky-600",
+                          contributor: "bg-emerald-500/15 text-emerald-600",
+                          observer: "bg-muted text-muted-foreground",
+                        };
+                        return (
+                          <span className={`text-[10px] uppercase font-bold px-1.5 py-0.5 rounded-full ${roleStyles[roomRole] ?? "bg-muted text-muted-foreground"}`}>
+                            {roomRole}
+                          </span>
+                        );
+                      })()}
+                      {/* Phase 2: Room visibility badge (read-only, label only). */}
+                      {(() => {
+                        const visibility = getRoomVisibility(activeComm);
+                        if (visibility === "open") return null;
+                        return (
+                          <span className="text-[10px] uppercase font-bold px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground">
+                            {visibility === "gated" ? "Gated" : "Sealed"}
+                          </span>
+                        );
+                      })()}
                     </SheetDescription>
                   </div>
                 </div>
               </SheetHeader>
 
               <div className="space-y-6">
-                <div className="text-sm">
-                  {activeComm.description}
-                </div>
+                {/* Phase 2: Room charter (read-only). Mission first, scope
+                    second; old circles fall back to description. */}
+                {activeComm.charter?.mission ? (
+                  <div className="space-y-2">
+                    <div className="text-sm font-medium">{activeComm.charter.mission}</div>
+                    {activeComm.charter.scope && (
+                      <div className="text-sm text-muted-foreground">{activeComm.charter.scope}</div>
+                    )}
+                    {activeComm.description && activeComm.description !== activeComm.charter.scope && (
+                      <div className="text-sm text-muted-foreground">{activeComm.description}</div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="text-sm">
+                    {activeComm.description}
+                  </div>
+                )}
 
                 {/* A: Tags in detail view */}
                 {activeComm.tags && activeComm.tags.length > 0 && (
@@ -908,7 +1018,7 @@ export function CommunityPage() {
                       toast({ title: activeComm.privacy === "restricted" ? "Request sent" : "Joined!", description: activeComm.privacy === "restricted" ? `Your request to join ${activeComm.name} is pending approval.` : `You joined ${activeComm.name}.` });
                     }).catch((e) => toast({ title: "Couldn't join", description: e instanceof Error ? e.message : "Try again.", variant: "destructive" }))}
                     onLeave={() => void leaveCommunity(activeComm.id).then(() => {
-                      toast({ title: "Left circle", description: `You left ${activeComm.name}. Your posts are preserved.` });
+                      toast({ title: "Left room", description: `You left ${activeComm.name}. Your posts are preserved.` });
                     }).catch((e) => toast({ title: "Couldn't leave", description: e instanceof Error ? e.message : "Try again.", variant: "destructive" }))}
                     onCancelRequest={() => void cancelJoinRequest(activeComm.id).then(() => {
                       toast({ title: "Request cancelled", description: `Your join request for ${activeComm.name} was withdrawn.` });
@@ -918,21 +1028,28 @@ export function CommunityPage() {
                 
                 <CircleRootAdmin communityId={activeComm.id} communityName={activeComm.name} />
 
-                {/* E: Participation is gated on membership — non-members can read but not post */}
+                {/* E: Participation is gated on membership — non-members can read but not post.
+                    Phase 5: Observers (a stored role) are members but read-only. */}
                 {activeComm.joinStatus !== "member" && (
                   <div className="bg-muted/30 border border-border/50 rounded-[16px] p-4 text-center">
                     <p className="text-sm text-muted-foreground">
                       {activeComm.joinStatus === "pending"
                         ? "Your join request is pending approval. You can browse but can't post yet."
-                        : `Join this circle to participate in discussions and check-ins.`}
+                        : `Join this Room to participate in discussions and check-ins.`}
                     </p>
                   </div>
                 )}
 
-                {activeComm.joinStatus === "member" && (
+                {activeComm.joinStatus === "member" && getRoomRole(activeComm) === "observer" && (
+                  <div className="bg-muted/30 border border-border/50 rounded-[16px] p-4 text-center">
+                    <p className="text-sm text-muted-foreground">You are an Observer in this Room — read-only access. Check-ins and posts are hidden.</p>
+                  </div>
+                )}
+
+                {activeComm.joinStatus === "member" && getRoomRole(activeComm) !== "observer" && (
                 <>
                 <div className="bg-accent/10 border rounded-[16px] p-4">
-                  <label className="text-sm font-semibold mb-2 block">Active Relay (Ask the Circle)</label>
+                  <label className="text-sm font-semibold mb-2 block">Active Relay (Ask the Room)</label>
                   <p className="text-xs text-muted-foreground mb-3">Send a question into orbit. The system will find the best member or resource to help you.</p>
                   <div className="flex gap-2">
                     <Input
@@ -988,7 +1105,7 @@ export function CommunityPage() {
                     ))}
                   </div>
                   <Input 
-                    placeholder="Update the circle on your progress..."
+                    placeholder="Update the Room on your progress..."
                     value={checkinMessage}
                     onChange={e => setCheckinMessage(e.target.value)}
                   />
@@ -1055,6 +1172,102 @@ export function CommunityPage() {
                           />
                         );
                       })}
+                    </div>
+                  )}
+                </div>
+
+                {/* Phase 7: Room Library — curated, versioned synthesis.
+                    Listed for everyone; only Curators/Stewards can add. */}
+                <div className="space-y-4 mt-8">
+                  <h4 className="font-semibold flex items-center gap-2 border-b pb-2">
+                    <BookOpen className="w-4 h-4" /> Library
+                  </h4>
+
+                  {libraryEntries.length === 0 ? (
+                    <p className="text-sm text-muted-foreground text-center py-4">No synthesis entries yet. Curators promote Deposits here.</p>
+                  ) : (
+                    <div className="space-y-3">
+                      {libraryEntries.map((entry) => (
+                        <div key={entry.id} className="p-3 border rounded-[16px] bg-card space-y-1">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="font-medium">{entry.title}</span>
+                            <span className="text-[10px] uppercase px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground">v{entry.version}</span>
+                          </div>
+                          <p className="text-sm text-muted-foreground">{entry.summary}</p>
+                          {entry.dissent && (
+                            <p className="text-xs text-amber-600 dark:text-amber-400">Dissent preserved: {entry.dissent}</p>
+                          )}
+                          <p className="text-[11px] text-muted-foreground">
+                            {entry.signedBy ? `Signed by steward · ` : `Pending steward sign-off · `}
+                            {entry.curatedBy ? `Curated by ${entry.curatedBy}` : "Unsigned"}
+                            {entry.superseded ? " · superseded" : ""}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Add-entry form — gated on Curator/Steward (Observer read-only). */}
+                  {(getRoomRole(activeComm) === "curator" || getRoomRole(activeComm) === "steward") && (
+                    <div className="p-3 border rounded-[16px] bg-muted/20 space-y-2">
+                      <Label className="text-xs text-muted-foreground">Promote a synthesis into the Library</Label>
+                      <Input
+                        value={libraryTitle}
+                        onChange={(e) => setLibraryTitle(e.target.value)}
+                        placeholder="Synthesis title"
+                        className="h-8 text-sm"
+                      />
+                      <Textarea
+                        value={librarySummary}
+                        onChange={(e) => setLibrarySummary(e.target.value)}
+                        placeholder="Summary of the synthesized Deposits"
+                        className="min-h-[60px] text-sm"
+                      />
+                      <Input
+                        value={libraryDepositIds}
+                        onChange={(e) => setLibraryDepositIds(e.target.value)}
+                        placeholder="Deposit IDs (comma separated)"
+                        className="h-8 text-sm"
+                      />
+                      <Textarea
+                        value={libraryDissent}
+                        onChange={(e) => setLibraryDissent(e.target.value)}
+                        placeholder="Dissent to preserve (optional)"
+                        className="min-h-[50px] text-sm"
+                      />
+                      <Button
+                        size="sm"
+                        className="w-full"
+                        disabled={!libraryTitle.trim() || !librarySummary.trim()}
+                        onClick={async () => {
+                          try {
+                            const now = Date.now();
+                            const role = getRoomRole(activeComm);
+                            await addLibraryEntry({
+                              id: crypto.randomUUID(),
+                              roomId: activeComm.id,
+                              depositIds: libraryDepositIds.split(",").map((s) => s.trim()).filter(Boolean),
+                              title: libraryTitle.trim(),
+                              summary: librarySummary.trim(),
+                              version: 1,
+                              curatedBy: role === "steward" ? `${currentDisplayName} (steward)` : `${currentDisplayName} (curator)`,
+                              signedBy: role === "steward" ? currentDisplayName : undefined,
+                              dissent: libraryDissent.trim() || undefined,
+                              createdAt: now,
+                              updatedAt: now,
+                            });
+                            setLibraryTitle("");
+                            setLibrarySummary("");
+                            setLibraryDissent("");
+                            setLibraryDepositIds("");
+                            toast({ title: "Library entry added", description: role === "steward" ? "Signed off by steward." : "Awaiting steward sign-off." });
+                          } catch (error) {
+                            toast({ title: "Couldn't add entry", description: error instanceof Error ? error.message : "Please try again.", variant: "destructive" });
+                          }
+                        }}
+                      >
+                        Add to Library
+                      </Button>
                     </div>
                   )}
                 </div>

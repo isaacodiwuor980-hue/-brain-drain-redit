@@ -1,5 +1,5 @@
 const DB_NAME = "brainBuilder";
-const DB_VERSION = 19;
+const DB_VERSION = 21;
 
 let dbPromise: Promise<IDBDatabase> | null = null;
 
@@ -447,6 +447,26 @@ export function openDB(): Promise<IDBDatabase> {
           habitStore.createIndex("milestoneId", "milestoneId", { unique: false });
           // Index on topic for @habit mention scanning.
           habitStore.createIndex("topic", "topic", { unique: false });
+        }
+      }
+      // v20: Room migration Phase 1 (additive schema only). No new stores —
+      // `charter`, `visibility`, `role`, and `createdBy` live on the existing
+      // `communities` records as optional fields, and `roomId` is an optional
+      // alias on `checkins` / `posts` records. Old records simply have these
+      // fields undefined and render unchanged. This block is intentionally
+      // empty; the version bump exists so future additive stores have a
+      // clean upgrade path.
+      if (oldVersion < 20) {
+        // No store changes in v20 — see comment above.
+      }
+      // v21: Room migration Phase 7 — the Library. New store for curated,
+      // versioned synthesis entries. Indexed by roomId so a Room's Library
+      // loads with a single index query. No existing store is renamed,
+      // removed, or re-keyed, so all prior records survive the upgrade.
+      if (oldVersion < 21) {
+        if (!db.objectStoreNames.contains("library_entries")) {
+          const libStore = db.createObjectStore("library_entries", { keyPath: "id" });
+          libStore.createIndex("roomId", "roomId", { unique: false });
         }
       }
     };
