@@ -67,3 +67,9 @@ No 0010 schema fix or 0011 RLS fix was created: the observed source marker and l
 ## BLOCKED ON DECISIONS
 
 See `DECISIONS_NEEDED.md` for safe defaults and all eight questions: staging access/backups, identity provisioning, experimental-feed soft-switch scope, shadow comparison design, stake/slashing/corpus policy, data rights/deletion/retention, actual tier schema, and reliable concurrency-version semantics. The existing source-marker column does not settle what the tier value should be. No decision is marked approved without the user's explicit answer.
+
+## Phase 1 status: CLOSED LOCALLY
+
+Closed on 2026-11-16 at pre-closure commit b0abda95. This means local handoff is complete; it does NOT mean local work cannot be reopened if a critical issue is discovered. Handoff artifacts: PHASE_1_CLOSURE.md and NEXT_SESSION_STAGING_CHECKLIST.md. Staging verification is required before any production decision.
+
+Correction to earlier entries: `0006_tsrg_foundation.sql:14` does add `reactions.tier` with default `mouth`; `0007` adds the separate `reaction_tier_source` marker. A default does not establish an explicit user choice. The 0009 preview does not model tier and its comment claiming no tier column is inaccurate after 0006. No migration or application code was modified during this closure. See the handoff for the brain-save Firebase-subject/UUID incompatibility, migration prerequisites, and local-only export/deletion limitations.
