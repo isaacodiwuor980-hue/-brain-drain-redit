@@ -2,12 +2,12 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vites
 import express from "express";
 import type { Server } from "node:http";
 
-const mock = vi.hoisted(() => ({ rpc: vi.fn(), configured: vi.fn(() => true) }));
+const mock = vi.hoisted(() => ({ rpc: vi.fn(), getOne: vi.fn(), configured: vi.fn(() => true) }));
 vi.mock("../lib/supabase", () => ({
   SupabaseError: class SupabaseError extends Error {
     constructor(message: string, public status: number, public body?: unknown) { super(message); }
   },
-  supabase: { rpc: mock.rpc, isConfigured: mock.configured },
+  supabase: { rpc: mock.rpc, getOne: mock.getOne, isConfigured: mock.configured },
 }));
 vi.mock("../middleware/auth", () => ({
   requireAuth(req: express.Request, res: express.Response, next: express.NextFunction) {
@@ -32,7 +32,7 @@ beforeAll(async () => {
   base = `http://127.0.0.1:${address.port}`;
 });
 afterAll(async () => { await new Promise<void>((resolve, reject) => server.close((err) => err ? reject(err) : resolve())); });
-beforeEach(() => { mock.rpc.mockReset(); mock.configured.mockReturnValue(true); });
+beforeEach(() => { mock.rpc.mockReset(); mock.getOne.mockReset(); mock.getOne.mockResolvedValue({ supabase_uid: "00000000-0000-4000-8000-000000000001" }); mock.configured.mockReturnValue(true); });
 
 const payload = { brain: { id: "b1", title: "Example" }, nodes: [] };
 async function post(body: unknown, authenticated = true) {
@@ -45,11 +45,11 @@ describe("brain save API with isolated auth/database mocks", () => {
     expect((await post({ brain: { id: "bad id", title: "x" }, nodes: [] })).status).toBe(400);
     expect(mock.rpc).not.toHaveBeenCalled();
   });
-  it("sends the verified identity and payload to the atomic database function", async () => {
-    mock.rpc.mockResolvedValue({ created: true, nodeCount: 0, brain: { id: "b1", author_id: "user-1", title: "Example", category: "", description: "", root_node_id: null, is_public: false, is_favorite: false, repo_status: null, active_branch: null, created_at: "2025-01-01T00:00:00Z" } });
+  it("sends the verified mapped UUID and payload to the atomic database function", async () => {
+    mock.rpc.mockResolvedValue({ created: true, nodeCount: 0, brain: { id: "b1", author_id: "00000000-0000-4000-8000-000000000001", title: "Example", category: "", description: "", root_node_id: null, is_public: false, is_favorite: false, repo_status: null, active_branch: null, created_at: "2025-01-01T00:00:00Z" } });
     const response = await post(payload);
     expect(response.status).toBe(201);
-    expect(mock.rpc).toHaveBeenCalledWith("save_brain_atomic", expect.objectContaining({ p_uid: "user-1", p_nodes: [] }));
+    expect(mock.rpc).toHaveBeenCalledWith("save_brain_atomic", expect.objectContaining({ p_uid: "00000000-0000-4000-8000-000000000001", p_nodes: [] }));
     expect(await response.json()).toMatchObject({ nodeCount: 0, brain: { id: "b1", created_at: 1735689600000 } });
   });
   it("fails closed on ownership conflicts and unavailable migrations", async () => {

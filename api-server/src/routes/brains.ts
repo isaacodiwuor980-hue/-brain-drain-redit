@@ -2,6 +2,7 @@ import { Router, type IRouter } from "express";
 import { z } from "zod";
 import { supabase, SupabaseError } from "../lib/supabase";
 import { optionalAuth, requireAuth } from "../middleware/auth";
+import { lookupMappedIdentity, requireMappedIdentity } from "../middleware/identity-map";
 
 const router: IRouter = Router();
 
@@ -120,7 +121,13 @@ router.get("/brains", optionalAuth, async (req, res) => {
       res.status(401).json({ error: "Authentication required" });
       return;
     }
-    filters.author_id = `eq.${req.auth.uid}`;
+    try {
+      const mapped = await lookupMappedIdentity(req.auth.uid);
+      if (!mapped) { res.status(403).json({ error: "Identity mapping required" }); return; }
+      filters.author_id = `eq.${mapped}`;
+    } catch {
+      res.status(503).json({ error: "Identity service unavailable" }); return;
+    }
   } else {
     filters.is_public = "eq.true";
   }
@@ -169,9 +176,12 @@ router.get("/brains/:id", optionalAuth, async (req, res) => {
     // Security: enforce visibility. Private brains are only accessible to their owner.
     // repo_status "private" or null = private; "public_repo" = public; "archived" = read-only public.
     const isPrivate = !brain.is_public && brain.repo_status !== "public_repo" && brain.repo_status !== "archived";
-    if (isPrivate && brain.author_id !== req.auth?.uid) {
-      res.status(404).json({ error: "Brain not found" });
-      return;
+    if (isPrivate) {
+      if (!req.auth) { res.status(404).json({ error: "Brain not found" }); return; }
+      let mapped: string | null;
+      try { mapped = await lookupMappedIdentity(req.auth.uid); }
+      catch { res.status(503).json({ error: "Identity service unavailable" }); return; }
+      if (!mapped || brain.author_id !== mapped) { res.status(404).json({ error: "Brain not found" }); return; }
     }
 
     const nodes = await supabase.get<BrainNodeRow>("brain_nodes", {
@@ -198,7 +208,7 @@ const UpsertBrainSchema = z.object({
 });
 
 /** Atomically create or update an owned brain and replace its nodes. */
-router.post("/brains", requireAuth, async (req, res) => {
+router.post("/brains", requireAuth, requireMappedIdentity, async (req, res) => {
   const parsed = UpsertBrainSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "Invalid brain", details: parsed.error.flatten() });
@@ -210,7 +220,7 @@ router.post("/brains", requireAuth, async (req, res) => {
   }
 
   const { brain: input, nodes } = parsed.data;
-  const uid = req.auth!.uid;
+  const uid = req.mappedUserId!;
 
   try {
     // One database transaction enforces ownership and replaces the node set.
@@ -245,7 +255,7 @@ router.post("/brains", requireAuth, async (req, res) => {
 });
 
 /** Delete a brain (author only). Cascades to nodes via the schema. */
-router.delete("/brains/:id", requireAuth, async (req, res) => {
+router.delete("/brains/:id", requireAuth, requireMappedIdentity, async (req, res) => {
   const id = String(req.params.id ?? "");
   if (!/^[A-Za-z0-9_-]+$/.test(id)) {
     res.status(400).json({ error: "Invalid brain id" });
@@ -263,12 +273,12 @@ router.delete("/brains/:id", requireAuth, async (req, res) => {
       res.status(404).json({ error: "Brain not found" });
       return;
     }
-    if (existing.author_id !== req.auth!.uid) {
+    if (existing.author_id !== req.mappedUserId) {
       res.status(403).json({ error: "You do not own this brain" });
       return;
     }
     // Keep the ownership predicate on the actual write as well as the probe.
-    await supabase.delete("brains", { id: existing.id, author_id: req.auth!.uid });
+    await supabase.delete("brains", { id: existing.id, author_id: req.mappedUserId! });
     res.status(204).end();
   } catch (error) {
     if (error instanceof SupabaseError) {
