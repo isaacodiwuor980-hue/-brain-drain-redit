@@ -2,6 +2,7 @@ import { Router, type IRouter } from "express";
 import { z } from "zod";
 import { supabase, SupabaseError } from "../lib/supabase";
 import { requireAuth } from "../middleware/auth";
+import { requireMappedIdentity } from "../middleware/identity-map";
 
 const router: IRouter = Router();
 
@@ -102,7 +103,7 @@ const FollowTopicSchema = z.object({
 });
 
 /** Follow a topic (authenticated). */
-router.post("/topics/follow", requireAuth, async (req, res) => {
+router.post("/topics/follow", requireAuth, requireMappedIdentity, async (req, res) => {
   const parsed = FollowTopicSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "Invalid request" });
@@ -115,7 +116,7 @@ router.post("/topics/follow", requireAuth, async (req, res) => {
   try {
     await supabase.insert(
       "topic_followers",
-      { topic_id: parsed.data.topicId, user_id: req.auth!.uid },
+      { topic_id: parsed.data.topicId, user_id: req.mappedUserId! },
       "resolution=merge-duplicates",
     );
     res.status(204).end();
