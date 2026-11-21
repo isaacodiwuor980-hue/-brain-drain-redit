@@ -20,3 +20,7 @@ Post-change full `npm test`: 347 tests / 68 files passed; `npm run typecheck` an
 ## Symmetric bridge follow-up
 
 Checkpoint `af102d1` preserved the preceding local work. Before implementation `npx vitest run lib/tsrg/symmetric-bridge.test.ts` had 2 failures because the function was absent. After implementation, the same tests and related `properties.test.ts` and `v2.test.ts` passed (17 tests in 3 files). Full `npm test`: 349 tests in 69 files passed; `npm run lint` (including typecheck) passed with 0 errors and 2 existing warnings; `npm run build` passed. Local dev server returned HTTP 200 for `/`; this does not verify browser interaction, integrations or production. `git diff --check` passed. No live services, migrations or flag enablement were involved.
+
+## Interest-learning prototype follow-up
+
+Checkpoint before changes: `310c053`. `npx vitest run lib/tsrg/interest-prototype.test.ts` failed three tests before the new function existed, then the same tests passed. Focused run with authority and symmetric bridge tests: 9 tests passed. Full `npm test`: 352 tests / 70 files passed. `npm run lint` (including typecheck) passed with 0 errors and 2 existing warnings; `npm run build` passed; `git diff --check` passed. Local dev server started and GET `/` returned 200; no browser workflow was verified. No Supabase database inspection or modification was performed.

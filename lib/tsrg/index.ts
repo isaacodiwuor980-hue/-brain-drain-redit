@@ -244,3 +244,40 @@ export function authorityCompositeV2(earnedBehavior: number, earnedZScore: numbe
 export function bridgingBonusSymmetricV3(support: ReadonlySet<string>, oppose: ReadonlySet<string>, medianGapMinutes: number | null): number {
   return Math.max(bridgingBonusV2(support, oppose, medianGapMinutes), bridgingBonusV2(oppose, support, medianGapMinutes));
 }
+
+/** A single verified exposure and whether it received a positive interaction.
+ * A downvote must not be recorded as a positive interaction or as evidence of
+ * disinterest. This prototype has no access to raw actions or expertise data.
+ */
+export type InterestExposureV3 = Readonly<{ id: string; topic: string; at: number; engaged: boolean }>;
+
+/**
+ * Offline interest experiment, never used for authority or public expert tags.
+ * Each record must represent a genuinely observed exposure, with downvotes
+ * excluded by the caller. Dedupe by stable exposure ID before calling; duplicate
+ * IDs are rejected. Sparse evidence and old evidence tend toward neutral 0.5.
+ * The half-life and prior are explicit experimental inputs, not launch policy.
+ * No tracking, persistence, opt-out or user-visible ranking is implemented.
+ */
+export function interestFromExposuresV3(events: readonly InterestExposureV3[], now: number, halfLifeMs: number, prior: number): Map<string, number> {
+  if (!Number.isFinite(now) || !Number.isFinite(halfLifeMs) || halfLifeMs <= 0 || !Number.isFinite(prior) || prior <= 0) throw new RangeError("Invalid interest model configuration");
+  const seen = new Set<string>();
+  const ordered = [...events];
+  for (const event of ordered) {
+    if (!event || typeof event.id !== "string" || !event.id || typeof event.topic !== "string" || !event.topic || !Number.isFinite(event.at) || event.at > now || typeof event.engaged !== "boolean" || seen.has(event.id)) throw new RangeError("Invalid or duplicate exposure");
+    seen.add(event.id);
+  }
+  // Stable order makes floating point addition independent of input order.
+  ordered.sort((a, b) => a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+  const sums = new Map<string, { total: number; positive: number }>();
+  for (const event of ordered) {
+    const weight = Math.pow(0.5, (now - event.at) / halfLifeMs);
+    const row = sums.get(event.topic) ?? { total: 0, positive: 0 };
+    row.total += weight;
+    if (event.engaged) row.positive += weight;
+    sums.set(event.topic, row);
+  }
+  const result = new Map<string, number>();
+  for (const [topic, row] of sums) result.set(topic, (prior * 0.5 + row.positive) / (prior + row.total));
+  return result;
+}
