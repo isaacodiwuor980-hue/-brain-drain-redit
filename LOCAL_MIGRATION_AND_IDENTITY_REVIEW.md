@@ -37,4 +37,36 @@ Identity mapping is not provisioned. Static inspection does not prove all route 
 | notifications, settings, saves, messaging | no complete cloud route audit completed | unverified; cloud lifecycle export/delete not implemented |
 | analytics/events, recommendations, client errors, data API | separate routes; identity, data retention and authorization not comprehensively audited | unverified |
 
-The separate 0011 setter rejects voters without explicit grants, contradicting the new requested 0.1 baseline: it is unwired and must be redesigned/tested before enabling. No user should be assigned authority just from self-declared tags. Neither email nor UUID-shaped Firebase subjects establish a valid mapping.
+The 0011 setter is unwired; see the Session A addendum below for its updated baseline behavior and unresolved snapshot policy. No user should be assigned authority just from self-declared tags. Neither email nor UUID-shaped Firebase subjects establish a valid mapping.
+
+## Session A per-route inventory (static inspection)
+
+All paths in `api-server/src/routes/index.ts` are listed below; test files are excluded. This inventory identifies identity sources, not a completed authorization or schema audit. Where a schema is absent, do not assume a type. Identity mapping lookup is server-side; it does not derive identities from email. `requireMappedIdentity` returns 403 `Identity mapping required`, or 503 on lookup failure; `/me` currently deliberately returns 401 on unmapped and remains inconsistent.
+
+| Route file | Before → after; target column | Status |
+| --- | --- | --- |
+| `brains.ts` | mapped UUID → mapped UUID, brains.author_id UUID; optional-auth public paths resolve mapping for private data | previously implemented; mocked tests only |
+| `me.ts` | mapped UUID → mapped UUID, user_identity_map.supabase_uid UUID | previously implemented; unmapped status 401 inconsistent |
+| `topics.ts` | follow Firebase UID → mapped UUID, topic_followers.user_id UUID; topic creation has no owner column | follow has mocked identity tests; topic creation unchanged |
+| `personality.ts` | Firebase UID → mapped UUID, personality_results.user_id UUID | submit/read have mocked identity tests |
+| `posts.ts` | Firebase UID → unchanged; posts.user_id/reactions.user_id UUID | not fixed; ordinary reactions are in this file; writes are non-atomic |
+| `feed.ts` | optional Firebase UID → unchanged; posts/reactions.user_id UUID, user_follows schema absent | not fixed; anonymous read must remain public |
+| `discover.ts` | Firebase UID → unchanged; topic_followers.user_id/profiles.id UUID; user_follows schema absent | not fixed; public search path must remain public |
+| `experts.ts` | Firebase UID → unchanged; experts.user_id/reviewed_by UUID | not fixed; reviewer's verified email is an admin gate, not a mapping |
+| `onboarding.ts` | Firebase UID → unchanged; onboarding.user_id UUID | not fixed |
+| `recall.ts` | Firebase UID → unchanged; recall_events.user_id UUID | not fixed; brain association authorization also needs review |
+| `mentors.ts` | Firebase UID → unchanged; mentee_user_id/mentor_user_id UUID | not fixed; conditional-write authorization also needs review |
+| `skills.ts` | Firebase UID → unchanged; author_id is absent in 0002, reviewer_id TEXT | author identity schema decision required; reviewer_id semantics unknown |
+| `habits.ts` | Firebase UID → unchanged; habits schema absent | schema/identity decision required; owner-conditioned writes need review |
+| `search.ts` | public search, no caller identity; skills schema | unchanged; published filtering mocked only |
+| `events.ts` | no authenticated identity; analytics storage has session/event IDs, analytics_events.user_id UUID nullable in 0001 | no user mapping; ingestion privacy/consent needs audit |
+| `client-errors.ts` | no authenticated identity; logs client payload, no owned DB column | unchanged; logging/privacy needs review |
+| `recommendations.ts` | no authenticated identity; reads analytics-store events | unchanged; data sensitivity/cache audit needed |
+| `data-api.ts` | public dataset/search; no mapped user column in this route | unchanged; corpus/claim review separate |
+| `health.ts` | no user identity; readiness reads public topics | unchanged |
+| `tsrg-status.ts` | no user identity; reads server_feature_flags | unchanged; cooperating online clients only |
+| `index.ts` | router registration only | no direct identity handling |
+
+There are no separate API route files for notifications, settings, saves or messaging in this router inventory. Tables notifications/messages have UUID user/sender/participant columns in 0001; client-local features and other server entry points must be separately checked, not assumed covered. `server.ts` also has sitemap, llms, data-quality and frontend-serving routes, not included above as owned-data APIs.
+
+0011 now stores 0.1 for users without an active grant in the post's actual topic (including revoked grants); grant and snapshot constraints enforce 0.1–1. This is an **unwired** local change, not a claim of real expertise. Existing snapshot scores remain historical if a grant is revoked or the post changes topic; any future aggregate must define and enforce revocation/topic-change policy before use. Tests changed the prior denial assertion because the user explicitly requested baseline voting. Independent database concurrency and grant-insertion races are not tested.
