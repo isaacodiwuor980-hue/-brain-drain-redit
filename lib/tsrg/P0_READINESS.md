@@ -73,3 +73,8 @@ See `DECISIONS_NEEDED.md` for safe defaults and all eight questions: staging acc
 Closed on 2026-11-16 at pre-closure commit b0abda95. This means local handoff is complete; it does NOT mean local work cannot be reopened if a critical issue is discovered. Handoff artifacts: PHASE_1_CLOSURE.md and NEXT_SESSION_STAGING_CHECKLIST.md. Staging verification is required before any production decision.
 
 Correction to earlier entries: `0006_tsrg_foundation.sql:14` does add `reactions.tier` with default `mouth`; `0007` adds the separate `reaction_tier_source` marker. A default does not establish an explicit user choice. The 0009 preview does not model tier and its comment claiming no tier column is inaccurate after 0006. No migration or application code was modified during this closure. See the handoff for the brain-save Firebase-subject/UUID incompatibility, migration prerequisites, and local-only export/deletion limitations.
+
+
+## Brain identity integration after local closure
+
+Protected brain save/list/read/delete paths now use `user_identity_map` via `lookupMappedIdentity` or `requireMappedIdentity`; public brain reads remain independent. This deliberately changes behavior for unmapped users, who fail closed, and the old mocked test asserting raw Firebase `p_uid` was replaced with a mapped-UUID assertion. Additional mocked HTTP tests cover two users and outages. The provisioning mechanism, existing account mappings, schema compatibility, staging and real multi-session correctness are not verified. Do not deploy before reviewed provisioning and staged validation. The prior closure section and direct-UID findings describe the historical commit, not this working tree.

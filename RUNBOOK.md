@@ -175,3 +175,10 @@ The repository's PGlite tests are useful regression checks but do not replace st
 - **Repo:** [GitHub URL]
 - **Status page:** [status URL]
 - **On-call:** [PagerDuty URL]
+
+
+## Brain identity mapping integration — rollout blocker
+
+Local code now requires the `0007` `user_identity_map` mapping for protected brain list, private read, save and delete operations; save passes the mapped UUID to the `0005` RPC. Unmapped subjects fail closed and identity lookup outages return 503. Public reads remain available without a mapping. **Do not deploy this code until** the deployed schema and both migrations are verified, mapping provisioning and recovery are reviewed, active users have verified mappings, and isolated staging tests pass for two users, no mapping, outages, existing data and concurrency. `0007`/`0005` have not been deployed by this work. This changes previous behavior for users without mappings and can block them from their cloud data. Never create mappings by guessing email or treating a Firebase subject as a Supabase UUID.
+
+Roll back API code only after assessing the prior version's ownership and non-atomic write risks; do not drop mapping rows or database functions without a reviewed backup and explicit authorization. Preserve local data and expose failures to users. See `PRODUCTION_READINESS_ROADMAP.md` and `NEXT_SESSION_STAGING_CHECKLIST.md`.

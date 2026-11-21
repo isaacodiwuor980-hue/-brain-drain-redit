@@ -81,3 +81,10 @@ The brain-write service-role authorization and identity-mapping concerns above r
 
 ### Further local durability repair
 - Social post creation and reaction writes now use strict IndexedDB writes, rejecting blocked storage instead of presenting a no-op as saved. Fake IndexedDB and blocked-storage tests cover the write primitive; complete browser interaction and cloud behavior remain unverified. Other authoritative local write paths still need an audit.
+
+## Subsequent local skill API hardening
+
+- The public `GET /api/v1/search/skills` used the service-role client without a published-only database predicate. Local code now filters on `status=published` and defensively excludes non-published results; `api-server/src/routes/search.privacy.http.test.ts` exercises three modes with mocked database rows. This does not protect direct Supabase access and is not production verification.
+- Skill PUT previously used `resolution=merge-duplicates` with an untrusted ID and could overwrite another author's record using the service role. The local route now inserts first and updates conflicts using a single ID-and-author predicate with returned-ID checking. DELETE now predicates the actual write on ID and author and reports a no-row race. Mocked HTTP tests and PostgREST request-construction tests cover these cases; real Supabase concurrency and schema behavior remain unverified.
+- Migration 0002's `skills` definition lacks the `author_id` and `updated_at` columns assumed by the current skill API. The route still uses Firebase subjects as author IDs, and identity mapping, actual schema compatibility, grants and RLS remain open blockers. No database was changed.
+- Isolated local PGlite reproduced the 0002 nested dollar-quote parse failure (SQLSTATE 42601 after omitting the pgvector extension statement) and the 0004 time-dependent partial-index predicate rejection (42P17). Staging validation and a reviewed, authorized migration plan remain necessary.
