@@ -371,3 +371,7 @@ To address all issues (including breaking changes), run:
 
 ```
 
+
+## Known dependency-audit item — Session C
+
+The full `npm audit` output above reported **9 moderate findings** in the development-tool dependency tree (`minimatch` via TypeScript ESLint and `postcss-selector-parser` via Tailwind Typography). The separate `npm audit --omit=dev` run in Session C reported **0 vulnerabilities**. This distinguishes the installed production dependency audit from the full tooling audit; it is not a security certification. No dependency upgrade or `audit fix` was attempted, and the advisory findings remain open. Recheck the dependency graph and evaluate safe patches before release.
