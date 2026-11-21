@@ -80,11 +80,16 @@ router.post("/topics", requireAuth, async (req, res) => {
       description: parsed.data.description,
       category: parsed.data.category ?? null,
     };
-    // On conflict (duplicate id) return the existing row instead of erroring.
-    await supabase.insert("topics", row, "resolution=merge-duplicates");
+    // Never merge a caller-supplied ID using the service role: another
+    // user's existing topic must not be overwritten on conflict.
+    await supabase.insert("topics", row);
     res.status(201).json({ topic: { ...row, followerCount: 0 } });
   } catch (error) {
     if (error instanceof SupabaseError) {
+      if (error.status === 409) {
+        res.status(409).json({ error: "Topic already exists or conflicts with an existing topic" });
+        return;
+      }
       res.status(502).json({ error: "Could not create topic" });
       return;
     }
