@@ -23,6 +23,7 @@ interface DecodedToken {
     exp: number;
     auth_time?: number;
     email?: string;
+    email_verified?: boolean;
     name?: string;
     picture?: string;
     firebase?: {
@@ -37,6 +38,7 @@ interface DecodedToken {
 export interface VerifiedAuth {
   uid: string;
   email?: string;
+  emailVerified?: boolean;
   displayName?: string;
   photoURL?: string;
 }
@@ -149,10 +151,16 @@ function verifyClaims(decoded: DecodedToken): VerifiedAuth {
     throw new Error("Token issuer does not match the Firebase project");
   }
 
-  if (!payload.sub || typeof payload.sub !== "string") {
-    throw new Error("Token has no subject");
+  if (typeof payload.sub !== "string" || payload.sub.length === 0 || payload.sub.length > 128) {
+    throw new Error("Token has invalid subject");
   }
 
+  // Arithmetic comparisons against undefined, strings or NaN can silently
+  // pass. Require numeric integer timestamps before enforcing their bounds.
+  if (!Number.isSafeInteger(payload.exp) || payload.exp <= 0 ||
+      !Number.isSafeInteger(payload.iat) || payload.iat <= 0) {
+    throw new Error("Token has invalid timestamps");
+  }
   if (payload.exp + ALLOWED_CLOCK_SKEW_MS / 1000 < now) {
     throw new Error("Token has expired");
   }
@@ -164,6 +172,7 @@ function verifyClaims(decoded: DecodedToken): VerifiedAuth {
   return {
     uid: payload.sub,
     email: payload.email,
+    emailVerified: payload.email_verified === true,
     displayName: payload.name,
     photoURL: payload.picture,
   };

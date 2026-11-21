@@ -30,8 +30,8 @@ const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || "")
   .map((s) => s.trim().toLowerCase())
   .filter(Boolean);
 
-function isAdmin(email: string | undefined): boolean {
-  if (!email) return false;
+function isAdmin(email: string | undefined, emailVerified: boolean | undefined): boolean {
+  if (!email || emailVerified !== true) return false;
   return ADMIN_EMAILS.includes(email.toLowerCase());
 }
 
@@ -121,7 +121,7 @@ router.post("/experts", requireAuth, async (req, res) => {
     res.status(201).json({ ok: true, status: "draft" });
   } catch (error) {
     if (error instanceof SupabaseError) {
-      req.log?.error?.({ err: error }, "Expert application failed");
+      req.log?.error?.({ status: error.status }, "Expert application failed");
       res.status(502).json({ error: "Storage unavailable" });
       return;
     }
@@ -169,7 +169,7 @@ router.get("/experts", optionalAuth, async (req, res) => {
     });
   } catch (error) {
     if (error instanceof SupabaseError) {
-      req.log?.error?.({ err: error }, "Expert list failed");
+      req.log?.error?.({ status: error.status }, "Expert list failed");
       res.status(502).json({ error: "Storage unavailable" });
       return;
     }
@@ -216,7 +216,7 @@ router.get("/experts/me", requireAuth, async (req, res) => {
     });
   } catch (error) {
     if (error instanceof SupabaseError) {
-      req.log?.error?.({ err: error }, "Expert self-fetch failed");
+      req.log?.error?.({ status: error.status }, "Expert self-fetch failed");
       res.status(502).json({ error: "Storage unavailable" });
       return;
     }
@@ -232,7 +232,7 @@ router.post("/experts/:id/submit", requireAuth, async (req, res) => {
   // S-4 fix: validate :id as UUID before using it in PostgREST filters.
   // Without this, an attacker could inject PostgREST filter operators via
   // the URL (e.g. /experts/eq.foo/submit). Experts IDs are UUIDs.
-  const id = String(req.params.id ?? "");
+  const id = String(req.params.id ?? "").toLowerCase();
   if (!/^[0-9a-fA-F-]{36}$/.test(id)) {
     res.status(400).json({ error: "Invalid id" });
     return;
@@ -242,6 +242,10 @@ router.post("/experts/:id/submit", requireAuth, async (req, res) => {
     return;
   }
 
+  if (!/^[A-Za-z0-9_-]{1,128}$/.test(req.auth!.uid)) {
+    res.status(403).json({ error: "Identity not supported" });
+    return;
+  }
   try {
     // Fetch + verify ownership in one go.
     const row = await supabase.getOne<{ user_id: string; credential_status: string }>("experts", {
@@ -262,16 +266,20 @@ router.post("/experts/:id/submit", requireAuth, async (req, res) => {
       return;
     }
 
-    await supabase.update(
+    // Re-check owner and status in the write itself; a prior read can race.
+    const updated = await supabase.updateMatchingIds(
       "experts",
-      { id: `eq.${id}` },
+      { id, user_id: req.auth!.uid, credential_status: "draft" },
       { credential_status: "pending_review" },
     );
-
+    if (updated.length !== 1 || updated[0] !== id) {
+      res.status(409).json({ error: "Application changed; please refresh" });
+      return;
+    }
     res.json({ ok: true, status: "pending_review" });
   } catch (error) {
     if (error instanceof SupabaseError) {
-      req.log?.error?.({ err: error }, "Expert submit-for-review failed");
+      req.log?.error?.({ status: error.status }, "Expert submit-for-review failed");
       res.status(502).json({ error: "Storage unavailable" });
       return;
     }
@@ -290,12 +298,12 @@ const AdminReviewSchema = z.object({
  */
 router.post("/experts/:id/verify", requireAuth, async (req, res) => {
   // S-4 fix: validate :id as UUID (same rationale as /submit above).
-  const id = String(req.params.id ?? "");
+  const id = String(req.params.id ?? "").toLowerCase();
   if (!/^[0-9a-fA-F-]{36}$/.test(id)) {
     res.status(400).json({ error: "Invalid id" });
     return;
   }
-  if (!isAdmin(req.auth?.email)) {
+  if (!isAdmin(req.auth?.email, req.auth?.emailVerified)) {
     res.status(403).json({ error: "Admin only" });
     return;
   }
@@ -321,12 +329,17 @@ router.post("/experts/:id/verify", requireAuth, async (req, res) => {
       is_public: parsed.data.decision === "verified",
     };
 
-    await supabase.update("experts", { id: `eq.${id}` }, changes);
-
+    // Only a pending application may transition; distinguish a missed update
+    // from success without leaking whether a private application exists.
+    const updated = await supabase.updateMatchingIds("experts", { id, credential_status: "pending_review" }, changes);
+    if (updated.length !== 1 || updated[0] !== id) {
+      res.status(409).json({ error: "Application is not pending review" });
+      return;
+    }
     res.json({ ok: true, status: parsed.data.decision });
   } catch (error) {
     if (error instanceof SupabaseError) {
-      req.log?.error?.({ err: error }, "Expert admin review failed");
+      req.log?.error?.({ status: error.status }, "Expert admin review failed");
       res.status(502).json({ error: "Storage unavailable" });
       return;
     }
