@@ -176,10 +176,12 @@ app.use(
 
 // A stricter limiter for ingest/error endpoints, a more lenient one for reads.
 const writeLimiter = createRateLimiter({
+  namespace: "write",
   windowMs: config.rateLimit.windowMs,
   max: config.rateLimit.max,
 });
 const readLimiter = createRateLimiter({
+  namespace: "read",
   windowMs: config.rateLimit.windowMs,
   max: config.rateLimit.max * 5,
 });
@@ -199,6 +201,7 @@ app.use("/api/client-errors", writeLimiter);
  * read traffic degrades independently.
  */
 const authLimiter = createRateLimiter({
+  namespace: "auth",
   windowMs: config.rateLimit.windowMs,
   // Writes are ~1/5th of a typical session; give them a proportional slice
   // but never less than 10/min (a human editing a brain legitimately).
@@ -207,12 +210,8 @@ const authLimiter = createRateLimiter({
 app.use("/api/posts", authLimiter);
 app.use("/api/brains", authLimiter);
 
-/**
- * Expensive read tier: paginated feed pages and full-text search are the two
- * hottest queries (they carry joins / PostgREST filters). Cap them at the
- * normal read budget while plain reads keep the 5x budget.
- */
-app.use("/api/search", readLimiter);
+// The general read limiter below also covers search. Applying the same
+// limiter here would count a single search request twice.
 // B3 (stale-cache fix): without an explicit Cache-Control, browsers may
 // heuristic-cache API GETs and serve them WITHOUT contacting the server —
 // observed live: a personalized /api/feed?mode=following response was served
@@ -223,19 +222,9 @@ app.use("/api", (_req, res, next) => {
   next();
 });
 
-/**
- * PERF: feed responses are served from a server-side SWR cache, so a short
- * private cache window is safe and removes repeat requests entirely on
- * back-navigation (the single most common mobile gesture). Personalized
- * reaction state stays correct because the server re-renders per-user anyway
- * — hence `private`, never `public`.
- */
-app.use("/api/feed", (req, res, next) => {
-  if (req.method === "GET") {
-    res.setHeader("Cache-Control", "private, max-age=15, stale-while-revalidate=60");
-  }
-  next();
-});
+// Feed responses can include the current viewer's reaction state. Keep the
+// API-wide no-store policy even in private browser caches across account
+// switching; server-side caching separately personalizes each response.
 app.use("/api", readLimiter);
 app.use("/api", router);
 
