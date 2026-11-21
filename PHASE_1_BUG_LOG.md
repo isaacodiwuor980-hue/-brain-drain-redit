@@ -22,3 +22,6 @@ Status terminology: VERIFIED = observed locally, UNKNOWN = not established. Thes
 
 ## Brain-save handoff correction — NOT CONFIRMED AS BUG
 - Source `api-server/src/routes/brains.ts` obtains `req.mappedUserId` after mapped identity middleware and passes it as `p_uid`; `api-server/src/routes/brains.identity.http.test.ts` passes with mocked dependencies. This refutes the handoff's direct Firebase UID claim for that path, but is not proof of real database security or every route.
+
+## Symmetric bridge — ADDITIVE PROTOTYPE VERIFIED, not integrated
+- User chose equal treatment of support and opposition. Before implementation, `npx vitest run lib/tsrg/symmetric-bridge.test.ts` failed 2 tests because the symmetric API did not exist. The same tests pass with `bridgingBonusSymmetricV3`; 17 related tests passed. It takes the maximum of the existing directional heuristics; clusters are caller-supplied, not independently verified. Legacy directional helpers are unchanged. It does not affect the current feed or establish fairness in deployment.

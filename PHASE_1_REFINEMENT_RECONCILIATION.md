@@ -6,3 +6,9 @@
 - **R5 VERIFIED by diff:** legacy exports retained unchanged; new exports are additive. The exploratory failing assertions targeted legacy APIs whereas passing assertions target V2, so no claim of a conventional failing-then-passing production regression is justified.
 
 No factual truth, production readiness, abuse resistance or 100% accuracy is implied by these calculations.
+
+## Later product decisions
+- User approved symmetric support/opposition bridging. `bridgingBonusSymmetricV3` is an isolated, unwired heuristic; the same test failed before the API existed and passes after. Cluster provenance and real-world fairness are unverified.
+- Expert-topic tags are public only after supporting evidence is reviewed; a tag is not a badge. No review workflow or public tag is implemented here.
+- A downvote is not evidence of topic disinterest. Signed-in users should be able to disable personalization and clear saved interest topics. Neither control is implemented here. Views and interests do not confer expertise.
+- Cold starts should be varied; personalize over time and reduce topic exposure with explicit hiding or sustained lack of engagement, while retaining variety. Exact signals, persistence, deletion, safeguards and rollout require design and verification against the actual schema. Do not treat the absence of an interaction as a reliably observed impression.

@@ -234,3 +234,13 @@ export function authorityCompositeV2(earnedBehavior: number, earnedZScore: numbe
   if (!Number.isFinite(earnedBehavior) || !Number.isFinite(earnedZScore) || earnedBehavior < 0 || earnedBehavior > 1 || earnedZScore < 0 || earnedZScore > 1) throw new RangeError("Invalid earned authority inputs");
   return Math.max(0.1, Math.min(1, 0.5 * earnedBehavior + 0.2 * earnedZScore));
 }
+
+/**
+ * Offline-only symmetric bridge heuristic. Either side may have two clusters
+ * not represented on the other side. This is not evidence of independence,
+ * truth or abuse, and does not implement a complete feed ranking pipeline.
+ * The existing directional functions remain unchanged.
+ */
+export function bridgingBonusSymmetricV3(support: ReadonlySet<string>, oppose: ReadonlySet<string>, medianGapMinutes: number | null): number {
+  return Math.max(bridgingBonusV2(support, oppose, medianGapMinutes), bridgingBonusV2(oppose, support, medianGapMinutes));
+}

@@ -16,3 +16,7 @@ Independent local subsets (commands run from repository root, all exit 0):
 Post-change full `npm test`: 347 tests / 68 files passed; `npm run typecheck` and `npm run build` passed; `git diff --check` passed. `npx eslint .` initially found one new test console warning; removing that log and rerunning yielded 0 errors / 2 pre-existing warnings. After that log-only test edit, the changed determinism file was rerun: 2 passed. Full suite was run immediately before that edit.
 
 **VERIFIED BY TEST:** limited arithmetic, seeded properties, selected local DB and mocked paths above. **MOCKED ONLY:** HTTP identity and storage dependencies. **UNVERIFIED:** real deployed schema/RLS, 70/15/10/5 full pipeline, all exports, cross-runtime determinism, comprehensive chaos and fairness/anti-abuse requirements. Passing tests documenting gaps do not mean those requirements are met.
+
+## Symmetric bridge follow-up
+
+Checkpoint `af102d1` preserved the preceding local work. Before implementation `npx vitest run lib/tsrg/symmetric-bridge.test.ts` had 2 failures because the function was absent. After implementation, the same tests and related `properties.test.ts` and `v2.test.ts` passed (17 tests in 3 files). Full `npm test`: 349 tests in 69 files passed; `npm run lint` (including typecheck) passed with 0 errors and 2 existing warnings; `npm run build` passed. Local dev server returned HTTP 200 for `/`; this does not verify browser interaction, integrations or production. `git diff --check` passed. No live services, migrations or flag enablement were involved.
