@@ -203,3 +203,34 @@ export function ringIdentityOverlap(current: ReadonlySet<string>, known: Readonl
     return [...current].filter(member => ring.members.has(member)).length / current.size >= 0.6;
   });
 }
+
+/** V2 honors design refinement R1. Under 0.10 remains read-only; 0.10–0.35 is Mouth. */
+export function authorityTierV2(value: number): AuthorityTier {
+  if (!Number.isFinite(value) || value < 0.1 || value > 1) return 0;
+  if (value < 0.35) return 1;
+  if (value < 0.55) return 2;
+  if (value < 0.75) return 3;
+  return 4;
+}
+
+/** V2 honors design refinement R1. Eligibility is not wired to production. */
+export function canStakeDetailedV2(authority: number, stake: StakeTier, ageDays: number): { allowed: boolean; reason?: string } {
+  const tier = authorityTierV2(authority);
+  if (tier === 0) return { allowed: false, reason: "AUTHORITY_TOO_LOW" };
+  if (!Number.isFinite(ageDays) || ageDays < 1) return { allowed: false, reason: "ACCOUNT_TOO_NEW" };
+  const index = tiers.indexOf(stake);
+  if (index < 0) return { allowed: false, reason: "INVALID_TIER" };
+  if (index >= tier) return { allowed: false, reason: `TIER_CAP_EXCEEDED (max: ${tiers[tier - 1]})` };
+  return { allowed: true };
+}
+
+/**
+ * V2 honors design refinements R1, R2 and R3. Only server-verified earned
+ * behavior and evidence-based z-score are eligible; views and self-declared
+ * credentials carry zero weight. Caller MUST verify provenance; arithmetic
+ * alone cannot detect misrepresented inputs. Never wired to user input.
+ */
+export function authorityCompositeV2(earnedBehavior: number, earnedZScore: number): number {
+  if (!Number.isFinite(earnedBehavior) || !Number.isFinite(earnedZScore) || earnedBehavior < 0 || earnedBehavior > 1 || earnedZScore < 0 || earnedZScore > 1) throw new RangeError("Invalid earned authority inputs");
+  return Math.max(0.1, Math.min(1, 0.5 * earnedBehavior + 0.2 * earnedZScore));
+}
