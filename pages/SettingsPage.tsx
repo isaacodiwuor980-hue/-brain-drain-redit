@@ -13,6 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { idb } from "@/lib/db";
 import { AdminGateDialog } from "@/components/ui/admin-gate-dialog";
 import { refreshLocalData } from "@/lib/data-maintenance";
+import { collectLocalExport } from "@/lib/local-data-export";
 
 interface SavedSettings {
   displayName: string;
@@ -214,27 +215,39 @@ export function SettingsPage() {
   };
 
   const handleExportAccountData = async () => {
-    const stores = ["profile", "settings", "posts", "topics", "brains", "nodes", "missions", "milestones", "comments", "conversations", "messages", "notifications", "communities", "checkins", "pathways", "books", "analytics_events"];
-    const data: Record<string, unknown> = {};
-
-    for (const store of stores) {
-      try {
-        data[store] = await idb.getAll(store);
-      } catch {
-        data[store] = [];
-      }
+    try {
+      const data = await collectLocalExport();
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = `brain-builder-local-export-${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(url);
+      toast({ title: "Local export ready", description: "Selected browser data only; cloud data and other local stores are not included." });
+    } catch {
+      toast({ title: "Local export failed", description: "Browser data could not be read. No complete export was created.", variant: "destructive" });
     }
+  };
 
-    const blob = new Blob([JSON.stringify({ exportedAt: new Date().toISOString(), data }, null, 2)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement("a");
-    anchor.href = url;
-    anchor.download = `brain-builder-export-${new Date().toISOString().slice(0, 10)}.json`;
-    document.body.appendChild(anchor);
-    anchor.click();
-    document.body.removeChild(anchor);
-    URL.revokeObjectURL(url);
-    toast({ title: "Export ready", description: "Your local account data export has been downloaded." });
+  const handleClearLocalData = async () => {
+    if (!confirm("Clear this browser's local data? This cannot be undone and may remove unsynced work. Your account and cloud data will NOT be deleted.")) return;
+    try {
+      await idb.clearAllStrict();
+      let browserStorageCleared = true;
+      try { localStorage.clear(); } catch { browserStorageCleared = false; }
+      try { sessionStorage.clear(); } catch { browserStorageCleared = false; }
+      toast({
+        title: browserStorageCleared ? "Local data cleared" : "Local data partly cleared",
+        description: browserStorageCleared ? "Browser data was cleared. Your account and cloud data were not deleted. Reloading..." : "IndexedDB was cleared, but some browser storage could not be cleared. Your account and cloud data were not deleted.",
+        ...(browserStorageCleared ? {} : { variant: "destructive" as const }),
+      });
+      if (browserStorageCleared) setTimeout(() => window.location.reload(), 1000);
+    } catch {
+      toast({ title: "Could not clear local data", description: "Browser storage could not be cleared. Your account and cloud data were not deleted.", variant: "destructive" });
+    }
   };
 
   return (
@@ -426,7 +439,7 @@ export function SettingsPage() {
                 <div className="p-6 flex items-center justify-between">
                   <div className="space-y-0.5">
                     <h3 className="font-medium">Push Notifications</h3>
-                    <p className="text-sm text-muted-foreground">Receive alerts for mentions and new followers.</p>
+                    <p className="text-sm text-muted-foreground">Saved preference only; it does not control push notifications yet.</p>
                   </div>
                   <Switch checked={notifications} onCheckedChange={setNotifications} />
                 </div>
@@ -434,7 +447,7 @@ export function SettingsPage() {
                 <div className="p-6 flex items-center justify-between">
                   <div className="space-y-0.5">
                     <h3 className="font-medium">Private Profile</h3>
-                    <p className="text-sm text-muted-foreground">Only approved followers can see your posts and brains.</p>
+                    <p className="text-sm text-muted-foreground">Saved preference only; it does not restrict profile, post, or brain visibility.</p>
                   </div>
                   <Switch checked={privateProfile} onCheckedChange={setPrivateProfile} />
                 </div>
@@ -442,7 +455,7 @@ export function SettingsPage() {
                 <div className="p-6 flex items-center justify-between">
                   <div className="space-y-0.5">
                     <h3 className="font-medium">Analytics &amp; Telemetry</h3>
-                    <p className="text-sm text-muted-foreground">Help us improve by sending anonymous usage data.</p>
+                    <p className="text-sm text-muted-foreground">Saved preference only; it does not currently control analytics collection.</p>
                   </div>
                   <Switch checked={dataCollection} onCheckedChange={setDataCollection} />
                 </div>
@@ -450,7 +463,7 @@ export function SettingsPage() {
             </Card>
             ) : (
               <p className="text-sm text-muted-foreground italic px-1 py-2 leading-relaxed">
-                {notifications ? "Notifications on" : "Notifications off"} • {privateProfile ? "Private profile" : "Public profile"} • {dataCollection ? "Telemetry on" : "Telemetry off"}. <span className="not-italic font-medium text-foreground/70">Tap to expand.</span>
+                Local preferences saved on this device; privacy, push, and analytics controls are not yet enforced. <span className="not-italic font-medium text-foreground/70">Tap to expand.</span>
               </p>
             )}
           </section>
@@ -473,7 +486,7 @@ export function SettingsPage() {
             {expandedSections.advanced && (
             <div className="space-y-2">
               <Button onClick={() => void handleExportAccountData()} variant="outline" className="w-full justify-between h-14 px-6 font-normal">
-                <span>Export Account Data</span>
+                <span>Export selected local data</span>
                 <ChevronRight className="w-5 h-5 text-muted-foreground" />
               </Button>
               <Button onClick={() => setIsRefreshOpen(true)} variant="outline" className="w-full justify-between h-14 px-6 font-normal">
@@ -483,19 +496,12 @@ export function SettingsPage() {
                 </span>
                 <ChevronRight className="w-5 h-5 text-muted-foreground" />
               </Button>
-              <Button onClick={() => {
-                if (confirm("Are you sure you want to delete your account? This will clear your local data. This cannot be undone.")) {
-                  void idb.clearAll().then(() => {
-                    try { localStorage.clear(); } catch {}
-                    try { sessionStorage.clear(); } catch {}
-                    toast({ title: "Account deleted", description: "All local data has been cleared. Reloading..." });
-                    setTimeout(() => window.location.reload(), 1000);
-                  });
-                }
-              }} variant="outline" className="w-full justify-between h-14 px-6 font-normal text-destructive hover:text-destructive hover:bg-destructive/10">
-                <span>Delete Account</span>
+              <p className="px-1 text-xs text-muted-foreground">The export contains selected browser data only and may include data from other accounts on this device. It does not include cloud data.</p>
+              <Button onClick={() => void handleClearLocalData()} variant="outline" className="w-full justify-between h-14 px-6 font-normal text-destructive hover:text-destructive hover:bg-destructive/10">
+                <span>Clear local browser data</span>
                 <ChevronRight className="w-5 h-5 text-destructive/50" />
               </Button>
+              <p className="px-1 text-xs text-muted-foreground">Clearing local data does not delete your account or cloud data. A complete account deletion process is not yet available here.</p>
             </div>
             )}
           </section>

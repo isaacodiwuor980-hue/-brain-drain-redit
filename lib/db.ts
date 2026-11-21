@@ -584,6 +584,21 @@ export const idb = {
     }, undefined);
   },
 
+  /** Read local export data without converting storage failures into empty lists. */
+  async getAllStrict<T>(storeName: string): Promise<T[]> {
+    const db = await openDB();
+    return new Promise<T[]>((resolve, reject) => {
+      const tx = db.transaction(storeName, "readonly");
+      const request = tx.objectStore(storeName).getAll();
+      let result: T[];
+      request.onsuccess = () => { result = request.result; };
+      request.onerror = () => reject(request.error ?? new Error("Local read failed"));
+      tx.oncomplete = () => resolve(result);
+      tx.onerror = () => reject(tx.error ?? new Error("Local read failed"));
+      tx.onabort = () => reject(tx.error ?? new Error("Local read aborted"));
+    });
+  },
+
   async getAll<T>(storeName: string): Promise<T[]> {
     return withStorageFallback(`getAll(${storeName})`, async () => {
       const db = await openDB();
@@ -713,6 +728,20 @@ export const idb = {
         tx.onabort = () => reject(tx.error);
       });
     }, undefined);
+  },
+
+  /** Clear IndexedDB in one transaction; never treat blocked storage as success. */
+  async clearAllStrict(): Promise<void> {
+    const db = await openDB();
+    const names = Array.from(db.objectStoreNames);
+    if (names.length === 0) return;
+    return new Promise<void>((resolve, reject) => {
+      const tx = db.transaction(names, "readwrite");
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error ?? new Error("Local clear failed"));
+      tx.onabort = () => reject(tx.error ?? new Error("Local clear aborted"));
+      for (const name of names) tx.objectStore(name).clear();
+    });
   },
 
   /**
