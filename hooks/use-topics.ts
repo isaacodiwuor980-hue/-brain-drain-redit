@@ -76,14 +76,10 @@ export function useTopics() {
           },
           token,
         );
-      } catch (error) {
-        // Keep the local topic; it will sync on the next refresh.
-        // Message only — the full ApiError stack spammed the console ×N on
-        // every guest session for an expected 401.
-        console.warn(
-          "Topic created locally, cloud sync deferred:",
-          error instanceof Error ? error.message : error,
-        );
+      } catch {
+        // There is no retry queue here. Do not promise a future sync or log
+        // upstream error details (a conflict, for example, needs resolution).
+        console.warn("Topic cloud creation failed; the local topic may not sync.");
       }
     },
     onSuccess: () => {

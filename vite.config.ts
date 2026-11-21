@@ -37,12 +37,75 @@ export default defineConfig({
     chunkSizeWarningLimit: 900,
     rollupOptions: {
       output: {
+        // PERF (Vite 8 / Rolldown): `manualChunks` is emulated and, verified
+        // on this build, LEAKED react + react-dom into the `radix-lazy`
+        // chunk: a 138 KB raw module was shipped containing a second React
+        // runtime (`flushSync`, `createPortal`, the
+        // "CANNOT_UPGRADE" dev strings) because ReactDOM also entered that
+        // group. Root cause: react-dom / react / scheduler ids were being
+        // absorbed by an earlier group before the vendor rule matched.
+        // Rolldown's native `advancedChunks.groups` are evaluated in order
+        // and only on modules not already claimed, so listing the React
+        // runtime FIRST makes the vendor chunk authoritative.
+        // (manualChunks below is kept as the fallback for non-Rolldown runs.)
+        advancedChunks: {
+          groups: [
+            {
+              name: "react-vendor",
+              test: /node_modules[\\/](react|react-dom|scheduler|use-sync-external-store)[\\/]/,
+              priority: 100,
+            },
+            {
+              name: "firebase-firestore",
+              test: /node_modules[\\/]@firebase[\\/](firestore|database)[\\/]|node_modules[\\/]firebase[\\/](firestore|database)[\\/]/,
+              priority: 90,
+            },
+            {
+              name: "firebase-auth",
+              test: /node_modules[\\/](@firebase|firebase)[\\/]/,
+              priority: 80,
+            },
+            {
+              name: "tanstack",
+              test: /node_modules[\\/]@tanstack[\\/]/,
+              priority: 70,
+            },
+            {
+              name: "wouter",
+              test: /node_modules[\\/]wouter[\\/]/,
+              priority: 60,
+            },
+            {
+              name: "date-fns",
+              test: /node_modules[\\/]date-fns[\\/]/,
+              priority: 50,
+            },
+            // radix-shell: primitives the app shell renders immediately
+            // (tooltip/dialog/dropdown/label/toast). Split so the big entry
+            // chunk stays small AND these vendor bytes stay cached across
+            // deploys (only the app chunk changes).
+            {
+              name: "radix-shell",
+              test: (id: string) =>
+                /node_modules[\\/]@radix-ui[\\/](react-(tooltip|alert-dialog|dialog|dropdown-menu|label|toast))[\\/]/.test(id),
+              priority: 40,
+            },
+            {
+              name: "radix-lazy",
+              test: /node_modules[\\/]@radix-ui[\\/]/,
+              priority: 30,
+            },
+          ],
+        },
         // Only split vendors that are used by the eagerly-loaded app shell.
         // Heavy, route-specific libs (d3, recharts, framer-motion, firebase)
         // stay inside their lazy route chunks so they are NOT preloaded on
         // first paint — they download only when the user visits that screen.
         manualChunks(id) {
           if (!id.includes("node_modules")) return undefined;
+          if (/node_modules\/(react|react-dom|scheduler|use-sync-external-store)\//.test(id)) {
+            return "react-vendor";
+          }
           if (id.includes("firebase")) {
             // PERF: split the firebase SDK by component. The whole SDK in
             // one chunk made ANY `import("firebase/auth")` pull the
@@ -57,6 +120,7 @@ export default defineConfig({
             }
             return "firebase-auth";
           }
+
           // PERF: split @radix-ui into two chunks:
           //  - radix-shell: primitives used by the eagerly-loaded app shell
           //    (tooltip, alert-dialog, dialog, dropdown-menu, label, toast).

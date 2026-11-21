@@ -25,6 +25,7 @@ interface PostRow {
   user_id: string;
   topic_id: string;
   content: string;
+  tags: string[] | null;
   post_type: string;
   event: unknown;
   media_urls: string[] | null;
@@ -70,6 +71,30 @@ function normalizePostType(raw: string | null | undefined): "post" | "question" 
   return "post";
 }
 
+/** Attach aggregate counts and only the requesting user's reaction types. */
+function renderFeedPosts(entry: CachedFeed, currentUserId: string | undefined) {
+  return entry.posts.map((row) => {
+    const reactions = entry.reactionsByPost[(row as { id: string }).id] || [];
+    const own: Record<string, string[]> = {};
+    if (currentUserId) {
+      for (const reaction of reactions) {
+        if (reaction.user_id === currentUserId && ["upvote", "downvote", "repost"].includes(reaction.reaction_type)) {
+          own[reaction.reaction_type] = [currentUserId];
+        }
+      }
+    }
+    return {
+      ...row,
+      reactions: {
+        upvote: reactions.filter((r) => r.reaction_type === "upvote").length,
+        downvote: reactions.filter((r) => r.reaction_type === "downvote").length,
+        repost: ((row as { repostCount?: number }).repostCount ?? 0) + reactions.filter((r) => r.reaction_type === "repost").length,
+      },
+      userReactions: Object.keys(own).length ? own : undefined,
+    };
+  });
+}
+
 router.get("/feed", optionalAuth, async (req, res) => {
   const parsed = FeedQuerySchema.safeParse(req.query);
   if (!parsed.success) {
@@ -112,7 +137,9 @@ router.get("/feed", optionalAuth, async (req, res) => {
       ) {
         followeeIds = [];
       } else {
-        throw err;
+        req.log?.error?.({}, "Following feed lookup failed");
+        res.status(502).json({ error: "Feed data source unavailable" });
+        return;
       }
     }
     if (followeeIds.length === 0) {
@@ -177,9 +204,9 @@ router.get("/feed", optionalAuth, async (req, res) => {
       const fresh = await fetchFeedPage(refreshMode, refreshTopic, refreshLimit, refreshOffset);
       feedCacheTouch(feedCache, key, fresh);
     })()
-      .catch((err) => {
+      .catch(() => {
         // Stale data stays served on refresh failure — log and move on.
-        log?.warn?.({ err }, "Feed background refresh failed — serving stale");
+        log?.warn?.({}, "Feed background refresh failed — serving stale");
       })
       .finally(() => {
         refreshInFlight.delete(key);
@@ -188,32 +215,10 @@ router.get("/feed", optionalAuth, async (req, res) => {
 
   /** Render a per-user response from a cached feed entry (HIT + STALE paths). */
   function renderFromCache(entry: CachedFeed, header: "HIT" | "STALE") {
-    const posts = entry.posts.map((row) => {
-      const postReactions = entry.reactionsByPost[(row as { id: string }).id] || [];
-      const upvotes = postReactions.filter((r) => r.reaction_type === "upvote").length;
-      const downvotes = postReactions.filter((r) => r.reaction_type === "downvote").length;
-      const reposts = postReactions.filter((r) => r.reaction_type === "repost").length;
-      const myReaction = currentUserId
-        ? postReactions.find((r) => r.user_id === currentUserId)?.reaction_type
-        : undefined;
-      // B-2 fix: cached rows store repostCount (camelCase, see cache fill
-      // below). Parentheses + the correct property name fix both the
-      // precedence bug and the snake_case lookup bug.
-      const baseRepostCount = (row as { repostCount?: number }).repostCount ?? 0;
-      return {
-        ...(row as object),
-        reactions: {
-          upvote: upvotes,
-          downvote: downvotes,
-          repost: baseRepostCount + reposts,
-        },
-        userReactions:
-          myReaction && currentUserId
-            ? { [myReaction]: [currentUserId] }
-            : undefined,
-      };
-    });
-    res.set("X-Feed-Cache", header);
+    const posts = renderFeedPosts(entry, currentUserId);
+    // res.header (not res.set) so the value does not get appended to Vary,
+    // which caused cache fragmentation for compressed responses.
+    res.header("X-Feed-Cache", header);
     res.json({
       posts,
       hasMore: entry.hasMore,
@@ -243,34 +248,13 @@ router.get("/feed", optionalAuth, async (req, res) => {
     // respond. Shared logic lives in fetchFeedPage so the SWR background
     // refresher uses the exact same code.
     const fresh = await fetchFeedPage(mode, topic, limit, offset, followeeIds);
-    feedCacheTouch(feedCache, cacheKey, fresh);
+    if (mode !== "following") feedCacheTouch(feedCache, cacheKey, fresh);
 
     // Per-user rendering identical to renderFromCache, but here we have the
     // live rows (with currentUserId reactions applied the same way).
-    const posts = fresh.posts.map((row) => {
-      const postReactions = fresh.reactionsByPost[(row as { id: string }).id] || [];
-      const upvotes = postReactions.filter((r) => r.reaction_type === "upvote").length;
-      const downvotes = postReactions.filter((r) => r.reaction_type === "downvote").length;
-      const reposts = postReactions.filter((r) => r.reaction_type === "repost").length;
-      const myReaction = currentUserId
-        ? postReactions.find((r) => r.user_id === currentUserId)?.reaction_type
-        : undefined;
+    const posts = renderFeedPosts(fresh, currentUserId);
 
-      return {
-        ...(row as object),
-        reactions: {
-          upvote: upvotes,
-          downvote: downvotes,
-          repost: ((row as { repostCount?: number }).repostCount ?? 0) + reposts,
-        },
-        userReactions:
-          myReaction && currentUserId
-            ? { [myReaction]: [currentUserId] }
-            : undefined,
-      };
-    });
-
-    res.set("X-Feed-Cache", "MISS");
+    res.header("X-Feed-Cache", "MISS");
     res.json({
       posts,
       hasMore: fresh.hasMore,
@@ -278,7 +262,7 @@ router.get("/feed", optionalAuth, async (req, res) => {
     });
   } catch (error) {
     if (error instanceof SupabaseError) {
-      req.log?.error?.({ err: error, status: error.status }, "Feed query failed");
+      req.log?.error?.({ status: error.status }, "Feed query failed");
       res.status(502).json({ error: "Feed data source unavailable" });
       return;
     }
@@ -312,7 +296,7 @@ async function fetchFeedPage(
   // apply local personalization signals.
   const rows = await supabase.get<PostRow>("posts", {
     select: `
-      id,user_id,topic_id,content,post_type,event,media_urls,brain_id,
+      id,user_id,topic_id,content,tags,post_type,event,media_urls,brain_id,
       repost_count,created_at,comment_count,
       topic:topics(name),
       author:profiles(display_name,avatar_url)
@@ -349,6 +333,7 @@ async function fetchFeedPage(
       userId: row.user_id,
       topicId: row.topic_id,
       content: row.content,
+      tags: row.tags ?? [],
       postType: normalizePostType(row.post_type),
       event: row.event,
       mediaUrls: row.media_urls || [],

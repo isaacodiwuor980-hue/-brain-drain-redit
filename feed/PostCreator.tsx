@@ -565,6 +565,10 @@ export function PostCreator({
       return;
     }
 
+    if (postTags.length > 10 || postTags.some(tag => !tag.trim() || tag.trim().length > 40)) {
+      toast({ title: "Check your tags", description: "Use up to 10 tags, each no more than 40 characters.", variant: "destructive" });
+      return;
+    }
     const community = communities.find((c) => c.id === selectedCommunityId);
     const newPost: Post = {
       id: crypto.randomUUID(),
@@ -903,8 +907,8 @@ export function PostCreator({
                         </SelectItem>
                         <SelectItem value="verified-experts">
                           <div className="flex flex-col">
-                            <span className="text-sm font-medium">Verified experts</span>
-                            <span className="text-[10px] text-muted-foreground">Credential-verified users can propose edits</span>
+                            <span className="text-sm font-medium">Expert proposals</span>
+                            <span className="text-[10px] text-muted-foreground">Expert proposals (review availability varies)</span>
                           </div>
                         </SelectItem>
                         <SelectItem value="public">
@@ -1436,6 +1440,7 @@ export function PostCreator({
                     <Search className="w-3.5 h-3.5 text-muted-foreground mr-1.5" />
                     <input
                       type="text"
+                      maxLength={40}
                       placeholder="Add tag (optional)..."
                       className="bg-transparent text-xs outline-none w-48 text-foreground"
                       value={tagInput}
@@ -1444,6 +1449,10 @@ export function PostCreator({
                         if (e.key === 'Enter' && tagInput.trim()) {
                           e.preventDefault();
                           if (!postTags.includes(tagInput.trim())) {
+                            if (postTags.length >= 10) {
+                              toast({ title: "Tag limit reached", description: "Use up to 10 tags per post.", variant: "destructive" });
+                              return;
+                            }
                             setPostTags([...postTags, tagInput.trim()]);
                           }
                           setTagInput("");

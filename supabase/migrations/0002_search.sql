@@ -8,15 +8,16 @@
 --   3. The `pgvector` extension + an `embedding` column for semantic search.
 --   4. A `match_skills` RPC function for cosine similarity search.
 --
--- ASSUMPTION (flagged in the task): pgvector may or may not be installed on
--- the target Supabase project. The migration uses `create extension if not
--- exists vector` so it's safe to run — if pgvector isn't available the
--- extension creation is skipped, and the semantic layer degrades gracefully
--- (the search route checks for the function at query time).
-
--- ── pgvector extension ──────────────────────────────────────────────────
--- Safe no-op if pgvector isn't installed on the Supabase project.
-create extension if not exists vector;
+-- Semantic search requires the target database to provide and permit pgvector.
+-- Missing extension files or insufficient privileges leave semantic search off;
+-- keyword and rule search remain available. Other extension errors fail loudly.
+-- The vector-specific blocks below are separate and run only when installed.
+do $extension$
+begin
+  create extension if not exists vector;
+exception when undefined_file or insufficient_privilege or feature_not_supported then
+  raise notice 'pgvector unavailable; semantic search is disabled';
+end $extension$;
 
 -- ── skills table ────────────────────────────────────────────────────────
 create table if not exists public.skills (
@@ -97,9 +98,10 @@ end $$;
 -- ── match_skills RPC (layer 3 — semantic cosine similarity) ─────────────
 -- Only create if pgvector is available. The search route checks for this
 -- function at query time and skips the semantic layer if it's missing.
-do $$
+do $fn$
 begin
   if exists (select 1 from pg_extension where extname = 'vector') then
+    execute $body$
     create or replace function public.match_skills(
       query_embedding vector(1536),
       match_count integer default 20,
@@ -129,5 +131,6 @@ begin
       order by s.embedding <=> query_embedding
       limit match_count;
     $$ language sql;
+    $body$;
   end if;
-end $$;
+end $fn$;

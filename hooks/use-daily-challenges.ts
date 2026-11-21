@@ -124,9 +124,9 @@ export function useDailyChallenges() {
     data: attempts = [],
     isLoading: isLoadingAttempts,
   } = useQuery({
-    queryKey: ["user_challenge_attempts"],
+    queryKey: ["user_challenge_attempts", currentUserId],
     queryFn: async () => {
-      return idb.getAll<UserChallengeAttempt>("user_challenge_attempts");
+      return (await idb.getAll<UserChallengeAttempt>("user_challenge_attempts")).filter(attempt => attempt.userId === currentUserId);
     },
   });
 
@@ -171,7 +171,7 @@ export function useDailyChallenges() {
         completedAt: Date.now(),
       };
 
-      await idb.put("user_challenge_attempts", attempt);
+      await idb.putStrict("user_challenge_attempts", attempt);
 
       if (xpEarned > 0) {
         await addXPEvent(
@@ -189,7 +189,16 @@ export function useDailyChallenges() {
     },
   });
 
+  const createChallenge = async (challenge: DailyChallenge) => {
+    if (!challenge.title.trim() || challenge.scenarios.length === 0 || challenge.scenarios.some(s => !s.prompt.trim() || s.options.length < 2 || s.options.some(o => !o.label.trim()) || s.options.filter(o => o.isCorrect).length !== 1)) {
+      throw new Error("Add a title, question, at least two answers and exactly one correct answer.");
+    }
+    await idb.putStrict("daily_challenges", challenge);
+    await queryClient.invalidateQueries({ queryKey: ["daily_challenges"] });
+  };
+
   return {
+    createChallenge,
     challenges,
     attempts,
     isLoading: isLoadingChallenges || isLoadingAttempts,

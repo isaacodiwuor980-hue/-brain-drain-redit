@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
+import { Input } from "@/ui/input";
 import { useDailyChallenges } from "@/hooks/use-daily-challenges";
 import { DailyChallenge } from "@/lib/extension-types";
 import { Button } from "@/ui/button";
@@ -18,7 +19,15 @@ import { triggerHaptic } from "@/lib/device";
 import { useToast } from "@/hooks/use-toast";
 
 export function DailyChallengesSection() {
-  const { challenges, attempts, isLoading, submitAttempt, isSubmitting } = useDailyChallenges();
+  const { challenges, attempts, isLoading, submitAttempt, isSubmitting, createChallenge } = useDailyChallenges();
+  const startedAt = useRef(0);
+  const [creating, setCreating] = useState(false);
+  const [title, setTitle] = useState("");
+  const [question, setQuestion] = useState("");
+  const [answerA, setAnswerA] = useState("");
+  const [answerB, setAnswerB] = useState("");
+  const [correct, setCorrect] = useState<"a" | "b">("a");
+  const [creatingBusy, setCreatingBusy] = useState(false);
   const { toast } = useToast();
   const [activeChallenge, setActiveChallenge] = useState<DailyChallenge | null>(null);
   const [currentScenarioIndex, setCurrentScenarioIndex] = useState(0);
@@ -41,6 +50,9 @@ export function DailyChallengesSection() {
 
   const handleStartChallenge = (challenge: DailyChallenge) => {
     triggerHaptic("selection");
+    // Timestamp is captured by the Start button handler, not during render.
+    // eslint-disable-next-line react-hooks/purity
+    startedAt.current = Date.now();
     setActiveChallenge(challenge);
     setCurrentScenarioIndex(0);
     setSelectedAnswers({});
@@ -70,7 +82,7 @@ export function DailyChallengesSection() {
         const result = await submitAttempt({
           challengeId: activeChallenge.id,
           answers: selectedAnswers,
-          timeSpentSeconds: 45,
+          timeSpentSeconds: Math.max(0, Math.round((Date.now() - startedAt.current) / 1000)),
         });
 
         triggerHaptic(result.isSuccessful ? "success" : "warning");
@@ -107,6 +119,30 @@ export function DailyChallengesSection() {
           Daily Reset
         </Badge>
       </div>
+
+      {!activeChallenge && <div className="space-y-3">
+        <Button variant="outline" size="sm" onClick={() => setCreating(!creating)}>{creating ? "Close creator" : "Create a scenario"}</Button>
+        {creating && <form className="space-y-2 rounded-xl border p-4" onSubmit={async e => {
+          e.preventDefault();
+          if (creatingBusy) return;
+          setCreatingBusy(true);
+          try {
+            const now = Date.now();
+            await createChallenge({ id: crypto.randomUUID(), dateString: new Date(now).toISOString().slice(0, 10), title: title.trim(), description: "User-created practice scenario", category: "Practice", difficulty: "beginner", type: "diagnostic_tree", rewardXp: 0, createdAt: now, scenarios: [{ id: crypto.randomUUID(), prompt: question.trim(), options: [{ id: "a", label: answerA.trim(), explanation: "", isCorrect: correct === "a" }, { id: "b", label: answerB.trim(), explanation: "", isCorrect: correct === "b" }] }] });
+            setTitle(""); setQuestion(""); setAnswerA(""); setAnswerB(""); setCreating(false);
+            toast({ title: "Scenario saved on this device", description: "This practice scenario is not shared or synced." });
+          } catch (error) { toast({ title: "Couldn't save scenario", description: error instanceof Error ? error.message : "Please try again.", variant: "destructive" }); }
+          finally { setCreatingBusy(false); }
+        }}>
+          <p className="text-xs text-muted-foreground">Create a local practice question. It is not shared and earns no XP.</p>
+          <Input aria-label="Scenario title" placeholder="Title" maxLength={120} value={title} onChange={e => setTitle(e.target.value)} required />
+          <Input aria-label="Scenario question" placeholder="Question" maxLength={500} value={question} onChange={e => setQuestion(e.target.value)} required />
+          <Input aria-label="Answer A" placeholder="Answer A" maxLength={300} value={answerA} onChange={e => setAnswerA(e.target.value)} required />
+          <Input aria-label="Answer B" placeholder="Answer B" maxLength={300} value={answerB} onChange={e => setAnswerB(e.target.value)} required />
+          <label className="text-sm">Correct answer <select value={correct} onChange={e => setCorrect(e.target.value as "a" | "b")} className="ml-2 rounded border bg-background p-1"><option value="a">Answer A</option><option value="b">Answer B</option></select></label>
+          <div><Button type="submit" disabled={creatingBusy}>Save scenario</Button></div>
+        </form>}
+      </div>}
 
       {/* Main Challenge Interface */}
       {!activeChallenge ? (

@@ -1,5 +1,8 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
-import { Story } from "@/lib/types";
+import { Story, StoryAttachment } from "@/lib/types";
+import { safeStoryLink, storyFileKind, STORY_TEXT_LIMIT } from "@/lib/story-attachments";
+import { useToast } from "@/hooks/use-toast";
+import { StorySafeText } from "./StorySafeText";
 import { useStories } from "@/hooks/use-stories";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -88,6 +91,7 @@ function SmartMedia({ src, alt, isVideo, poster, eager = false }: {
 export function StoriesBar() {
   const { stories, isLoading, markAsViewed, addStory } = useStories();
   const { user } = useAuth();
+  const { toast } = useToast();
   const { brains } = useDatabase();
   
   const [runningBrainId, setRunningBrainId] = useState<string | null>(null);
@@ -95,6 +99,32 @@ export function StoriesBar() {
   const [isAddingNote, setIsAddingNote] = useState(false);
   const [noteContent, setNoteContent] = useState("");
   const [selectedBrainId, setSelectedBrainId] = useState<string>("none");
+  const [attachments, setAttachments] = useState<StoryAttachment[]>([]);
+  const [linkInput, setLinkInput] = useState("");
+  const [extraText, setExtraText] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const addFile = async (file: File) => {
+    try {
+      const kind = storyFileKind(file);
+      let url = "";
+      let html: string | undefined;
+      if (kind === "html") {
+        html = await file.text();
+        if (html.length > STORY_TEXT_LIMIT) throw new Error("HTML is limited to 10,000 characters.");
+      } else {
+        url = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => typeof reader.result === "string" ? resolve(reader.result) : reject(new Error("Could not read file."));
+          reader.onerror = () => reject(new Error("Could not read file."));
+          reader.readAsDataURL(file);
+        });
+      }
+      setAttachments(prev => [...prev, { id: crypto.randomUUID(), kind, url, html, name: file.name, mimeType: file.type, sizeBytes: file.size, createdAt: Date.now() }]);
+    } catch (error) {
+      toast({ title: "Attachment not added", description: error instanceof Error ? error.message : "Please try again.", variant: "destructive" });
+    }
+  };
 
   const [viewerState, setViewerState] = useState<{ userIdx: number, storyIdx: number, key: number, isPaused: boolean } | null>(null);
   const [progress, setProgress] = useState(0);
@@ -286,18 +316,26 @@ export function StoriesBar() {
   };
 
   const handlePublishNote = async () => {
-    if (!noteContent || !user) return;
-    await addStory({
-      userId: user.id,
-      authorName: user.displayName || user.username || "Anonymous",
-      authorAvatar: user.avatarUrl,
-      type: "note",
-      content: noteContent,
-      brainId: selectedBrainId !== "none" ? selectedBrainId : undefined
-    });
-    setIsAddingNote(false);
-    setNoteContent("");
-    setSelectedBrainId("none");
+    if (!noteContent.trim() || !user || saving) return;
+    setSaving(true);
+    try {
+      await addStory({
+        userId: user.id,
+        authorName: user.displayName || user.username || "Anonymous",
+        authorAvatar: user.avatarUrl,
+        type: "note",
+        content: noteContent.trim(),
+        attachments,
+        brainId: selectedBrainId !== "none" ? selectedBrainId : undefined,
+      });
+      setIsAddingNote(false);
+      setNoteContent("");
+      setAttachments([]);
+      setSelectedBrainId("none");
+      toast({ title: "Note saved on this device", description: "Stories are not currently synced to other devices." });
+    } catch (error) {
+      toast({ title: "Couldn't save note", description: error instanceof Error ? error.message : "Please try again.", variant: "destructive" });
+    } finally { setSaving(false); }
   };
 
   if (isLoading) {
@@ -418,19 +456,26 @@ export function StoriesBar() {
 
       {/* Add Note Modal */}
       <Dialog open={isAddingNote} onOpenChange={setIsAddingNote}>
-        <DialogContent className="max-w-sm rounded-[24px]">
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto rounded-[24px]">
           <DialogHeader>
             <DialogTitle>Share a Note</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
               <Label>What's on your mind?</Label>
-              <Input 
-                value={noteContent} 
-                onChange={e => setNoteContent(e.target.value)} 
-                placeholder="What's up? Share a quick note..." 
-                maxLength={60}
-              />
+              <textarea aria-label="Note text" value={noteContent} onChange={e => setNoteContent(e.target.value)} placeholder="Share a note..." maxLength={2000} rows={4} className="w-full rounded-md border bg-background p-3 text-sm" />
+              <p className="text-xs text-muted-foreground">Saved on this device for 24 hours. Attachments are not uploaded or shared.</p>
+            </div>
+            <div className="space-y-3 rounded-xl border p-3">
+              <Label htmlFor="story-file">Attach a photo, PDF, or HTML file</Label>
+              <Input id="story-file" type="file" accept="image/jpeg,image/png,image/webp,image/gif,application/pdf,.pdf,text/html,.html,.htm" onChange={e => { const file = e.target.files?.[0]; if (file) void addFile(file); e.target.value = ""; }} />
+              <p className="text-xs text-muted-foreground">Up to 1 MB each. HTML is displayed as text, not executed.</p>
+              <Label htmlFor="story-link">Attach a link</Label>
+              <div className="flex gap-2"><Input id="story-link" value={linkInput} onChange={e => setLinkInput(e.target.value)} placeholder="https://example.com" /><Button type="button" variant="outline" onClick={() => { const url = safeStoryLink(linkInput); if (!url) { toast({ title: "Enter a valid HTTP or HTTPS link", variant: "destructive" }); return; } setAttachments(prev => [...prev, { id: crypto.randomUUID(), kind: "link", url, name: url, createdAt: Date.now() }]); setLinkInput(""); }}>Add</Button></div>
+              <Label htmlFor="story-extra">Attach text</Label>
+              <textarea id="story-extra" value={extraText} maxLength={STORY_TEXT_LIMIT} onChange={e => setExtraText(e.target.value)} rows={3} className="w-full rounded-md border bg-background p-2 text-sm" />
+              <Button type="button" variant="outline" size="sm" disabled={!extraText.trim()} onClick={() => { setAttachments(prev => [...prev, { id: crypto.randomUUID(), kind: "text", url: "", html: extraText.trim(), name: "Text", createdAt: Date.now() }]); setExtraText(""); }}>Add text</Button>
+              {attachments.map(a => <div key={a.id} className="flex items-center gap-2 text-xs"><span className="flex-1 truncate">{a.kind}: {a.name}</span><Button type="button" variant="ghost" size="sm" aria-label={`Remove ${a.name || a.kind}`} onClick={() => setAttachments(prev => prev.filter(item => item.id !== a.id))}>Remove</Button></div>)}
             </div>
             <div className="space-y-2">
               <Label>Attach a Brain (Optional)</Label>
@@ -449,7 +494,7 @@ export function StoriesBar() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsAddingNote(false)}>Cancel</Button>
-            <Button onClick={handlePublishNote} disabled={!noteContent}>Share Note</Button>
+            <Button onClick={handlePublishNote} disabled={!noteContent.trim() || saving}>{saving ? "Saving…" : "Save Note"}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -587,6 +632,16 @@ export function StoriesBar() {
                     </div>
                   )}
                 </div>
+
+                {activeStory.attachments && activeStory.attachments.length > 0 && (
+                  <div className="relative z-50 pointer-events-auto max-h-[24vh] overflow-y-auto rounded-xl bg-black/80 border border-white/20 p-3 space-y-2 text-sm">
+                    <Button size="sm" variant="secondary" onClick={() => setViewerState(prev => prev ? { ...prev, isPaused: !prev.isPaused } : null)}>{viewerState.isPaused ? "Resume story" : "Pause to read attachments"}</Button>
+                    {activeStory.attachments.map(a => {
+                      const safeLink = a.kind === "link" ? safeStoryLink(a.url) : null;
+                      return <div key={a.id} className="break-words">{safeLink ? <a href={safeLink} target="_blank" rel="noopener noreferrer" className="underline">{a.name || "Open link"}</a> : a.kind === "file" && /^data:(application\/pdf|application\/octet-stream);base64,/i.test(a.url) ? <a href={a.url} download={a.name || "attachment.pdf"} className="underline">Download {a.name || "PDF"}</a> : (a.kind === "text" || a.kind === "html") ? <details onToggle={() => setViewerState(prev => prev ? { ...prev, isPaused: true } : null)}><summary>{a.name || a.kind}</summary><StorySafeText text={a.html} /></details> : <span>{a.name || a.kind}</span>}</div>;
+                    })}
+                  </div>
+                )}
 
                 {activeStory.brainId && (
                   <div className="mt-8 mb-4 relative z-50">

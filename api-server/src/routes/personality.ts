@@ -22,6 +22,7 @@ import { Router, type IRouter } from "express";
 import { z } from "zod";
 import { supabase, SupabaseError } from "../lib/supabase";
 import { requireAuth } from "../middleware/auth";
+import { requireMappedIdentity } from "../middleware/identity-map";
 
 const router: IRouter = Router();
 
@@ -77,7 +78,7 @@ function scoreBfi10(r: z.infer<typeof ResponsesSchema>) {
  * computed trait scores. Each user can submit multiple times (re-tests);
  * the most recent is considered their "current" personality.
  */
-router.post("/personality/submit", requireAuth, async (req, res) => {
+router.post("/personality/submit", requireAuth, requireMappedIdentity, async (req, res) => {
   const parsed = SubmitSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "Invalid responses", details: parsed.error.flatten() });
@@ -93,7 +94,7 @@ router.post("/personality/submit", requireAuth, async (req, res) => {
 
   try {
     await supabase.insert("personality_results", {
-      user_id: req.auth!.uid,
+      user_id: req.mappedUserId!,
       responses: parsed.data.responses,
       extraversion: scores.extraversion,
       agreeableness: scores.agreeableness,
@@ -122,7 +123,7 @@ router.post("/personality/submit", requireAuth, async (req, res) => {
  * GET /api/personality
  * Returns the caller's most recent personality result (or null if none).
  */
-router.get("/personality", requireAuth, async (req, res) => {
+router.get("/personality", requireAuth, requireMappedIdentity, async (req, res) => {
   if (!supabase.isConfigured()) {
     res.status(503).json({ error: "Storage not configured" });
     return;
@@ -131,7 +132,7 @@ router.get("/personality", requireAuth, async (req, res) => {
   try {
     const row = await supabase.getOne<PersonalityResultRow>("personality_results", {
       select: "id,extraversion,agreeableness,conscientiousness,neuroticism,openness,test_version,created_at",
-      filters: { user_id: `eq.${req.auth!.uid}` },
+      filters: { user_id: `eq.${req.mappedUserId!}` },
       order: { column: "created_at", ascending: false },
     });
 

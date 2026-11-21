@@ -1,13 +1,24 @@
-import { useState, useEffect, useCallback } from "react";
-import { getOfflineQueue, QueuedAction, saveOfflineQueue } from "@/lib/offline-sync";
+import { useState, useEffect, useCallback, useRef } from "react";
+import {
+  getOfflineQueue,
+  actionsForOwner,
+  getDeadLetterQueue,
+  partitionDueActions,
+  quarantineActions,
+  recordFailure,
+  reconcileSyncBatch,
+  saveOfflineQueue,
+  QueuedAction,
+} from "@/lib/offline-sync";
 import { useOnlineStatus } from "./use-online-status";
 import { triggerHaptic } from "@/lib/device";
 import { useToast } from "./use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 import { idb } from "@/lib/db";
 import { env } from "@/lib/env";
-import { getAuthToken } from "@/lib/auth-token";
-import { createPost, reactToPost } from "@/lib/api/feed";
+import { getAuthSession } from "@/lib/auth-token";
+import { useAuth } from "@/components/auth/AuthContext";
+import { createPost, reactToPost, toCreatePostInput } from "@/lib/api/feed";
 import { saveBrain } from "@/lib/api/brains";
 import type { Post, Brain, Node } from "@/lib/types";
 
@@ -16,6 +27,10 @@ export function useOfflineSync() {
   const isOnline = status === "online";
   const [queue, setQueue] = useState<QueuedAction[]>(getOfflineQueue);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [authRetryAt, setAuthRetryAt] = useState(0);
+  const syncingRef = useRef(false);
+  const { user } = useAuth();
+  const currentUserId = user?.uid;
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -44,89 +59,112 @@ export function useOfflineSync() {
    */
   const syncNow = useCallback(async () => {
     const currentQueue = getOfflineQueue();
-    if (currentQueue.length === 0 || !isOnline || isSyncing) return;
+    if (currentQueue.length === 0 || !isOnline || syncingRef.current) return;
     if (!env.apiEnabled) {
-      // Local-only build (VITE_LOCAL_ONLY=1) — nothing to sync to. Clear the
-      // queue so it doesn't grow unbounded in local-only mode.
-      saveOfflineQueue([]);
-      setQueue([]);
+      // A local-only build cannot replay these actions. Preserve them for a
+      // later cloud-enabled session rather than silently discarding work.
       return;
     }
 
+    // Never replay a different user's work or legacy entries with no owner.
+    if (!currentUserId) return;
+    const { due } = partitionDueActions(actionsForOwner(currentQueue, currentUserId));
+    if (due.length === 0) return;
+    const session = await getAuthSession().catch(() => null);
+    if (!session?.token || session.uid !== currentUserId) {
+      setAuthRetryAt(Date.now() + 30_000);
+      return;
+    }
+    if (syncingRef.current) return;
+    syncingRef.current = true;
     setIsSyncing(true);
-    triggerHaptic("medium");
+    try {
+      triggerHaptic("medium");
 
-    const token = await getAuthToken().catch(() => null);
-    const succeeded: string[] = [];
-    const failed: QueuedAction[] = [];
-    let skipped = 0;
+      const succeeded: string[] = [];
+      const retries: QueuedAction[] = [];
+      const dead: QueuedAction[] = [];
+      let skipped = 0;
 
-    for (const action of currentQueue) {
-      try {
-        const result = await replayAction(action, token);
-        if (result === "skipped") {
-          skipped++;
-          succeeded.push(action.id); // remove from queue — no point retrying
-        } else {
-          succeeded.push(action.id);
+      // HARDENED: only replay actions whose jittered backoff has elapsed.
+      // Actions still waiting are carried over untouched — so a burst of
+      // failures can't spin the loop or hammer a struggling API.
+      for (const action of due) {
+        const active = await getAuthSession().catch(() => null);
+        if (!active?.token || active.uid !== currentUserId) {
+          setAuthRetryAt(Date.now() + 30_000);
+          break;
         }
-      } catch (err) {
-        // Keep the action for retry, but cap retries at 5 to avoid a
-        // poison-queue that never drains.
-        const retryCount = action.retryCount + 1;
-        if (retryCount >= 5) {
-          // Drop permanently — log but don't block the rest of the queue.
-          console.warn(`Offline action ${action.id} (${action.type}) dropped after 5 retries:`, err);
-          succeeded.push(action.id); // remove from queue
-        } else {
-          failed.push({ ...action, retryCount });
+        try {
+          const result = await replayAction(action, active.token);
+          succeeded.push(action.id);
+          if (result === "skipped") skipped++;
+        } catch (err) {
+          const { retry, dead: quarantined } = recordFailure(action);
+          if (quarantined) {
+            console.warn(
+              `Offline action ${action.id} (${action.type}) quarantined after repeated failures:`,
+              err,
+            );
+            dead.push(quarantined);
+          } else if (retry) {
+            retries.push(retry);
+          }
         }
       }
+
+      // An enqueue may have happened during the network requests. Re-read the
+      // queue and only update entries that are still present by their unique id.
+      const latest = getOfflineQueue();
+      const latestIds = new Set(latest.map((action) => action.id));
+      const stillDead = dead.filter((action) => latestIds.has(action.id));
+      if (stillDead.length > 0) quarantineActions(stillDead);
+      const nextQueue = reconcileSyncBatch(latest, succeeded, retries, stillDead.map((action) => action.id));
+      saveOfflineQueue(nextQueue);
+      setQueue(nextQueue);
+
+      const syncedCount = succeeded.length - skipped;
+
+      if (nextQueue.length === 0 && stillDead.length === 0) {
+        triggerHaptic("success");
+        toast({
+          title: "Sync complete",
+          description: `${syncedCount} offline item${syncedCount === 1 ? "" : "s"} synced${skipped > 0 ? ` (${skipped} remained local or required no replay)` : ""}.`,
+        });
+        void queryClient.invalidateQueries({ queryKey: ["posts"] });
+        void queryClient.invalidateQueries({ queryKey: ["profile"] });
+        void queryClient.invalidateQueries({ queryKey: ["missions"] });
+        void queryClient.invalidateQueries({ queryKey: ["brains"] });
+      } else {
+        triggerHaptic("warning");
+        toast({
+          title: "Sync partially complete",
+          description: `${syncedCount} synced; ${nextQueue.length} pending${stillDead.length ? `, ${stillDead.length} need attention` : ""}.`,
+          variant: "destructive",
+        });
+      }
+    } finally {
+      syncingRef.current = false;
+      setIsSyncing(false);
     }
-
-    // Rebuild the queue: keep only failed actions.
-    const remaining = currentQueue.filter((a) => !succeeded.includes(a.id));
-    // Merge with failed actions that have updated retryCounts.
-    const nextQueue = remaining.map(
-      (a) => failed.find((f) => f.id === a.id) || a,
-    );
-    saveOfflineQueue(nextQueue);
-    setQueue(nextQueue);
-
-    const syncedCount = succeeded.length - skipped;
-
-    if (failed.length === 0) {
-      triggerHaptic("success");
-      toast({
-        title: "All changes synced",
-        description: `${syncedCount} offline item${syncedCount === 1 ? "" : "s"} synced${skipped > 0 ? ` (${skipped} already saved locally)` : ""}.`,
-      });
-      void queryClient.invalidateQueries({ queryKey: ["posts"] });
-      void queryClient.invalidateQueries({ queryKey: ["profile"] });
-      void queryClient.invalidateQueries({ queryKey: ["missions"] });
-      void queryClient.invalidateQueries({ queryKey: ["brains"] });
-    } else {
-      triggerHaptic("warning");
-      toast({
-        title: "Sync partially complete",
-        description: `${syncedCount} synced, ${failed.length} will retry next time.`,
-        variant: "destructive",
-      });
-    }
-    setIsSyncing(false);
-  }, [isOnline, isSyncing, toast, queryClient]);
+  }, [isOnline, currentUserId, toast, queryClient]);
 
   // Auto-sync when coming back online
   useEffect(() => {
-    if (isOnline && queue.length > 0) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- legitimate external-trigger sync: auto-flush the offline queue when connectivity returns; refactoring to derived state would change behavior (syncNow drives IDB + network writes + toast side effects).
-      void syncNow();
-    }
-  }, [isOnline, queue.length, syncNow]);
+    if (!isOnline || isSyncing || !currentUserId || !env.apiEnabled) return;
+    const eligible = actionsForOwner(queue, currentUserId);
+    if (eligible.length === 0) return;
+    const nextAt = Math.min(...eligible.map((action) => action.nextAttemptAt ?? 0));
+    const delay = Math.max(0, nextAt - Date.now(), authRetryAt - Date.now());
+    const timer = window.setTimeout(() => { void syncNow(); }, delay);
+    return () => window.clearTimeout(timer);
+  }, [isOnline, isSyncing, queue, currentUserId, authRetryAt, syncNow]);
 
   return {
     isOnline,
     pendingCount: queue.length,
+    /** Actions that exhausted their retry budget (need attention). */
+    deadLetterCount: getDeadLetterQueue().length,
     isSyncing,
     syncNow,
   };
@@ -152,16 +190,7 @@ async function replayAction(
         return "skipped";
       }
       await createPost(
-        {
-          id: post.id,
-          topicId: post.topicId,
-          content: post.content,
-          postType: post.postType,
-          event: post.event,
-          mediaUrls: post.mediaUrls,
-          brainId: post.brainId,
-          createdAt: post.createdAt,
-        },
+        toCreatePostInput(post),
         token,
       );
       return "synced";

@@ -2,6 +2,7 @@ import { Router, type IRouter } from "express";
 import { z } from "zod";
 import { supabase, SupabaseError } from "../lib/supabase";
 import { optionalAuth, requireAuth } from "../middleware/auth";
+import { lookupMappedIdentity, requireMappedIdentity } from "../middleware/identity-map";
 
 const router: IRouter = Router();
 
@@ -82,6 +83,7 @@ function toClientBrain(row: BrainRow) {
     active_branch: row.active_branch,
     isFavorite: row.is_favorite,
     createdAt: new Date(row.created_at).getTime(),
+    created_at: new Date(row.created_at).getTime(),
     isPublic: row.is_public,
   };
 }
@@ -119,7 +121,13 @@ router.get("/brains", optionalAuth, async (req, res) => {
       res.status(401).json({ error: "Authentication required" });
       return;
     }
-    filters.author_id = `eq.${req.auth.uid}`;
+    try {
+      const mapped = await lookupMappedIdentity(req.auth.uid);
+      if (!mapped) { res.status(403).json({ error: "Identity mapping required" }); return; }
+      filters.author_id = `eq.${mapped}`;
+    } catch {
+      res.status(503).json({ error: "Identity service unavailable" }); return;
+    }
   } else {
     filters.is_public = "eq.true";
   }
@@ -168,9 +176,12 @@ router.get("/brains/:id", optionalAuth, async (req, res) => {
     // Security: enforce visibility. Private brains are only accessible to their owner.
     // repo_status "private" or null = private; "public_repo" = public; "archived" = read-only public.
     const isPrivate = !brain.is_public && brain.repo_status !== "public_repo" && brain.repo_status !== "archived";
-    if (isPrivate && brain.author_id !== req.auth?.uid) {
-      res.status(404).json({ error: "Brain not found" });
-      return;
+    if (isPrivate) {
+      if (!req.auth) { res.status(404).json({ error: "Brain not found" }); return; }
+      let mapped: string | null;
+      try { mapped = await lookupMappedIdentity(req.auth.uid); }
+      catch { res.status(503).json({ error: "Identity service unavailable" }); return; }
+      if (!mapped || brain.author_id !== mapped) { res.status(404).json({ error: "Brain not found" }); return; }
     }
 
     const nodes = await supabase.get<BrainNodeRow>("brain_nodes", {
@@ -196,9 +207,8 @@ const UpsertBrainSchema = z.object({
   nodes: z.array(NodeSchema).max(500),
 });
 
-/** Create or update a brain and its nodes in one transaction-like call.
- *  Nodes are replaced wholesale to keep the client/server topology simple. */
-router.post("/brains", requireAuth, async (req, res) => {
+/** Atomically create or update an owned brain and replace its nodes. */
+router.post("/brains", requireAuth, requireMappedIdentity, async (req, res) => {
   const parsed = UpsertBrainSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "Invalid brain", details: parsed.error.flatten() });
@@ -210,78 +220,34 @@ router.post("/brains", requireAuth, async (req, res) => {
   }
 
   const { brain: input, nodes } = parsed.data;
-  const uid = req.auth!.uid;
+  const uid = req.mappedUserId!;
 
   try {
-    // Check ownership if the brain already exists.
-    const existing = await supabase.getOne<BrainRow>("brains", {
-      filters: { id: `eq.${input.id}` },
-    });
-    if (existing && existing.author_id !== uid) {
-      res.status(403).json({ error: "You do not own this brain" });
-      return;
-    }
-
-    const brainRow = {
-      id: input.id,
-      author_id: uid,
-      title: input.title,
-      category: input.category,
-      description: input.description,
-      root_node_id: input.root_node_id ?? null,
-      is_public: input.is_public,
-      is_favorite: input.is_favorite,
-      repo_status: input.repo_status ?? null,
-      active_branch: input.active_branch ?? null,
-    };
-
-    await supabase.insert("brains", brainRow, "resolution=merge-duplicates");
-
-    // Replace nodes safely: insert/upsert the new set FIRST, then delete any
-    // old nodes that are not part of the new set. This avoids a window where
-    // a failed insert would leave the brain with no nodes at all.
-    if (nodes.length > 0) {
-      await supabase.insert(
-        "brain_nodes",
-        nodes.map((n) => ({
-          id: n.id,
-          brain_id: brainRow.id,
-          node_type: n.node_type,
-          question_text: n.question_text ?? null,
-          result_text: n.result_text ?? null,
-          next_steps: n.next_steps ?? null,
-          if_true_node_id: n.if_true_node_id ?? null,
-          if_false_node_id: n.if_false_node_id ?? null,
-          attachments: n.attachments ?? [],
-        })),
-        "resolution=merge-duplicates",
-      );
-    }
-
-    // Delete stale nodes belonging to this brain that were not in the upsert.
-    // PostgREST filters with `not.in.(...)`; an empty new set deletes all.
-    const newIds = nodes.map((n) => n.id);
-    if (newIds.length > 0) {
-      await supabase.deleteNotIn(
-        "brain_nodes",
-        { brain_id: brainRow.id },
-        "id",
-        newIds,
-      );
-    } else {
-      await supabase.delete("brain_nodes", { brain_id: brainRow.id });
-    }
-
-    res.status(existing ? 200 : 201).json({
-      brain: toClientBrain({
-        ...brainRow,
-        created_at: existing?.created_at ?? new Date().toISOString(),
-      } as BrainRow),
-      nodeCount: nodes.length,
+    // One database transaction enforces ownership and replaces the node set.
+    // If migration 0005 has not been deployed, fail closed instead of falling
+    // back to the old service-role read/check/upsert race.
+    const result = await supabase.rpc<{ brain: BrainRow; created: boolean; nodeCount: number }>(
+      "save_brain_atomic",
+      { p_uid: uid, p_brain: input, p_nodes: nodes },
+    );
+    res.status(result.created ? 201 : 200).json({
+      brain: toClientBrain(result.brain),
+      nodeCount: result.nodeCount,
     });
   } catch (error) {
     if (error instanceof SupabaseError) {
-      res.status(502).json({ error: "Could not save brain" });
+      let code: unknown;
+      try {
+        const body = typeof error.body === "string" ? JSON.parse(error.body) : error.body;
+        code = (body as { code?: unknown } | null)?.code;
+      } catch { /* malformed upstream error */ }
+      if (code === "42501") {
+        res.status(403).json({ error: "Brain or node ownership conflict" });
+      } else if (code === "22023") {
+        res.status(400).json({ error: "Invalid brain topology" });
+      } else {
+        res.status(502).json({ error: "Could not save brain" });
+      }
       return;
     }
     throw error;
@@ -289,7 +255,7 @@ router.post("/brains", requireAuth, async (req, res) => {
 });
 
 /** Delete a brain (author only). Cascades to nodes via the schema. */
-router.delete("/brains/:id", requireAuth, async (req, res) => {
+router.delete("/brains/:id", requireAuth, requireMappedIdentity, async (req, res) => {
   const id = String(req.params.id ?? "");
   if (!/^[A-Za-z0-9_-]+$/.test(id)) {
     res.status(400).json({ error: "Invalid brain id" });
@@ -307,11 +273,12 @@ router.delete("/brains/:id", requireAuth, async (req, res) => {
       res.status(404).json({ error: "Brain not found" });
       return;
     }
-    if (existing.author_id !== req.auth!.uid) {
+    if (existing.author_id !== req.mappedUserId) {
       res.status(403).json({ error: "You do not own this brain" });
       return;
     }
-    await supabase.delete("brains", { id: existing.id });
+    // Keep the ownership predicate on the actual write as well as the probe.
+    await supabase.delete("brains", { id: existing.id, author_id: req.mappedUserId! });
     res.status(204).end();
   } catch (error) {
     if (error instanceof SupabaseError) {

@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { useTheme } from "@/lib/theme";
 import { useToast } from "@/hooks/use-toast";
@@ -7,6 +7,19 @@ export function useShortcuts() {
   const [, setLocation] = useLocation();
   const { theme, setTheme } = useTheme();
   const { toast } = useToast();
+  const [paletteOpen, setPaletteOpen] = useState(false);
+
+  /**
+   * PHASE 3 — instant keyboard navigation. ⌘K / Ctrl+K / "/" now opens the
+   * command palette (search across brains, topics AND pages) instead of
+   * jumping to a blank /search page. Shift+? still lists the shortcuts.
+   * An "bd:open-palette" window event lets the shell/menus trigger it too.
+   */
+  useEffect(() => {
+    const open = () => setPaletteOpen(true);
+    window.addEventListener("bd:open-palette", open);
+    return () => window.removeEventListener("bd:open-palette", open);
+  }, []);
 
   useEffect(() => {
     let keySequence = "";
@@ -22,10 +35,10 @@ export function useShortcuts() {
         return;
       }
 
-      // Handle Command/Ctrl + K or / for instant search
+      // Command/Ctrl+K or "/" → command palette (instant, in-place search).
       if (((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") || e.key === "/") {
         e.preventDefault();
-        setLocation("/search");
+        setPaletteOpen(true);
         return;
       }
 
@@ -74,7 +87,7 @@ export function useShortcuts() {
         e.preventDefault();
         toast({
           title: "Keyboard Shortcuts",
-          description: "Cmd/Ctrl+K: Search | Cmd/Ctrl+\\: Toggle Theme | g+[h/l/c/m/p/s/n/f]: Navigate | ?: Help",
+          description: "Cmd/Ctrl+K or /: Quick search palette | Cmd/Ctrl+\\: Toggle Theme | g+[h/l/c/m/p/s/n/f]: Navigate | ?: Help",
           duration: 5000,
         });
         keySequence = "";
@@ -91,4 +104,11 @@ export function useShortcuts() {
       clearTimeout(timeout);
     };
   }, [setLocation, theme, setTheme, toast]);
+
+  return {
+    paletteOpen,
+    setPaletteOpen,
+    /** Lets a button/menu open the palette without faking a key event. */
+    openPalette: () => setPaletteOpen(true),
+  };
 }

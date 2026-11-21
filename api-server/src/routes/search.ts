@@ -64,7 +64,9 @@ router.get("/v1/search/skills", async (req, res) => {
   try {
     // ── Layer 1: Rule filters (SQL WHERE on Skill ID fields) ──────────
     // These narrow the candidate set before the ranked layers run.
-    const filters: Record<string, string> = {};
+    // This route is public and the service-role client bypasses RLS.
+    // Never request unpublished skills from the database.
+    const filters: Record<string, string> = { status: "eq.published" };
     if (domain) filters.domain = `eq.${domain.toUpperCase()}`;
     if (make) filters.make = `eq.${make.toUpperCase()}`;
     if (model) filters.model = `eq.${model.toUpperCase()}`;
@@ -100,17 +102,17 @@ router.get("/v1/search/skills", async (req, res) => {
     let keywordResults: SkillRow[] = [];
     try {
       keywordResults = await supabase.get<SkillRow>("skills", queryOptions);
-    } catch (err) {
+    } catch {
       // Supabase returned an error (e.g. skills table missing — PGRST205).
       // Log + return empty results so the client can fall back to IDB.
-      logger.warn({ err }, "Skill keyword search failed — returning empty results");
+      logger.warn("Skill keyword search failed — returning empty results");
       res.json({
         query: q,
         filters: { domain, make, model, year, part },
         layers,
         results: [],
         resultCount: 0,
-        note: "Skill search unavailable — the skills table may not exist in Supabase yet. Run migration 0002_search.sql to enable.",
+        note: "Skill search is temporarily unavailable.",
         generatedAt: new Date().toISOString(),
       });
       return;
@@ -131,12 +133,14 @@ router.get("/v1/search/skills", async (req, res) => {
     const seen = new Set<string>();
     const merged: (SkillRow & { _layer: "semantic" | "keyword" })[] = [];
     for (const r of semanticResults) {
+      if (r.status !== "published") continue;
       if (!seen.has(r.id)) {
         seen.add(r.id);
         merged.push({ ...r, _layer: "semantic" });
       }
     }
     for (const r of keywordResults) {
+      if (r.status !== "published") continue;
       if (!seen.has(r.id)) {
         seen.add(r.id);
         merged.push({ ...r, _layer: "keyword" });
@@ -173,8 +177,8 @@ router.get("/v1/search/skills", async (req, res) => {
       },
       generatedAt: new Date().toISOString(),
     });
-  } catch (error) {
-    logger.error({ err: error }, "Skill search failed");
+  } catch {
+    logger.error("Skill search failed");
     res.status(500).json({ error: "Search failed" });
   }
 });

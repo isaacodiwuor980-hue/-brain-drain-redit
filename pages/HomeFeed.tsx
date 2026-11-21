@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo, useCallback, lazy, Suspense } from "react";
+import { useEffect, useState, useMemo, useCallback, useRef, lazy, Suspense } from "react";
 import { useSocial } from "@/hooks/use-social";
 import { useTopics } from "@/hooks/use-topics";
 import { PostCard } from "@/components/feed/PostCard";
@@ -19,6 +19,15 @@ import { FeedMode, rankHomeFeedPosts, rankRelatedTopics } from "@/lib/recommenda
 import { triggerHaptic } from "@/lib/device";
 import { useAnalyticsEvents } from "@/hooks/use-recommendations";
 import { useToast } from "@/hooks/use-toast";
+import { QuickDecision } from "@/components/ui/quick-decision";
+import { ToastAction } from "@/components/ui/toast";
+import { useDatabase } from "@/hooks/use-database";
+import { instantiateSample, SAMPLE_BRAINS } from "@/lib/sample-brains";
+import { ReasoningTree } from "@/components/ui/reasoning-tree";
+import { ConfidenceBadge } from "@/components/ui/confidence-badge";
+import { computeConfidence } from "@/lib/reasoning-view";
+import { ViewErrorBoundary } from "@/components/ui/view-error-boundary";
+import { isGuestUser } from "@/lib/user-data";
 
 import { DailyChallengesSection } from "@/feed/DailyChallengesSection";
 import { LiveSessionBanner } from "@/feed/LiveSessionBanner";
@@ -36,7 +45,6 @@ import {
 // paint. Suspense fallback preserves layout height to avoid CLS.
 const StoriesBar = lazy(() => import("@/feed/StoriesBar").then(m => ({ default: m.StoriesBar })));
 
-const NeuralGraph = lazy(() => import("@/components/NeuralGraph").then(m => ({ default: m.NeuralGraph })));
 const PostCreator = lazy(() => import("@/components/feed/PostCreator").then((module) => ({ default: module.PostCreator })));
 
 // Helper to seed data if empty
@@ -45,6 +53,11 @@ const SEED_TOPICS: Topic[] = [
   { id: "t2", name: "Philosophy", description: "Deep thoughts", followerCount: 800 },
   { id: "t3", name: "React", description: "UI Framework", followerCount: 2000 }
 ];
+
+// A complete, bundled sample brain used to demonstrate structured reasoning
+// on the feed itself (no network, no auth, no IndexedDB).
+const FEATURED_BRAIN =
+  SAMPLE_BRAINS.find((s) => s.id === "sample-laptop") ?? SAMPLE_BRAINS[0];
 
 export function HomeFeed() {
   // B3: activeFeed must live ABOVE useSocial — the Following tab now drives
@@ -57,9 +70,61 @@ export function HomeFeed() {
   const [location, setLocation] = useLocation();
   const { toast } = useToast();
   // Phase 2: real user identity.
-  const { user } = useAuth();
+  const { user, signIn } = useAuth();
   const currentUserId = userIdOr(user);
   const currentDisplayName = displayNameOr(user);
+  // PHASE 3 — instant value: persisted brain library + sample templates so a
+  // first-time visitor can run a real decision tree without signing in.
+  const { saveBrainData } = useDatabase();
+  const quickDecisionSaving = useRef(false);
+
+  const handleQuickDecisionSave = useCallback(
+    async (index: number) => {
+      if (quickDecisionSaving.current) throw new Error("Another save is in progress.");
+      const sample = SAMPLE_BRAINS[index];
+      if (!sample) throw new Error("Sample not found.");
+      quickDecisionSaving.current = true;
+      try {
+        // GUEST-TRAP FIX (#17): this used to abort the save for guests and ask
+        // for an account FIRST — so a first-time visitor who had just finished
+        // a real decision tree clicked "Keep this brain" and had their work
+        // thrown away to get a login prompt. That is the exact Quora/Reddit
+        // wall we set out to beat, and it contradicts local-first: the brain
+        // can be written to IndexedDB instantly and synced later.
+        // Now: save locally always. Auth is requested only for the part that
+        // genuinely needs an account — cloud sync.
+        await saveBrainData(instantiateSample(sample));
+        const isRealAccount = !!user && !isGuestUser(user);
+        if (isRealAccount) {
+          toast({
+            title: "Brain saved",
+            description: `"${sample.title}" is saved on this device. Cloud sync may be delayed.`,
+          });
+        } else {
+          toast({
+            title: "Brain saved on this device",
+            description: `"${sample.title}" is in your library now. Sign in to sync it across devices — everything you built so far is kept.`,
+            action: (
+              <ToastAction altText="Sign in to sync this brain" onClick={() => void signIn().catch(() => {})}>
+                Sync
+              </ToastAction>
+            ),
+          });
+        }
+      } catch (error) {
+        console.error("Quick decision save failed", error);
+        toast({
+          title: "Could not save",
+          description: "Your run is still on screen — try again in a moment.",
+          variant: "destructive",
+        });
+        throw error;
+      } finally {
+        quickDecisionSaving.current = false;
+      }
+    },
+    [saveBrainData, toast, user, signIn],
+  );
   // B3: the Following view gets its own honest empty state instead of the
   // For-You dry state (whose "Share Your First Brain" CTA makes no sense
   // under Following). Keyed on feed EMPTINESS, not auth: guests may carry an
@@ -67,30 +132,10 @@ export function HomeFeed() {
   // follows need the same message.
   const isFollowingEmpty = activeFeed === "following" && !isLoading && posts.length === 0;
   
-  const graphData = useMemo(() => {
-    const nodes = topics.map(t => ({ id: t.id, name: t.name }));
-    const links: { source: string; target: string }[] = [];
-    
-    const userTopics: Record<string, Set<string>> = {};
-    const validTopicIds = new Set(topics.map(t => t.id));
-    posts.forEach(post => {
-      if (!userTopics[post.userId]) userTopics[post.userId] = new Set();
-      if (validTopicIds.has(post.topicId)) {
-        userTopics[post.userId].add(post.topicId);
-      }
-    });
-    
-    Object.values(userTopics).forEach(set => {
-      const arr = Array.from(set);
-      for (let i = 0; i < arr.length; i++) {
-        for (let j = i + 1; j < arr.length; j++) {
-          links.push({ source: arr[i], target: arr[j] });
-        }
-      }
-    });
-    
-    return { nodes, links };
-  }, [posts, topics]);
+  const featuredBrainConfidence = useMemo(
+    () => computeConfidence(FEATURED_BRAIN.brain, FEATURED_BRAIN.nodes),
+    [],
+  );
 
   const [selectedTopicId, setSelectedTopicId] = useState<string | null>(null);
   // FRAGMENT C: Reddit-style sort modes.
@@ -350,9 +395,24 @@ export function HomeFeed() {
   }, [posts, topics, analyticsEvents, activeFeed, selectedTopicId, displayLimit, location, sortMode, now]);
 
   if (isLoading || isSeeding) {
+    // PHASE 1/3 — the old loading state was a wall of skeletons: on Slow 3G
+    // (or a cold IDB open) a first-time visitor stared at grey boxes with no
+    // way to do anything. The instant-value card renders FIRST — it needs no
+    // network, auth, or IndexedDB — and the feed skeletons fill in below it.
     return (
-      <div className="max-w-2xl mx-auto min-h-screen border-x border-border/50 bg-background/50 p-4 space-y-4">
-        {[1, 2, 3].map((i) => <PostSkeleton key={i} />)}
+      <div className="max-w-2xl mx-auto min-h-screen border-x border-border/50 bg-background/50">
+        <div className="px-3 pt-3">
+          <QuickDecision
+            onSaveBrain={handleQuickDecisionSave}
+            onCreateOwn={() => {
+              window.dispatchEvent(new CustomEvent("bd:open-brain-wizard"));
+              setLocation("/library?create=brain");
+            }}
+          />
+        </div>
+        <div className="p-4 space-y-4" aria-busy="true" aria-label="Loading your feed">
+          {[1, 2, 3].map((i) => <PostSkeleton key={i} />)}
+        </div>
       </div>
     );
   }
@@ -360,6 +420,9 @@ export function HomeFeed() {
   return (
     <div className="max-w-2xl mx-auto min-h-screen border-x border-border/50 bg-background/50">
       
+      <div className="px-3 pt-2 md:hidden">
+        <a href="#home-posts" className="inline-flex min-h-11 items-center rounded-full px-3 text-sm font-medium text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">Jump to posts ↓</a>
+      </div>
       <div className="bg-background pt-4 border-b border-border/40">
         <Suspense fallback={<div className="h-24" aria-hidden="true" />}>
           <StoriesBar />
@@ -367,6 +430,30 @@ export function HomeFeed() {
       </div>
 
       <MomentumWidget />
+
+      {/* PHASE 3 — frictionless onboarding: run a REAL decision brain here,
+          above the fold, before any feed data, auth prompt, or IDB read. */}
+      <div className="px-3 pt-3">
+        <QuickDecision
+          onSaveBrain={handleQuickDecisionSave}
+          onCreateOwn={() => {
+            setCreatorPostType("post");
+            setSelectedQuestionForAnswer(null);
+            // The brain wizard lives in the library; the event handles the
+            // "already there" case and the query param handles navigation.
+            window.dispatchEvent(new CustomEvent("bd:open-brain-wizard"));
+            setLocation("/library?create=brain");
+          }}
+          onExploreSamples={() => {
+            try {
+              sessionStorage.setItem("brain-drain-open-sample", "1");
+            } catch {
+              /* private mode — the library still opens normally */
+            }
+            setLocation("/library");
+          }}
+        />
+      </div>
 
       {/* Feed fetch failure banner — shows when /api/feed failed (non-auth)
           and we are showing cached/seed fallback. Dismissible; Retry refetches. */}
@@ -423,7 +510,7 @@ export function HomeFeed() {
         <FindFriendsFromGmail />
       </div>
 
-      <div className="sticky top-0 z-20 bg-background/85 backdrop-blur-xl border-b border-border/40">
+      <div className="sticky top-[calc(3.5rem+env(safe-area-inset-top))] md:top-0 z-20 bg-background/85 backdrop-blur-xl border-b border-border/40">
         <Tabs value={activeFeed} onValueChange={handleFeedChange} className="w-full">
           <TabsList aria-label="Feed view" className="bg-transparent w-full h-12 flex p-0 border-b-0">
             <TabsTrigger value="foryou" className="flex-1 h-full relative data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:text-foreground data-[state=active]:font-bold rounded-none px-4 pb-0 text-[15px] font-medium text-muted-foreground hover:bg-muted/15 transition-all cursor-pointer">
@@ -523,7 +610,7 @@ export function HomeFeed() {
         </div>
       </div>
 
-      <div className="flex flex-col gap-4 p-2 sm:p-4 pb-24">
+      <div id="home-posts" tabIndex={-1} className="scroll-mt-[calc(7rem+env(safe-area-inset-top))] flex flex-col gap-4 p-2 sm:p-4 pb-6 focus:outline-none">
         {displayedPosts.length > 0 ? (
           <>
             {displayedPosts.map(post => {
@@ -543,6 +630,11 @@ export function HomeFeed() {
                     containIntrinsicSize: '600px',
                   }}
                 >
+                  {/* Per-post boundary: ONE malformed post (bad sanitized
+                      HTML, missing media, corrupt timestamp) used to throw
+                      during render and blank the ENTIRE feed. Now only that
+                      row is replaced by a retry chip. */}
+                  <ViewErrorBoundary label="post" compact>
                   <PostCard
                     post={post}
                     onReact={reactToPost}
@@ -562,6 +654,7 @@ export function HomeFeed() {
                       });
                     }}
                   />
+                  </ViewErrorBoundary>
                 </div>
               );
             })}
@@ -642,10 +735,28 @@ export function HomeFeed() {
             </div>
           </div>
 
+          {/* PHASE 3 — "Neural Framework" used to be a random force-graph of
+              topics: pretty, non-deterministic, and zero information about
+              anyone's reasoning. It now shows an actual decision brain's
+              reasoning tree + confidence, teasering the core product value. */}
           <div className="p-6 border-t border-border/50">
-            <h3 className="font-semibold text-lg mb-4">Neural Framework</h3>
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <h3 className="text-lg font-semibold">Reasoning, not walls of text</h3>
+                <p className="text-xs text-muted-foreground">
+                  Every brain renders as a visual tree, a step-by-step walkthrough, or an interactive run.
+                </p>
+              </div>
+              <ConfidenceBadge confidence={featuredBrainConfidence} />
+            </div>
             <Suspense fallback={<div className="h-64 animate-pulse bg-muted rounded-[16px]" />}>
-              <NeuralGraph nodes={graphData.nodes} links={graphData.links} />
+              <ViewErrorBoundary label="reasoning tree" compact>
+                <ReasoningTree
+                  brain={FEATURED_BRAIN.brain}
+                  nodes={FEATURED_BRAIN.nodes}
+                  onNodeClick={() => setLocation("/library")}
+                />
+              </ViewErrorBoundary>
             </Suspense>
           </div>
         </>

@@ -4,8 +4,11 @@ import { getAnalyticsEvents } from "@/lib/analytics";
 import { rankBrainsByLocalSignals } from "@/lib/recommendations";
 import { Brain, Node, BrainData } from "@/lib/types";
 import { env } from "@/lib/env";
-import { listBrains, saveBrain as saveBrainApi, deleteBrain as deleteBrainApi, isBrainsError } from "@/lib/api/brains";
+import { listBrains, saveBrain as saveBrainApi, isBrainsError } from "@/lib/api/brains";
 import { getAuthToken } from "@/lib/auth-token";
+import { mergeCloudWithLocal } from "@/lib/brain-merge";
+import { loadBrainData } from "@/lib/load-brain-data";
+import { deleteBrainData } from "@/lib/delete-brain";
 
 const generateId = () => crypto.randomUUID();
 
@@ -49,13 +52,13 @@ export function useDatabase() {
       try {
         // Signed-in users see their own brains; guests see public ones.
         const token = await getAuthToken();
-        const response = await listBrains({ mine: Boolean(token), limit: 100 });
+        const response = await listBrains({ mine: Boolean(token), limit: 100, authToken: token });
 
         // Cache cloud brains, preserving any local-only (seeded/offline) brains.
         if (response.brains.length > 0) {
-          await idb.putAll("brains", response.brains as Brain[]);
+          await idb.cacheNewBrains(response.brains);
         }
-        const merged = mergeCloudWithLocal(response.brains as Brain[], localBrains);
+        const merged = mergeCloudWithLocal(response.brains, await idb.getAll<Brain>("brains"));
         const events = await getAnalyticsEvents();
         return rankBrainsByLocalSignals(merged, events);
       } catch (error) {
@@ -64,9 +67,9 @@ export function useDatabase() {
           try {
             const response = await listBrains({ mine: false, limit: 100 });
             if (response.brains.length > 0) {
-              await idb.putAll("brains", response.brains as Brain[]);
+              await idb.cacheNewBrains(response.brains);
             }
-            const merged = mergeCloudWithLocal(response.brains as Brain[], localBrains);
+            const merged = mergeCloudWithLocal(response.brains, await idb.getAll<Brain>("brains"));
             const events = await getAnalyticsEvents();
             return rankBrainsByLocalSignals(merged, events);
           } catch {
@@ -79,18 +82,13 @@ export function useDatabase() {
     },
   });
 
-  const getBrainData = async (brainId: string): Promise<BrainData | null> => {
-    const brain = await idb.get<Brain>("brains", brainId);
-    if (!brain) return null;
-    const nodes = await idb.getAllByIndex<Node>("nodes", "brain_id", brainId);
-    return { brain, nodes };
-  };
+  const getBrainData = loadBrainData;
 
   const saveBrainDataMutation = useMutation({
     mutationFn: async (data: BrainData) => {
-      // Optimistic local write.
-      await idb.put("brains", data.brain);
-      await idb.putAll("nodes", data.nodes);
+      // Local-first data must be committed together; cache-style no-op writes
+      // would otherwise report success even when IndexedDB is unavailable.
+      await idb.saveBrainWithNodes(data.brain, data.nodes);
 
       // Same-origin API when VITE_API_BASE_URL is empty — see lib/env.ts.
       if (!env.apiEnabled) return;
@@ -124,23 +122,7 @@ export function useDatabase() {
   });
 
   const deleteBrainMutation = useMutation({
-    mutationFn: async (brainId: string) => {
-      await idb.delete("brains", brainId);
-      const nodes = await idb.getAllByIndex<Node>("nodes", "brain_id", brainId);
-      await idb.deleteAll(
-        "nodes",
-        nodes.map((n) => n.id),
-      );
-
-      // Same-origin API when VITE_API_BASE_URL is empty — see lib/env.ts.
-      if (!env.apiEnabled) return;
-      try {
-        const token = await getAuthToken();
-        if (token) await deleteBrainApi(brainId, token);
-      } catch (error) {
-        console.warn("Brain deleted locally, cloud delete deferred", error);
-      }
-    },
+    mutationFn: deleteBrainData,
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["brains"] });
     },
@@ -168,14 +150,6 @@ export function useDatabase() {
     exportData,
     refresh: () => queryClient.invalidateQueries({ queryKey: ["brains"] }),
   };
-}
-
-function mergeCloudWithLocal(cloudBrains: Brain[], localBrains: Brain[]): Brain[] {
-  const cloudIds = new Set(cloudBrains.map((b) => b.id));
-  // Keep seeded/local-only brains so the UI is never empty; cloud brains win
-  // on ID collisions.
-  const localOnly = localBrains.filter((b) => !cloudIds.has(b.id));
-  return [...cloudBrains, ...localOnly];
 }
 
 async function seedDatabase() {

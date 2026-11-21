@@ -1,12 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Brain } from "./types";
 
-// Mirrors the mergeCloudWithLocal contract in hooks/use-database.ts.
-function mergeCloudWithLocal(cloudBrains: Brain[], localBrains: Brain[]): Brain[] {
-  const cloudIds = new Set(cloudBrains.map((b) => b.id));
-  const localOnly = localBrains.filter((b) => !cloudIds.has(b.id));
-  return [...cloudBrains, ...localOnly];
-}
+import { mergeCloudWithLocal } from "./brain-merge";
 
 const brain = (id: string, overrides: Partial<Brain> = {}): Brain => ({
   id,
@@ -27,12 +22,12 @@ describe("mergeCloudWithLocal (brains)", () => {
     expect(merged.map((b) => b.id)).toEqual(["c1", "seed-1", "seed-2"]);
   });
 
-  it("lets the cloud brain win on ID collisions", () => {
+  it("preserves local edits on ID collisions", () => {
     const cloud = [brain("b1", { title: "Cloud title", category: "cloud" })];
     const local = [brain("b1", { title: "Local title", category: "local" })];
     const merged = mergeCloudWithLocal(cloud, local);
     expect(merged).toHaveLength(1);
-    expect(merged[0].title).toBe("Cloud title");
+    expect(merged[0].title).toBe("Local title");
   });
 
   it("returns cloud brains when local is empty", () => {

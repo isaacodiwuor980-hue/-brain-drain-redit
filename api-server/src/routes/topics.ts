@@ -2,6 +2,7 @@ import { Router, type IRouter } from "express";
 import { z } from "zod";
 import { supabase, SupabaseError } from "../lib/supabase";
 import { requireAuth } from "../middleware/auth";
+import { requireMappedIdentity } from "../middleware/identity-map";
 
 const router: IRouter = Router();
 
@@ -80,11 +81,16 @@ router.post("/topics", requireAuth, async (req, res) => {
       description: parsed.data.description,
       category: parsed.data.category ?? null,
     };
-    // On conflict (duplicate id) return the existing row instead of erroring.
-    await supabase.insert("topics", row, "resolution=merge-duplicates");
+    // Never merge a caller-supplied ID using the service role: another
+    // user's existing topic must not be overwritten on conflict.
+    await supabase.insert("topics", row);
     res.status(201).json({ topic: { ...row, followerCount: 0 } });
   } catch (error) {
     if (error instanceof SupabaseError) {
+      if (error.status === 409) {
+        res.status(409).json({ error: "Topic already exists or conflicts with an existing topic" });
+        return;
+      }
       res.status(502).json({ error: "Could not create topic" });
       return;
     }
@@ -97,7 +103,7 @@ const FollowTopicSchema = z.object({
 });
 
 /** Follow a topic (authenticated). */
-router.post("/topics/follow", requireAuth, async (req, res) => {
+router.post("/topics/follow", requireAuth, requireMappedIdentity, async (req, res) => {
   const parsed = FollowTopicSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "Invalid request" });
@@ -110,7 +116,7 @@ router.post("/topics/follow", requireAuth, async (req, res) => {
   try {
     await supabase.insert(
       "topic_followers",
-      { topic_id: parsed.data.topicId, user_id: req.auth!.uid },
+      { topic_id: parsed.data.topicId, user_id: req.mappedUserId! },
       "resolution=merge-duplicates",
     );
     res.status(204).end();

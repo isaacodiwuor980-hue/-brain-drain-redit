@@ -1,0 +1,17 @@
+# Phase 1 readiness: NOT READY
+
+Local checks are green within the documented subset, but the full requested six layers and coverage target are not complete. No production-ready, 100% accuracy, or full-behavior claim is warranted. No TSRG flag was enabled; no staging or production system was accessed; local PGlite tests do not apply a live migration.
+
+Release gates: establish actual schema and migration history without exposing credentials; resolve applied-migration immutability and identity provisioning/enforcement; define and implement the missing feed pipeline; review authority input provenance, weights, bridging and anti-abuse policy; restore coverage tooling and cover all exports and specified adversarial/chaos cases; verify real RLS, concurrency, flags, rollback, fairness and shadow review before any deployment. Existing `/api/tsrg/status` is an online cooperating-client soft switch, not a universal kill switch.
+
+Open policy decisions: (1) baseline 0.10 exception versus below-0.15 read-only: recommend explicitly allowing Mouth at 0.10 and making wording consistent. (2) directional support-side vs symmetric bridging: recommend stakeholder review before choosing. (3) authority weights and trust provenance: recommend server-verified earned inputs and independent fairness review before rollout. Graph-density flags alone are not proof of abuse; avoid automatic punishment.
+
+Security/history: credential-shaped Google API key in `firebase-applet-config.json:4` was detected without printing it; validity/restrictions unknown. Verify restrictions and rotate if sensitive. Confirm revocation of the previously exposed historical token and inspect security logs. Scan was not comprehensive. Current live schema is unknown and may contain manually applied migrations; no reapplication or edit to live migrations should be assumed safe. Draft PR #3 remains unmerged.
+
+## Feed follow-up progress
+
+User selected symmetric bridging; public expert-topic tags require evidence review; downvotes do not imply disinterest; personalization must be optional and saved interests clearable. An unwired symmetric helper has local regression tests. The current feed still does not implement these decisions end-to-end. The home page re-sorts after the experimental ordering, and the real feed lacks reliable exposure and trusted tier inputs. Account-level privacy controls, persistence and clearing, evidence review, atomic ordered reactions, and complete rollout are not implemented. Existing schema and identity mapping remain unknown and may be live; no DB changes are authorized. These are blockers rather than completed features.
+
+## Latest local work
+
+The new isolated interest calculation has tests for cold-start emptiness, positive interaction, observed non-engagement, decay, deterministic ordering, duplicate rejection, and invalid input. It has not been wired to any screen, database, preference or tracking system; no real interest tags have been created. Before implementation with real users, establish reliable measured exposures, privacy/retention and deletion, opt-out propagation, account isolation, safeguards against manipulation and bias, cold-start candidate selection, and reviewed parameter calibration. Database schema and historical migrations are still unknown. Connecting Supabase to the conversation and listing projects did not link the app or authorize modifications.

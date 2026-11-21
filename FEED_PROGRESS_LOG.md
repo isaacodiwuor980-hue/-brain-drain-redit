@@ -1,0 +1,27 @@
+# Feed work progress
+
+## Coverage repair and database inspection — stopped on access failure
+
+**VERIFIED (ran it):** Starting branch `arena/7af7488e-brain-drain-redit`, checkpoint `b7f4f26`, working tree clean, so no extra checkpoint commit was needed. Installed `@vitest/coverage-v8` pinned to 4.1.12, matching installed Vitest; package lock updated. `CI=1 npx vitest run --coverage` passed 352 tests / 70 files. `npm run lint` (includes typecheck) passed with zero errors and two existing warnings. `npm run build` passed. `git diff --check` passed.
+
+Coverage baseline, percentages in order statements / branches / functions / lines, from the V8 text report:
+
+| File | Statements | Branches | Functions | Lines |
+|---|---:|---:|---:|---:|
+| api-server/src/routes/feed.ts | 75 | 69.23 | 81.81 | 75.23 |
+| api-server/src/routes/posts.ts | 64.70 | 60.52 | 100 | 63.07 |
+| hooks/use-social.ts | 3.24 | 6.09 | 2.85 | 2.96 |
+| lib/recommendations.ts | 40.93 | 20.14 | 44.68 | 40.15 |
+| lib/post-votes.ts | 95.12 | 89.18 | 100 | 95 |
+| lib/api/feed.ts | 14.28 | 13.63 | 33.33 | 17.64 |
+| lib/tsrg/feed-ranking.ts | 100 | 100 | 100 | 100 |
+| lib/tsrg/feed.ts | 100 | 80.95 | 100 | 100 |
+| lib/tsrg/index.ts | 96.20 | 95.49 | 100 | 97.95 |
+
+The reported aggregate for files included by the current Vitest configuration is 59.98 / 52.70 / 55.91 / 61.09. **UNVERIFIED:** this is not a complete project-wide coverage figure: unimported files such as `pages/HomeFeed.tsx` were absent from the report. 100% for isolated code does not prove integration, safety or production behavior. To reproduce: `CI=1 npx vitest run --coverage`.
+
+**VERIFIED (ran it):** Supabase connector listed one project named BRAIN DRAIN. Read-only requests for migration history and catalog metadata failed with database authentication error `28P01`. No migration or data-changing query was sent. No user records or credentials were requested. No actual schema, RLS, functions, indexes, triggers, extensions, or migration history was obtained, and recorded-vs-actual comparison remains unknown. Stop rather than retrying or bypassing the provider error.
+
+**UNVERIFIED / blocked:** Home-page ordering fix, full identity inventory, migration plan, new feed pipeline, server-controlled immediate kill switch, privacy controls, points ledger, reviewed expert-tag workflow, actual concurrent reaction guarantees, real DB authorization, and complete production readiness. Existing status endpoint is a cooperating-client soft switch only. Do not assume linked app or write migrations based on the unsuccessful inspection. The four separately documented security and migration-history issues remain go-live blockers.
+
+**Next:** Resolve Supabase database connectivity without sharing passwords or tokens here. After the connector is healthy, re-run only approved read-only catalog and migration-history inspection; compare actual schema with local files, then plan and implement safely with no live writes.

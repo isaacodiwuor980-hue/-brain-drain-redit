@@ -8,9 +8,10 @@
 
 import { execSync } from "node:child_process";
 import { writeFileSync, readFileSync, existsSync } from "node:fs";
+import { resolve } from "node:path";
 
-const BASE = "http://localhost:3000";
-const SCREENSHOT_DIR = "/home/z/my-project/scripts/screenshots";
+const BASE = process.env.BASE_URL || "http://localhost:3000";
+const SCREENSHOT_DIR = resolve(process.env.SCREENSHOT_DIR || "scripts/screenshots");
 import { mkdirSync } from "node:fs";
 mkdirSync(SCREENSHOT_DIR, { recursive: true });
 

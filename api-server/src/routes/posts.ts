@@ -9,6 +9,7 @@ const CreatePostSchema = z.object({
   id: z.string().min(1).max(120),
   topicId: z.string().min(1).max(80),
   content: z.string().min(1).max(10_000),
+  tags: z.array(z.string().trim().min(1).max(40)).max(10).optional(),
   postType: z.enum(["post", "question", "answer"]).default("post"),
   event: z
     .object({
@@ -22,7 +23,8 @@ const CreatePostSchema = z.object({
     .optional(),
   mediaUrls: z.array(z.string().url().max(2000)).max(10).optional(),
   brainId: z.string().max(120).optional(),
-  createdAt: z.number().int().positive().optional(),
+  // Date.toISOString throws outside the JavaScript Date range.
+  createdAt: z.number().int().positive().max(8_640_000_000_000_000).optional(),
 });
 
 const ReactSchema = z.object({
@@ -53,6 +55,7 @@ router.post("/posts", requireAuth, async (req, res) => {
     user_id: auth!.uid,
     topic_id: input.topicId,
     content: input.content,
+    tags: input.tags ?? [],
     post_type: input.postType,
     event: input.event ?? null,
     media_urls: input.mediaUrls ?? [],
@@ -68,6 +71,7 @@ router.post("/posts", requireAuth, async (req, res) => {
         userId: row.user_id,
         topicId: row.topic_id,
         content: row.content,
+        tags: row.tags,
         postType: row.post_type,
         event: row.event,
         mediaUrls: row.media_urls,
@@ -139,9 +143,6 @@ router.post("/posts/:id/react", requireAuth, async (req, res) => {
       },
     );
 
-    const currentVote = existing.find(
-      (r) => r.reaction_type === "upvote" || r.reaction_type === "downvote",
-    );
     const currentRepost = existing.find((r) => r.reaction_type === "repost");
 
     if (reactionType === "repost") {
@@ -156,20 +157,14 @@ router.post("/posts/:id/react", requireAuth, async (req, res) => {
         });
       }
     } else {
-      // Voting: remove opposite vote if present.
-      const opposite = reactionType === "upvote" ? "downvote" : "upvote";
-      const oppositeRow = existing.find((r) => r.reaction_type === opposite);
-      if (oppositeRow) {
-        await supabase.delete("reactions", { id: oppositeRow.id });
+      // Remove each existing vote at most once, even if legacy data contains
+      // both directions. The active direction toggles off; otherwise switch.
+      const votes = existing.filter((r) => r.reaction_type === "upvote" || r.reaction_type === "downvote");
+      const isActive = votes.some((r) => r.reaction_type === reactionType);
+      for (const vote of votes) {
+        await supabase.delete("reactions", { id: vote.id });
       }
-
-      if (currentVote?.reaction_type === reactionType) {
-        // Toggle off.
-        await supabase.delete("reactions", { id: currentVote.id });
-      } else {
-        if (currentVote) {
-          await supabase.delete("reactions", { id: currentVote.id });
-        }
+      if (!isActive) {
         await supabase.insert("reactions", {
           target_type: "post",
           target_id: postId,
