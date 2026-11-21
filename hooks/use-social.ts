@@ -12,6 +12,7 @@ import { togglePostReaction } from "../lib/post-votes";
 import {
   createPost as createPostApi,
   fetchFeed,
+  toCreatePostInput,
   reactToPost as reactToPostApi,
   isApiError,
   type CloudPost,
@@ -268,16 +269,7 @@ export function useSocial(mode: "foryou" | "following" = "foryou", topicId: stri
       }
       try {
         await createPostApi(
-          {
-            id: post.id,
-            topicId: post.topicId,
-            content: post.content,
-            postType: post.postType,
-            event: post.event,
-            mediaUrls: post.mediaUrls,
-            brainId: post.brainId,
-            createdAt: post.createdAt,
-          },
+          toCreatePostInput(post),
           token,
         );
       } catch (error) {

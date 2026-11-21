@@ -37,3 +37,34 @@ describe("ordinary feed and reactions stay independent of TSRG flags", () => {
     expect(db.getOne).not.toHaveBeenCalled(); expect(db.rpc).not.toHaveBeenCalled();
   });
 });
+
+describe("ordinary reaction transitions with a mocked database", () => {
+  it.each([
+    { label: "switches up to down", existing: [{ id: "vote-up", reaction_type: "upvote" }], next: "downvote", deleted: ["vote-up"], insert: true },
+    { label: "switches down to up", existing: [{ id: "vote-down", reaction_type: "downvote" }], next: "upvote", deleted: ["vote-down"], insert: true },
+    { label: "toggles the active vote off", existing: [{ id: "vote-up", reaction_type: "upvote" }], next: "upvote", deleted: ["vote-up"], insert: false },
+    { label: "cleans inconsistent legacy votes when toggled off", existing: [{ id: "vote-down", reaction_type: "downvote" }, { id: "vote-up", reaction_type: "upvote" }], next: "upvote", deleted: ["vote-down", "vote-up"], insert: false },
+  ])("$label", async ({ existing, next, deleted, insert }) => {
+    db.getOne.mockResolvedValueOnce({ id: "post1" });
+    db.get.mockResolvedValueOnce(existing).mockResolvedValueOnce([]);
+    db.delete.mockResolvedValue(undefined); db.insert.mockResolvedValue(undefined);
+    const res = await fetch(`${base}/api/posts/post1/react`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ reactionType: next }) });
+    expect(res.status).toBe(200);
+    expect(db.delete.mock.calls.map(call => call[1].id)).toEqual(deleted);
+    expect(db.insert).toHaveBeenCalledTimes(insert ? 1 : 0);
+    expect(db.rpc).not.toHaveBeenCalled();
+  });
+});
+
+describe("post creation timestamp validation", () => {
+  it("rejects an out-of-range date before writing instead of throwing during serialization", async () => {
+    const res = await fetch(`${base}/api/posts`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ id: "post1", topicId: "topic1", content: "hello", createdAt: 8_640_000_000_000_001 }) });
+    expect(res.status).toBe(400); expect(db.insert).not.toHaveBeenCalled();
+  });
+  it("accepts an ordinary creation timestamp", async () => {
+    db.insert.mockResolvedValueOnce(undefined);
+    const createdAt = 1_700_000_000_000;
+    const res = await fetch(`${base}/api/posts`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ id: "post1", topicId: "topic1", content: "hello", createdAt }) });
+    expect(res.status).toBe(201); expect((await res.json()).post.createdAt).toBe(createdAt);
+  });
+});

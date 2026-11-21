@@ -18,7 +18,7 @@ import { idb } from "@/lib/db";
 import { env } from "@/lib/env";
 import { getAuthSession } from "@/lib/auth-token";
 import { useAuth } from "@/components/auth/AuthContext";
-import { createPost, reactToPost } from "@/lib/api/feed";
+import { createPost, reactToPost, toCreatePostInput } from "@/lib/api/feed";
 import { saveBrain } from "@/lib/api/brains";
 import type { Post, Brain, Node } from "@/lib/types";
 
@@ -190,16 +190,7 @@ async function replayAction(
         return "skipped";
       }
       await createPost(
-        {
-          id: post.id,
-          topicId: post.topicId,
-          content: post.content,
-          postType: post.postType,
-          event: post.event,
-          mediaUrls: post.mediaUrls,
-          brainId: post.brainId,
-          createdAt: post.createdAt,
-        },
+        toCreatePostInput(post),
         token,
       );
       return "synced";

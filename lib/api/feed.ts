@@ -61,11 +61,27 @@ export interface CreatePostInput {
   id: string;
   topicId: string;
   content: string;
+  tags?: string[];
   postType?: "post" | "question" | "answer" | "note";
   event?: Post["event"];
   mediaUrls?: string[];
   brainId?: string;
   createdAt?: number;
+}
+
+/** Shared by immediate create and offline replay to avoid dropping fields. */
+export function toCreatePostInput(post: Post): CreatePostInput {
+  return {
+    id: post.id,
+    topicId: post.topicId,
+    content: post.content,
+    tags: post.tags,
+    postType: post.postType,
+    event: post.event,
+    mediaUrls: post.mediaUrls,
+    brainId: post.brainId,
+    createdAt: post.createdAt,
+  };
 }
 
 /** Creates a post on the server. Requires a valid auth token. */
