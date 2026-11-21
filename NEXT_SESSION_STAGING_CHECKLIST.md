@@ -65,3 +65,7 @@ Each gate below is blocked by unfinished local work and/or requires explicit ope
 | G12 | operational | Define monitored small-cohort rollout, abort criteria and responsible operator; verify server kill switch. | blocked |
 
 `GET /api/tsrg/status` currently applies only to cooperating online experimental-feed clients; it is not a universal authorization or offline kill switch. No new requested flag has been implemented for tiered reactions, authority or ranking.
+
+## History discrepancy and identity rollout — unresolved
+
+Historical `worklog.md` text claims initial/search SQL was executed in a Supabase project, whereas the latest instruction states no migrations were applied anywhere. Neither the historical prose nor local tests verify current state. G2 is blocked pending operator reconciliation of actual migration history, schemas and any previously edited historical files. G4 is blocked pending identity-enforcement mode implementation, coverage and an operator-approved provisioning-first rollout: validate reviewed mappings and backup, observe shadow safely, address unmapped UUID-backed accounts, then only consider enforce after authorization. Current routes already fail closed in some places; do not deploy them as though shadow mode exists. No staging work is authorized or attempted by this note.
