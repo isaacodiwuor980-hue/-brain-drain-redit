@@ -9,6 +9,7 @@ import { useMessages } from "@/hooks/use-messages";
 import { idb } from "@/lib/db";
 import { CircleCheckIn, Post, LibraryEntry } from "@/lib/types";
 import { getRoomRole, getRoomVisibility } from "@/lib/room-logic";
+import { toggleCheckinVote } from "@/lib/checkin-votes";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -80,43 +81,9 @@ function useRoomLibrary(roomId: string | undefined) {
 }
 
 /**
- * Quora-style toggle vote for circle check-ins — replaces the old
- * always-increment buttons (every tap was +1, up/down stacked, no
- * un-vote). Mirrors togglePostReaction semantics: mutual exclusion,
- * click the active vote again to remove it. My-state lives on the
- * record (myUpvote/myDownvote) since this build is local-first.
- */
-function toggleCheckinVote(c: CircleCheckIn, direction: "up" | "down"): CircleCheckIn {
-  const up = c.myUpvote ?? false;
-  const down = c.myDownvote ?? false;
-  const upvotes = c.upvotes ?? 0;
-  const downvotes = c.downvotes ?? 0;
-  if (direction === "up") {
-    if (up) return { ...c, upvotes: Math.max(0, upvotes - 1), myUpvote: false };
-    return {
-      ...c,
-      upvotes: upvotes + 1,
-      myUpvote: true,
-      downvotes: down ? Math.max(0, downvotes - 1) : downvotes,
-      myDownvote: false,
-    };
-  }
-  if (down) return { ...c, downvotes: Math.max(0, downvotes - 1), myDownvote: false };
-  return {
-    ...c,
-    downvotes: downvotes + 1,
-    myDownvote: true,
-    upvotes: up ? Math.max(0, upvotes - 1) : upvotes,
-    myUpvote: false,
-  };
-}
-
-/**
  * Room migration: role + visibility derivation lives in lib/room-logic.ts
  * so the core semantics are unit-testable without rendering React.
  */
-
-
 
 /**
  * B/C/D: Membership-state-aware button.

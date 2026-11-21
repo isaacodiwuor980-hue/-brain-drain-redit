@@ -260,7 +260,7 @@ export function CircleRootAdmin({ communityId, communityName }: Props) {
                   <Button variant="outline" size="sm" disabled={currentRole === "curator"} onClick={() => { void promoteToCurator(communityId); toast({ title: "Role updated", description: "You are now a Curator." }); }}>
                     Make Curator
                   </Button>
-                  <Button variant="outline" size="sm" disabled={currentRole === "contributor" || currentRole === "observer"} onClick={() => { void demoteToContributor(communityId); toast({ title: "Role updated", description: "You are now a Contributor." }); }}>
+                  <Button variant="outline" size="sm" disabled={currentRole === "contributor"} onClick={() => { void demoteToContributor(communityId); toast({ title: "Role updated", description: "You are now a Contributor." }); }}>
                     Make Contributor
                   </Button>
                   <Button variant="outline" size="sm" disabled={currentRole === "observer"} onClick={() => { void makeObserver(communityId); toast({ title: "Role updated", description: "You are now an Observer (read-only)." }); }}>
@@ -315,6 +315,21 @@ export function CircleRootAdmin({ communityId, communityName }: Props) {
                 >
                   Save Charter
                 </Button>
+              </div>
+            </TabsContent>
+
+            {/* General Settings is an intentional stub in Phases 1–7: the
+                Room's real configuration (charter, roles, content toggles,
+                moderation rules) lives in the other tabs. This tab is kept
+                present (not omitted) so the trigger always renders a panel
+                instead of a blank/undefined one. No backend is wired here. */}
+            <TabsContent value="settings" className="m-0 space-y-6">
+              <div>
+                <h3 className="text-lg font-bold">General Settings</h3>
+                <p className="text-sm text-muted-foreground">Room-wide configuration that doesn't belong to a specific tab.</p>
+              </div>
+              <div className="p-4 border rounded-[16px] bg-muted/20 text-sm text-muted-foreground">
+                General settings aren't configurable in this build yet. Use the Charter, Member Roles, Content Configuration, and Moderation tabs to configure this Room.
               </div>
             </TabsContent>
 
