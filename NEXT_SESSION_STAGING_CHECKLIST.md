@@ -44,3 +44,24 @@ For each step record sanitized commands, intended contracts and actual results i
 - Do not make further identity code changes without explicit authorization and review.
 - Do not call mutating RPCs as live shadows or equate backend service-role access with user authorization.
 - Do not claim COMPLETE before the evidence report exists, or treat staging success as production clearance.
+
+## Release gates — all require future work; none executed here
+
+Each gate below is blocked by unfinished local work and/or requires explicit operator authorization. Do not start on staging until local defects, flag requirements and migration/identity plans are resolved.
+
+| Gate | Type | Test and evidence required | Status |
+| --- | --- | --- | --- |
+| G1 | operational | Confirm isolated environment and authorization; document backup plus successful restore drill. | blocked |
+| G2 | technical | Confirm migration history and extension permissions; snapshot tables/functions/columns before and after ordered 0001–latest application; capture logs and verify data. | blocked |
+| G3 | technical | Exercise real Supabase grants/RLS for anon, users A and B on every relevant table; record cross-user denials and allowed behavior. | blocked |
+| G4 | operational / technical | Review and run identity provisioning with trusted mappings; verify every user route with two real test accounts and unmapped denial. | blocked |
+| G5 | technical | Test independent concurrent sessions for same post and brain with disposable data; record state and conflicts. | blocked |
+| G6 | technical | Verify real Redis Lua atomicity, TTL, concurrent clients, namespaces, failures and fallback; capture measurements. | blocked |
+| G7 | operational / technical | Implement then review shadow ranking, authority and brigade decisions, false positives and human sign-off before enabling. | blocked |
+| G8 | technical | Test iOS Safari, Android Chrome and desktop, accessibility and offline replay; record device/browser results. | blocked |
+| G9 | legal / operational | Obtain written decisions on retention, export, deletion, licensing and consent; align implemented controls and disclosures. | blocked |
+| G10 | technical | Run an approved modest disposable load/soak; record p50/p95, errors and resource usage. | blocked |
+| G11 | operational / technical | Rehearse flags-off, forward-fix/rollback and backup restoration; record recovery and owners. | blocked |
+| G12 | operational | Define monitored small-cohort rollout, abort criteria and responsible operator; verify server kill switch. | blocked |
+
+`GET /api/tsrg/status` currently applies only to cooperating online experimental-feed clients; it is not a universal authorization or offline kill switch. No new requested flag has been implemented for tiered reactions, authority or ranking.

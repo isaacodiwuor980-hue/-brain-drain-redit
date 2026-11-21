@@ -57,3 +57,7 @@ The 1–11 steps in `NEXT_SESSION_STAGING_CHECKLIST.md` are the detailed plan. D
 ## Commit and push state
 
 Before closure: branch `arena/7af7488e-brain-drain-redit`, commit `b0abda95ea4b5d18950fca8c70de2e64b6c4a34c`, clean working tree; `git ls-remote` showed the same commit on the branch. This document cannot truthfully contain the hash of the commit that first contains it. See the final session report and Git history for the actual closure commit and push outcome.
+
+## Later local follow-up (not closure of remaining work)
+
+Migrations 0002 and 0004 were locally edited under the user's statement that no migrations have been applied; a stub-auth PGlite chain without pgvector passes. Identity mapping beyond brain routes, tier voting UI/API, baseline authority and ranking remain unfinished. See `LOCAL_MIGRATION_AND_IDENTITY_REVIEW.md` and `PRODUCTION_READINESS_ROADMAP.md`; no staging or production action was taken.
