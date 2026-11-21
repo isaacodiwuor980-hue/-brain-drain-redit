@@ -8,7 +8,7 @@
 CREATE TABLE IF NOT EXISTS public.topic_authority_grants (
   user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   topic_id text NOT NULL REFERENCES public.topics(id),
-  authority_score numeric(5,4) NOT NULL CHECK (authority_score > 0 AND authority_score <= 1),
+  authority_score numeric(5,4) NOT NULL CHECK (authority_score >= 0.1 AND authority_score <= 1),
   reviewer_id uuid NOT NULL REFERENCES auth.users(id),
   evidence_reference text NOT NULL CHECK (char_length(evidence_reference) BETWEEN 1 AND 200),
   verified_at timestamptz NOT NULL DEFAULT now(),
@@ -21,7 +21,7 @@ CREATE TABLE IF NOT EXISTS public.tiered_post_votes (
   user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   direction text NOT NULL CHECK (direction IN ('upvote', 'downvote')),
   tier text NOT NULL CHECK (tier IN ('mouth', 'lunch', 'house', 'life')),
-  authority_score_snapshot numeric(5,4) NOT NULL CHECK (authority_score_snapshot > 0 AND authority_score_snapshot <= 1),
+  authority_score_snapshot numeric(5,4) NOT NULL CHECK (authority_score_snapshot >= 0.1 AND authority_score_snapshot <= 1),
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
   PRIMARY KEY (post_id, user_id)
@@ -58,10 +58,12 @@ BEGIN
     DELETE FROM public.tiered_post_votes WHERE post_id = p_post_id AND user_id = v_uid;
     RETURN jsonb_build_object('postId', p_post_id, 'direction', NULL, 'tier', NULL);
   END IF;
-  -- FOR SHARE serializes against concurrent grant updates/revocations.
+  -- An active grant is topic-specific. Missing or revoked grants use the
+  -- baseline; no authority is inferred from user-provided interests.
+  -- FOR SHARE serializes against concurrent updates to an existing grant.
   SELECT authority_score INTO v_score FROM public.topic_authority_grants
     WHERE user_id = v_uid AND topic_id = v_topic AND revoked_at IS NULL FOR SHARE;
-  IF NOT FOUND THEN RAISE EXCEPTION 'Topic authority required' USING ERRCODE = '42501'; END IF;
+  IF NOT FOUND THEN v_score := 0.1; END IF;
   INSERT INTO public.tiered_post_votes(post_id, user_id, direction, tier, authority_score_snapshot)
     VALUES(p_post_id, v_uid, p_direction, p_tier, v_score)
     ON CONFLICT(post_id, user_id) DO UPDATE

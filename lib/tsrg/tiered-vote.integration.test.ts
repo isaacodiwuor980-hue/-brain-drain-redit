@@ -45,12 +45,24 @@ describe("isolated explicit tiered vote foundation", () => {
     await set("alice", "coding-post", null, null);
     expect((await db.query("SELECT * FROM public.tiered_post_votes")).rows).toEqual([]);
   });
-  it("denies other topics, other accounts, unmapped identities and revoked grants", async () => {
-    await expect(set("alice", "gaming-post", "upvote", "life")).rejects.toMatchObject({ code: "42501" });
-    await expect(set("bob", "coding-post", "upvote", "mouth")).rejects.toMatchObject({ code: "42501" });
+  // Deliberate behavior change: absence/revocation of a grant now uses the
+  // requested baseline rather than denying an otherwise mapped voter.
+  it("uses baseline for a new user and does not transfer authority across topics", async () => {
+    await set("bob", "coding-post", "upvote", "life");
+    await set("alice", "gaming-post", "upvote", "life");
+    const rows = await db.query<{ user_id: string; authority_score_snapshot: string }>("SELECT user_id,authority_score_snapshot::text FROM public.tiered_post_votes ORDER BY user_id");
+    expect(rows.rows).toEqual([{ user_id: alice, authority_score_snapshot: "0.1000" }, { user_id: bob, authority_score_snapshot: "0.1000" }]);
+    // Life weight 4 multiplied by baseline trust 0.1 gives 0.4 points.
+    expect(Number(rows.rows[0].authority_score_snapshot) * 4).toBeCloseTo(0.4);
     await expect(set("unknown", "coding-post", "upvote", "life")).rejects.toMatchObject({ code: "42501" });
+  });
+  it("uses baseline after a grant is revoked", async () => {
     await db.query("UPDATE public.topic_authority_grants SET revoked_at=now() WHERE user_id=$1", [alice]);
-    await expect(set("alice", "coding-post", "upvote", "life")).rejects.toMatchObject({ code: "42501" });
+    await set("alice", "coding-post", "upvote", "life");
+    expect((await db.query("SELECT authority_score_snapshot::text FROM public.tiered_post_votes")).rows).toEqual([{ authority_score_snapshot: "0.1000" }]);
+  });
+  it("enforces the minimum authority in stored grants", async () => {
+    await expect(db.query("UPDATE public.topic_authority_grants SET authority_score=0.09 WHERE user_id=$1", [alice])).rejects.toMatchObject({ code: "23514" });
   });
   it("allows a user to remove their own vote after authority is revoked", async () => {
     await set("alice", "coding-post", "upvote", "life");
