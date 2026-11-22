@@ -278,6 +278,7 @@ export function interestFromExposuresV3(events: readonly InterestExposureV3[], n
     sums.set(event.topic, row);
   }
   const result = new Map<string, number>();
-  for (const [topic, row] of sums) result.set(topic, (prior * 0.5 + row.positive) / (prior + row.total));
+  // Center on neutral to avoid underflow when a very small prior is halved.
+  for (const [topic, row] of sums) result.set(topic, 0.5 + (row.positive - row.total * 0.5) / (prior + row.total));
   return result;
 }

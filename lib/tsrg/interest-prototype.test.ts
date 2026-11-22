@@ -37,3 +37,11 @@ describe("offline interest model", () => {
     expect(() => calculate([{...a, engaged: "yes" as never}], 10, 100, 2)).toThrow(RangeError);
   });
 });
+
+describe("interest numerical safety", () => {
+  it("keeps negligible old evidence neutral even with the smallest allowed prior", () => {
+    const calculate = candidate.interestFromExposuresV3!;
+    const scores = calculate([{id:"old", topic:"art", at:0, engaged:false}], 10_000, 1, Number.MIN_VALUE);
+    expect(scores.get("art")).toBe(0.5);
+  });
+});

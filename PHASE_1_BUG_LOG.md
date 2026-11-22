@@ -25,3 +25,6 @@ Status terminology: VERIFIED = observed locally, UNKNOWN = not established. Thes
 
 ## Symmetric bridge — ADDITIVE PROTOTYPE VERIFIED, not integrated
 - User chose equal treatment of support and opposition. Before implementation, `npx vitest run lib/tsrg/symmetric-bridge.test.ts` failed 2 tests because the symmetric API did not exist. The same tests pass with `bridgingBonusSymmetricV3`; 17 related tests passed. It takes the maximum of the existing directional heuristics; clusters are caller-supplied, not independently verified. Legacy directional helpers are unchanged. It does not affect the current feed or establish fairness in deployment.
+
+## Interest prototype numeric underflow — FIXED locally in unwired helper
+- Reproduce: `npx vitest run lib/tsrg/interest-prototype.test.ts`. For a smallest positive prior and fully decayed observation, the old expression returned 0 instead of neutral 0.5 due to floating-point underflow in `prior * 0.5`. The same regression failed before and passed after a centered expression. Legacy feed and production behavior remain unchanged; the function is not connected.
