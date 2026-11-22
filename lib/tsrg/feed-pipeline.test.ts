@@ -34,3 +34,20 @@ describe("isolated replaceable feed ordering", () => {
     expect(buildOfflineFeed([], { seed: 0, rules })).toEqual([]);
   });
 });
+
+describe("model input isolation", () => {
+  it("does not let a failing model mutate caller data or the rules fallback", () => {
+    const input = candidates.map(c => ({ ...c, signals: { ...c.signals } }));
+    const before = JSON.stringify(input);
+    const expected = buildOfflineFeed(input, { seed: 2, rules }).map(c => c.id);
+    const result = buildOfflineFeed(input, {
+      seed: 2, rules, modelWeight: 0.5,
+      model: candidate => {
+        (candidate.signals as { quality: number }).quality = 0;
+        throw new Error("model failed");
+      },
+    });
+    expect(JSON.stringify(input)).toBe(before);
+    expect(result.map(c => c.id)).toEqual(expected);
+  });
+});

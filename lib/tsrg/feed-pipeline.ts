@@ -47,10 +47,16 @@ export function buildOfflineFeed(candidates: readonly FeedCandidate[], options: 
   }
   // Canonicalize evaluation order to avoid input-order-dependent accumulation.
   const canonical = [...candidates].sort((a, b) => a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
-  const ruleScores = canonical.map(candidate => normalized(rules(candidate)));
+  // Do not hand plugins references to the caller's objects. Freeze a minimal
+  // snapshot so a failed scorer cannot corrupt inputs or a later fallback.
+  const inputs: FeedCandidate[] = canonical.map(candidate => Object.freeze({
+    id: candidate.id, topic: candidate.topic, author: candidate.author, source: candidate.source,
+    signals: Object.freeze({ quality: candidate.signals.quality, relevance: candidate.signals.relevance }),
+  }));
+  const ruleScores = inputs.map(candidate => normalized(rules(candidate)));
   let modelScores: number[] | undefined;
   if (model && modelWeight > 0) {
-    try { modelScores = canonical.map(candidate => normalized(model(candidate))); }
+    try { modelScores = inputs.map(candidate => normalized(model(candidate))); }
     catch { modelScores = undefined; }
   }
   return canonical.map((candidate, i) => ({
