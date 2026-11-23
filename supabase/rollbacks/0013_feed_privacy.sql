@@ -1,0 +1,6 @@
+-- REVIEW ONLY. This is intentionally not an executable rollback.
+-- Stop consumers and disable the feature first. Dropping preference or interest
+-- tables would irreversibly destroy saved preferences/interests: require a
+-- verified backup, restore plan and explicit written approval. Restoring a
+-- backup must respect later opt-outs and deletion requests. Functions and tables
+-- must not be dropped on any real database by copying this comment.

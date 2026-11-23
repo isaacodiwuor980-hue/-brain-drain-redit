@@ -1,0 +1,70 @@
+-- LOCAL TESTING / REVIEW ONLY. Do not apply to Supabase. This proposal is not
+-- integrated with the feed, identity provisioning, tracking or UI. Service
+-- callers must authenticate and resolve the user's UUID before invoking it.
+-- OFF by default; opt-out removes only the proposed interest-topic rows, not
+-- analytics events, caches, backups or other derived copies. A complete privacy
+-- lifecycle, epochs for delayed events and real multi-session tests are required.
+CREATE TABLE public.feed_personalization_preferences (
+  user_id uuid PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  enabled boolean NOT NULL DEFAULT false,
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE TABLE public.feed_interest_topics (
+  user_id uuid NOT NULL REFERENCES public.feed_personalization_preferences(user_id) ON DELETE CASCADE,
+  topic_id text NOT NULL REFERENCES public.topics(id),
+  score numeric(5,4) NOT NULL CHECK (score >= 0 AND score <= 1),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (user_id, topic_id)
+);
+ALTER TABLE public.feed_personalization_preferences ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.feed_interest_topics ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON public.feed_personalization_preferences, public.feed_interest_topics FROM PUBLIC, anon, authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.feed_personalization_preferences, public.feed_interest_topics TO service_role;
+
+-- The preference row serializes cooperating readers/writers with disable/clear.
+-- Existing analytics and other clients do not use this lock.
+CREATE FUNCTION public.feed_set_personalization(p_uid uuid, p_enabled boolean)
+RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
+BEGIN
+  IF p_uid IS NULL OR p_enabled IS NULL THEN RAISE EXCEPTION 'Invalid preference' USING ERRCODE = '22023'; END IF;
+  INSERT INTO public.feed_personalization_preferences(user_id) VALUES (p_uid) ON CONFLICT (user_id) DO NOTHING;
+  PERFORM 1 FROM public.feed_personalization_preferences WHERE user_id = p_uid FOR UPDATE;
+  UPDATE public.feed_personalization_preferences SET enabled=p_enabled, updated_at=now() WHERE user_id=p_uid;
+  IF NOT p_enabled THEN DELETE FROM public.feed_interest_topics WHERE user_id=p_uid; END IF;
+END $$;
+
+CREATE FUNCTION public.feed_clear_interests(p_uid uuid)
+RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
+BEGIN
+  IF p_uid IS NULL THEN RAISE EXCEPTION 'Invalid identity' USING ERRCODE = '22023'; END IF;
+  INSERT INTO public.feed_personalization_preferences(user_id) VALUES (p_uid) ON CONFLICT (user_id) DO NOTHING;
+  PERFORM 1 FROM public.feed_personalization_preferences WHERE user_id=p_uid FOR UPDATE;
+  DELETE FROM public.feed_interest_topics WHERE user_id=p_uid;
+END $$;
+
+CREATE FUNCTION public.feed_record_interest(p_uid uuid, p_topic text, p_score numeric)
+RETURNS boolean LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
+DECLARE v_enabled boolean;
+BEGIN
+  IF p_uid IS NULL OR p_topic IS NULL OR p_topic = '' OR p_score IS NULL OR p_score::text IN ('NaN','Infinity','-Infinity') OR p_score < 0 OR p_score > 1 THEN
+    RAISE EXCEPTION 'Invalid interest' USING ERRCODE = '22023';
+  END IF;
+  INSERT INTO public.feed_personalization_preferences(user_id) VALUES (p_uid) ON CONFLICT (user_id) DO NOTHING;
+  SELECT enabled INTO v_enabled FROM public.feed_personalization_preferences WHERE user_id=p_uid FOR UPDATE;
+  IF NOT v_enabled THEN RETURN false; END IF;
+  INSERT INTO public.feed_interest_topics(user_id,topic_id,score) VALUES (p_uid,p_topic,p_score)
+    ON CONFLICT (user_id,topic_id) DO UPDATE SET score=EXCLUDED.score, updated_at=now();
+  RETURN true;
+END $$;
+
+CREATE FUNCTION public.feed_read_interests(p_uid uuid)
+RETURNS TABLE(topic_id text, score numeric) LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
+DECLARE v_enabled boolean;
+BEGIN
+  IF p_uid IS NULL THEN RAISE EXCEPTION 'Invalid identity' USING ERRCODE = '22023'; END IF;
+  SELECT enabled INTO v_enabled FROM public.feed_personalization_preferences WHERE user_id=p_uid FOR SHARE;
+  IF NOT FOUND OR NOT v_enabled THEN RETURN; END IF;
+  RETURN QUERY SELECT t.topic_id,t.score FROM public.feed_interest_topics t WHERE t.user_id=p_uid;
+END $$;
+REVOKE ALL ON FUNCTION public.feed_set_personalization(uuid,boolean), public.feed_clear_interests(uuid), public.feed_record_interest(uuid,text,numeric), public.feed_read_interests(uuid) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.feed_set_personalization(uuid,boolean), public.feed_clear_interests(uuid), public.feed_record_interest(uuid,text,numeric), public.feed_read_interests(uuid) TO service_role;
