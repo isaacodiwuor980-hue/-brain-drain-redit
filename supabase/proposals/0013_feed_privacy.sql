@@ -27,8 +27,18 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON public.feed_personalization_preferences,
 -- Existing analytics and other clients do not use this lock.
 CREATE FUNCTION public.feed_set_personalization(p_uid uuid, p_enabled boolean)
 RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
+DECLARE v_flag boolean;
 BEGIN
   IF p_uid IS NULL OR p_enabled IS NULL THEN RAISE EXCEPTION 'Invalid preference' USING ERRCODE = '22023'; END IF;
+  -- Serialize enabling with an update/delete of the same feature-flag row.
+  -- Disable must not depend on the flag so privacy requests still work.
+  IF p_enabled THEN
+    SELECT enabled INTO v_flag FROM public.server_feature_flags
+      WHERE name='feed_interest_tracking_v2' FOR SHARE;
+    IF NOT FOUND OR v_flag IS DISTINCT FROM true THEN
+      RAISE EXCEPTION 'Feature unavailable' USING ERRCODE = '42501';
+    END IF;
+  END IF;
   INSERT INTO public.feed_personalization_preferences(user_id) VALUES (p_uid) ON CONFLICT (user_id) DO NOTHING;
   PERFORM 1 FROM public.feed_personalization_preferences WHERE user_id = p_uid FOR UPDATE;
   UPDATE public.feed_personalization_preferences SET interest_epoch = interest_epoch + CASE WHEN NOT p_enabled OR NOT enabled THEN 1 ELSE 0 END, enabled=p_enabled, updated_at=now() WHERE user_id=p_uid;
@@ -59,11 +69,13 @@ END $$;
 
 CREATE FUNCTION public.feed_record_interest(p_uid uuid, p_topic text, p_score numeric, p_epoch bigint)
 RETURNS boolean LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
-DECLARE v_enabled boolean; v_epoch bigint;
+DECLARE v_enabled boolean; v_epoch bigint; v_flag boolean;
 BEGIN
   IF p_epoch IS NULL OR p_epoch < 0 OR p_uid IS NULL OR p_topic IS NULL OR p_topic = '' OR p_score IS NULL OR p_score::text IN ('NaN','Infinity','-Infinity') OR p_score < 0 OR p_score > 1 THEN
     RAISE EXCEPTION 'Invalid interest' USING ERRCODE = '22023';
   END IF;
+  SELECT enabled INTO v_flag FROM public.server_feature_flags WHERE name='feed_interest_tracking_v2' FOR SHARE;
+  IF NOT FOUND OR v_flag IS DISTINCT FROM true THEN RETURN false; END IF;
   INSERT INTO public.feed_personalization_preferences(user_id) VALUES (p_uid) ON CONFLICT (user_id) DO NOTHING;
   SELECT enabled, interest_epoch INTO v_enabled, v_epoch FROM public.feed_personalization_preferences WHERE user_id=p_uid FOR UPDATE;
   IF NOT v_enabled OR p_epoch <> v_epoch THEN RETURN false; END IF;
@@ -74,9 +86,11 @@ END $$;
 
 CREATE FUNCTION public.feed_read_interests(p_uid uuid)
 RETURNS TABLE(topic_id text, score numeric) LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
-DECLARE v_enabled boolean;
+DECLARE v_enabled boolean; v_flag boolean;
 BEGIN
   IF p_uid IS NULL THEN RAISE EXCEPTION 'Invalid identity' USING ERRCODE = '22023'; END IF;
+  SELECT enabled INTO v_flag FROM public.server_feature_flags WHERE name='feed_interest_tracking_v2' FOR SHARE;
+  IF NOT FOUND OR v_flag IS DISTINCT FROM true THEN RETURN; END IF;
   SELECT enabled INTO v_enabled FROM public.feed_personalization_preferences WHERE user_id=p_uid FOR SHARE;
   IF NOT FOUND OR NOT v_enabled THEN RETURN; END IF;
   RETURN QUERY SELECT t.topic_id,t.score FROM public.feed_interest_topics t WHERE t.user_id=p_uid;

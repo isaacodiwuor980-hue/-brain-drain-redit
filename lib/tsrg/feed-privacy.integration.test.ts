@@ -9,10 +9,12 @@ beforeAll(async () => {
   await db.exec(`CREATE ROLE anon; CREATE ROLE authenticated; CREATE ROLE service_role;
     CREATE SCHEMA auth; CREATE TABLE auth.users(id uuid PRIMARY KEY);
     CREATE TABLE public.topics(id text PRIMARY KEY);
+    CREATE TABLE public.server_feature_flags(name text PRIMARY KEY, enabled boolean NOT NULL);
+    INSERT INTO public.server_feature_flags VALUES ('feed_interest_tracking_v2', true);
     INSERT INTO auth.users VALUES ('${a}'), ('${b}'); INSERT INTO public.topics VALUES ('art'),('science');`);
   await db.exec(await readFile("supabase/proposals/0013_feed_privacy.sql", "utf8"));
 }, 30000);
-beforeEach(async () => { await db.exec("DELETE FROM public.feed_interest_topics; DELETE FROM public.feed_personalization_preferences;"); });
+beforeEach(async () => { await db.exec("DELETE FROM public.feed_interest_topics; DELETE FROM public.feed_personalization_preferences; UPDATE public.server_feature_flags SET enabled=true WHERE name='feed_interest_tracking_v2';"); });
 afterAll(async () => { await db?.close(); });
 async function setEnabled(uid: string, enabled: boolean) { return db.query("SELECT public.feed_set_personalization($1,$2)", [uid, enabled]); }
 async function epoch(uid: string): Promise<string> {
@@ -27,6 +29,15 @@ describe("local privacy SQL proposal, service-only and not wired", () => {
     expect(await read(a)).toEqual([]);
     expect((await db.query("SELECT count(*)::int AS n FROM public.feed_interest_topics")).rows).toEqual([{n:0}]);
   });
+  it("rejects enabling inside the transaction when the server switch is off or absent", async () => {
+    await db.exec("UPDATE public.server_feature_flags SET enabled=false WHERE name='feed_interest_tracking_v2'");
+    await expect(setEnabled(a, true)).rejects.toMatchObject({code:"42501"});
+    expect((await db.query("SELECT count(*)::int AS n FROM public.feed_personalization_preferences")).rows).toEqual([{n:0}]);
+    await setEnabled(a, false);
+    await db.exec("DELETE FROM public.server_feature_flags WHERE name='feed_interest_tracking_v2'");
+    await expect(setEnabled(a, true)).rejects.toMatchObject({code:"42501"});
+    await db.exec("INSERT INTO public.server_feature_flags VALUES ('feed_interest_tracking_v2', true)");
+  });
   it("reads and clears only the requested account", async () => {
     await setEnabled(a, true); await setEnabled(b, true);
     expect(await write(a, "art", 0.9)).toBe(true); expect(await write(b, "science", 0.7)).toBe(true);
@@ -35,6 +46,15 @@ describe("local privacy SQL proposal, service-only and not wired", () => {
     expect(await read(a)).toEqual([]); expect(await write(a, "art", 0.8)).toBe(false);
     expect(await read(b)).toEqual([{topic_id:"science",score:"0.7000"}]);
     expect((await db.query("SELECT count(*)::int AS n FROM public.feed_interest_topics WHERE user_id=$1", [a])).rows).toEqual([{n:0}]);
+  });
+  it("does not use or collect proposed interests while the server switch is off", async () => {
+    await setEnabled(a, true); const generation = await epoch(a);
+    await write(a, "art", 0.8, generation);
+    await db.exec("UPDATE public.server_feature_flags SET enabled=false WHERE name='feed_interest_tracking_v2'");
+    expect(await read(a)).toEqual([]);
+    expect(await write(a, "science", 0.9, generation)).toBe(false);
+    await db.query("SELECT public.feed_clear_interests($1)", [a]);
+    await setEnabled(a, false);
   });
   it("does not return stale saved rows while the preference is off", async () => {
     await setEnabled(a, true); await write(a, "art", 0.7);
