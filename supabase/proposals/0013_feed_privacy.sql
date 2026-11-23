@@ -1,5 +1,6 @@
 -- LOCAL TESTING / REVIEW ONLY. Do not apply to Supabase. This proposal is not
--- integrated with the feed, identity provisioning, tracking or UI. Service
+-- integrated with the feed, identity provisioning, tracking or UI. A local-only
+-- API can call these functions but is not live or browser-integrated. Service
 -- callers must authenticate and resolve the user's UUID before invoking it.
 -- OFF by default; opt-out removes only the proposed interest-topic rows, not
 -- analytics events, caches, backups or other derived copies. A complete privacy

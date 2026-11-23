@@ -209,6 +209,7 @@ const authLimiter = createRateLimiter({
 });
 app.use("/api/posts", authLimiter);
 app.use("/api/brains", authLimiter);
+app.use("/api/feed-privacy", authLimiter);
 
 // The general read limiter below also covers search. Applying the same
 // limiter here would count a single search request twice.
