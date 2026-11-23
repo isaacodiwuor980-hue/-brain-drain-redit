@@ -1,0 +1,11 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Local privacy test fixture</title></head>
+<body><p>Isolated synthetic-data test fixture; not part of the application UI.</p>
+<script type="module">
+import { trackEvent, getAnalyticsEvents, flushAnalyticsEvents } from '/lib/analytics.ts';
+import { setLocalAnalyticsEnabled, clearLocalAnalytics, getLocalAnalyticsControl, LOCAL_ANALYTICS_CHANGE } from '/lib/local-analytics-control.ts';
+import { idb } from '/lib/db.ts';
+window.privacyHarness = { trackEvent, getAnalyticsEvents, flushAnalyticsEvents, setLocalAnalyticsEnabled, clearLocalAnalytics, getLocalAnalyticsControl, getStored: () => idb.getAllStrict('analytics_events') };
+window.privacyStorageNotifications = 0;
+window.addEventListener('storage', e => { if (e.key === LOCAL_ANALYTICS_CHANGE || e.key === null) window.privacyStorageNotifications++; });
+</script></body></html>

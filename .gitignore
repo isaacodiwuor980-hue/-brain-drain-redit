@@ -21,6 +21,7 @@ Thumbs.db
 *.swp
 
 # Tooling output
+.cache/
 coverage/
 screenshots/
 backups/
