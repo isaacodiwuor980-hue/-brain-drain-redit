@@ -32,3 +32,7 @@ node scripts/test/privacy-postgres-concurrency.mjs
 ```
 
 The binary, data directory and runtime dependencies are temporary and excluded from the repository. Setup and cleanup must be carried out by an operator familiar with local PostgreSQL; verify a cluster is disposable before removing it. A separate staging environment with representative schema and appropriate security controls remains necessary.
+
+## Points reservation concurrency (separate proposal)
+
+On the same dedicated local PostgreSQL 17 cluster, `node scripts/test/points-postgres-concurrency.mjs` creates and drops a fresh synthetic database after checking the same socket/data-directory/TCP restrictions. The observed test covers 50 concurrent wallet opens, 50 competing reservations, and 50 identical retries each of reservation and release. It is manual, not CI, and does not test live Supabase, all transaction schedules, tiered voting, burning, account deletion or API ownership. See `FEED_SUPABASE_PLAN.md` for production blockers.
