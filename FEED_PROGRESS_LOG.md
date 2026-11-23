@@ -173,3 +173,8 @@ Full `CI=1 npx vitest run --coverage`: **417 tests / 79 files passed**, included
 ### Production-readiness follow safety
 - VERIFIED: the mocked HTTP regression failed before the change because missing follow storage returned 204. The route now returns 503 without exposing upstream details; another upstream error remains 502. The focused two-test run and full 422-test / 81-file coverage run passed. Lint/typecheck/build passed with two existing lint warnings. Commit `94fac8d`; no live writes or deployment.
 - UNVERIFIED: follow functionality on the live schema; the application's legacy `user_follows` does not match observed `follows`. Identity provisioning and real RLS/concurrent-writer validation remain blockers. See `PRE_PRODUCTION_CHECKLIST.md`.
+
+### TSRG offline scoring validation
+- VERIFIED: two new regression cases failed before the fix: missing required ranking weights and arithmetic overflow returned invalid scores instead of rejecting them. The offline scorer now rejects missing weights and non-finite computed scores; ordinary scoring weights and live feed behavior are unchanged.
+- VERIFIED: focused tests passed; coverage run 424 tests in 82 files, 62.25% statements / 55.01% branches / 59.46% functions / 63.05% lines in configured scope. Lint and typecheck passed with two existing warnings; build passed.
+- UNVERIFIED: real-world ranking quality, fairness, trusted signal provenance, live data/RLS, and production operation. This does not authorize or enable deployment.

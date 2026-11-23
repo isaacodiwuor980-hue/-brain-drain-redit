@@ -32,6 +32,9 @@ function unit(value: number, name: string): number {
 }
 /** Returns a bounded [0,1] score. No downstream ordering is changed. */
 export function scoreFeedCandidate(signals: FeedRankingSignals, weights: FeedRankingWeights = DEFAULT_FEED_RANKING_WEIGHTS): number {
+  for (const name of Object.keys(DEFAULT_FEED_RANKING_WEIGHTS) as (keyof FeedRankingWeights)[]) {
+    if (!Object.prototype.hasOwnProperty.call(weights, name)) throw new RangeError(`Missing weight: ${name}`);
+  }
   for (const [name, value] of Object.entries(weights)) {
     if (!Number.isFinite(value) || value < 0 || (name === "explorationHalfLife" && value === 0)) throw new RangeError(`Invalid weight: ${name}`);
   }
@@ -46,5 +49,6 @@ export function scoreFeedCandidate(signals: FeedRankingSignals, weights: FeedRan
     weights.recency * unit(recency, "recency") + weights.topicInterest * unit(topicInterest, "topicInterest") +
     weights.authorAuthority * unit(authorAuthority, "authorAuthority") + weights.exploration * novelty -
     weights.brigadeRisk * unit(brigadeRisk, "brigadeRisk") - weights.lowTrustSpike * unit(lowTrustSpike, "lowTrustSpike");
+  if (!Number.isFinite(value)) throw new RangeError("Invalid feed score");
   return Math.max(0, Math.min(1, value));
 }
