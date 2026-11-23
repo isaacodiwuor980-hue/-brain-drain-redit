@@ -144,8 +144,8 @@ router.get("/feed", optionalAuth, async (req, res) => {
   // B3 FOLLOWING FIX: "following" previously returned the exact same rows as
   // "foryou" (mode was never applied) — the tab was a dead control. Resolve
   // the caller's follow graph from user_follows. Guests (and users whose
-  // follows table isn't deployed yet) get an honest empty page, matching the
-  // graceful 204 path in discover.ts POST /follow.
+  // follows table isn't deployed yet) get an empty page. This legacy lookup
+  // is not compatible with the inspected live schema; follow writes fail closed.
   let followeeIds: string[] | null = null;
   if (mode === "following") {
     if (!currentUserId) {

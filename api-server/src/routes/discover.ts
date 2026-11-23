@@ -143,11 +143,8 @@ router.post("/discover/follow", requireAuth, async (req, res) => {
     return;
   }
   try {
-    // B-6 fix: previously the inner try/catch swallowed ALL insert failures
-    // (including Supabase outages and network errors) and returned 204, so
-    // the client believed the follow succeeded when it silently didn't.
-    // Now we only swallow the specific "table missing" case (PGRST205 /
-    // 404) — every other error propagates as 502 so the client can retry.
+    // A missing table is an unavailable feature, not a successful follow.
+    // Other storage errors propagate as retryable failures.
     try {
       await supabase.insert(
         "user_follows",
@@ -155,21 +152,21 @@ router.post("/discover/follow", requireAuth, async (req, res) => {
         "resolution=merge-duplicates",
       );
     } catch (insertErr) {
-      // Distinguish "table not deployed yet" (graceful 204 — feature unavailable)
-      // from "Supabase is down / network error" (502 — client should retry).
+      // Distinguish unavailable follow storage from a general upstream error.
       const isTableMissing =
         insertErr instanceof SupabaseError &&
         (insertErr.status === 404 || /PGRST205|Could not find/.test(String(insertErr.body || "")));
       if (isTableMissing) {
-        logger.warn({ targetUserId }, "user_follows table not deployed — follow silently ignored");
-        res.status(204).end();
+        logger.warn({}, "Follow storage unavailable");
+        res.status(503).json({ error: "Follow service unavailable" });
         return;
       }
       throw insertErr;
     }
     res.status(204).end();
-  } catch (err) {
-    logger.warn({ err }, "Follow user failed");
+  } catch {
+    // Upstream errors may contain account identifiers or request data.
+    logger.warn({}, "Follow user failed");
     res.status(502).json({ error: "Could not follow user" });
   }
 });
