@@ -178,3 +178,8 @@ Full `CI=1 npx vitest run --coverage`: **417 tests / 79 files passed**, included
 - VERIFIED: two new regression cases failed before the fix: missing required ranking weights and arithmetic overflow returned invalid scores instead of rejecting them. The offline scorer now rejects missing weights and non-finite computed scores; ordinary scoring weights and live feed behavior are unchanged.
 - VERIFIED: focused tests passed; coverage run 424 tests in 82 files, 62.25% statements / 55.01% branches / 59.46% functions / 63.05% lines in configured scope. Lint and typecheck passed with two existing warnings; build passed.
 - UNVERIFIED: real-world ranking quality, fairness, trusted signal provenance, live data/RLS, and production operation. This does not authorize or enable deployment.
+
+### Initial 20,000-user synthetic TSRG benchmark
+- VERIFIED: added a reproducible local-only sequential simulation of 20,000 artificial feed requests, each 80 candidates and 10 output slots. Zero ranking errors in that run; 200,000 slots. Matched synthetic groups received 109,936 vs 90,064 exposures: a fairness warning requiring investigation. See `TSRG_SYNTHETIC_STRESS_REPORT.md` for scope, metrics and limitations.
+- VERIFIED: 426 tests / 83 files passed, coverage in configured scope 62.69% statements / 55.26% branches / 59.82% functions / 63.31% lines; lint/typecheck/build passed with two existing warnings. No live writes or deployment.
+- UNVERIFIED: live concurrency, service reliability, fairness for real people, real post quality or factual accuracy, expert detection and competitor comparisons. The benchmark uses synthetic fixture scores and does not approve production settings.
