@@ -88,7 +88,7 @@ function onPrivacyChange() {
 }
 if (typeof window !== "undefined") {
   window.addEventListener(LOCAL_ANALYTICS_CHANGE, onPrivacyChange);
-  window.addEventListener("storage", event => { if (event.key === LOCAL_ANALYTICS_CHANGE) onPrivacyChange(); });
+  window.addEventListener("storage", event => { if (event.key === null || event.key === LOCAL_ANALYTICS_CHANGE) onPrivacyChange(); });
 }
 let flushTimer: number | null = null;
 let isFlushing = false;
@@ -201,7 +201,11 @@ export async function flushAnalyticsEvents() {
   const controller = new AbortController();
   activeRequest = controller;
   try {
-    const control = await getLocalAnalyticsControl();
+    // If preference storage is unavailable, discard pending events rather than
+    // retrying them against a later, possibly reset, browser database.
+    let control: Awaited<ReturnType<typeof getLocalAnalyticsControl>>;
+    try { control = await getLocalAnalyticsControl(); }
+    catch { backendQueue = []; return; }
     if (controller.signal.aborted || !control.enabled) return;
     batch = batch.filter(item => item.epoch === control.epoch);
     if (batch.length === 0) return;

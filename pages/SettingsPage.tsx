@@ -46,7 +46,7 @@ export function SettingsPage() {
   useEffect(() => {
     let mounted = true;
     const refresh = () => { void getLocalAnalyticsControl().then(value => { if (mounted) setLocalActivity(value.enabled); }).catch(() => { if (mounted) setLocalActivity(null); }); };
-    const onStorage = (event: StorageEvent) => { if (event.key === LOCAL_ANALYTICS_CHANGE) refresh(); };
+    const onStorage = (event: StorageEvent) => { if (event.key === null || event.key === LOCAL_ANALYTICS_CHANGE) refresh(); };
     refresh(); window.addEventListener(LOCAL_ANALYTICS_CHANGE, refresh); window.addEventListener("storage", onStorage);
     return () => { mounted = false; window.removeEventListener(LOCAL_ANALYTICS_CHANGE, refresh); window.removeEventListener("storage", onStorage); };
   }, []);
@@ -253,7 +253,11 @@ export function SettingsPage() {
   const handleClearLocalData = async () => {
     if (!confirm("Clear this browser's local data? This cannot be undone and may remove unsynced work. Your account and cloud data will NOT be deleted.")) return;
     try {
+      // Stop pending activity sends in this tab before wiping its preference.
+      // A browser storage clear also notifies other tabs where supported.
+      window.dispatchEvent(new Event(LOCAL_ANALYTICS_CHANGE));
       await idb.clearAllStrict();
+      window.dispatchEvent(new Event(LOCAL_ANALYTICS_CHANGE));
       let browserStorageCleared = true;
       try { localStorage.clear(); } catch { browserStorageCleared = false; }
       try { sessionStorage.clear(); } catch { browserStorageCleared = false; }

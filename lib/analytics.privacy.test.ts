@@ -25,9 +25,37 @@ describe("local activity privacy integration", () => {
     expect(qc.setQueryData).toHaveBeenCalledWith(["analytics_events"], []);
     expect(qc.invalidateQueries).toHaveBeenCalledWith({queryKey:["analytics_events"]});
   });
+  it("discards queued activity when another tab clears browser storage", async () => {
+    await trackEvent("topic_selected", {topicId:"example"});
+    window.dispatchEvent(new StorageEvent("storage", {key:null}));
+    await flushAnalyticsEvents(); expect(fetch).not.toHaveBeenCalled();
+  });
+  it("aborts an in-flight send and does not retry it after turning activity off", async () => {
+    let signal: AbortSignal | undefined;
+    let notifyStarted!: () => void;
+    const started = new Promise<void>(resolve => { notifyStarted = resolve; });
+    vi.mocked(fetch).mockImplementationOnce((_input, init) => new Promise((_resolve, reject) => {
+      signal = init?.signal ?? undefined;
+      signal?.addEventListener("abort", () => reject(new DOMException("aborted", "AbortError")), { once: true });
+      notifyStarted();
+    }));
+    await trackEvent("topic_selected", {topicId:"example"});
+    const sending = flushAnalyticsEvents(); await started;
+    await setLocalAnalyticsEnabled(false); await sending;
+    expect(signal?.aborted).toBe(true);
+    await setLocalAnalyticsEnabled(true); await flushAnalyticsEvents();
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
   it("allows events again after explicit enable", async () => {
     await setLocalAnalyticsEnabled(false); await setLocalAnalyticsEnabled(true); await trackEvent("topic_selected", {topicId:"example"}); await flushAnalyticsEvents();
     expect(fetch).toHaveBeenCalledTimes(1); expect(await getAnalyticsEvents()).toHaveLength(1);
+  });
+  it("drops a queued batch if the preference cannot be checked, rather than replaying later", async () => {
+    await trackEvent("topic_selected", {topicId:"example"});
+    resetDBConnection(); vi.stubGlobal("indexedDB", undefined);
+    await flushAnalyticsEvents(); expect(fetch).not.toHaveBeenCalled();
+    vi.stubGlobal("indexedDB", new IDBFactory());
+    await flushAnalyticsEvents(); expect(fetch).not.toHaveBeenCalled();
   });
   it("fails closed when browser preference storage is unavailable", async () => {
     resetDBConnection(); vi.stubGlobal("indexedDB", undefined); await trackEvent("topic_selected", {topicId:"example"}); await flushAnalyticsEvents(); expect(fetch).not.toHaveBeenCalled(); expect(await getAnalyticsEvents()).toEqual([]);
