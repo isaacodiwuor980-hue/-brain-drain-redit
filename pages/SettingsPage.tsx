@@ -14,13 +14,13 @@ import { idb } from "@/lib/db";
 import { AdminGateDialog } from "@/components/ui/admin-gate-dialog";
 import { refreshLocalData } from "@/lib/data-maintenance";
 import { collectLocalExport } from "@/lib/local-data-export";
+import { clearLocalAnalytics, getLocalAnalyticsControl, LOCAL_ANALYTICS_CHANGE, setLocalAnalyticsEnabled } from "@/lib/local-analytics-control";
 
 interface SavedSettings {
   displayName: string;
   bio: string;
   notifications: boolean;
   privateProfile: boolean;
-  dataCollection: boolean;
 }
 
 const DEFAULT_SETTINGS: SavedSettings = {
@@ -28,7 +28,6 @@ const DEFAULT_SETTINGS: SavedSettings = {
   bio: "",
   notifications: true,
   privateProfile: false,
-  dataCollection: true,
 };
 
 export function SettingsPage() {
@@ -42,7 +41,28 @@ export function SettingsPage() {
   const [bio, setBio] = useState(savedSettings.bio);
   const [notifications, setNotifications] = useState(savedSettings.notifications);
   const [privateProfile, setPrivateProfile] = useState(savedSettings.privateProfile);
-  const [dataCollection, setDataCollection] = useState(savedSettings.dataCollection);
+  const [localActivity, setLocalActivity] = useState<boolean | null>(null);
+  const [activityBusy, setActivityBusy] = useState(false);
+  useEffect(() => {
+    let mounted = true;
+    const refresh = () => { void getLocalAnalyticsControl().then(value => { if (mounted) setLocalActivity(value.enabled); }).catch(() => { if (mounted) setLocalActivity(null); }); };
+    const onStorage = (event: StorageEvent) => { if (event.key === LOCAL_ANALYTICS_CHANGE) refresh(); };
+    refresh(); window.addEventListener(LOCAL_ANALYTICS_CHANGE, refresh); window.addEventListener("storage", onStorage);
+    return () => { mounted = false; window.removeEventListener(LOCAL_ANALYTICS_CHANGE, refresh); window.removeEventListener("storage", onStorage); };
+  }, []);
+  const changeLocalActivity = async (enabled: boolean) => {
+    setActivityBusy(true);
+    try { await setLocalAnalyticsEnabled(enabled); setLocalActivity(enabled); }
+    catch { setLocalActivity(null); toast({ title: "Could not save activity setting", description: "Browser storage is unavailable. No change was confirmed.", variant: "destructive" }); }
+    finally { setActivityBusy(false); }
+  };
+  const clearLocalActivity = async () => {
+    if (!confirm("Clear saved activity on this browser? This cannot be undone. Cloud records and other devices are not affected.")) return;
+    setActivityBusy(true);
+    try { await clearLocalAnalytics(); toast({ title: "Local activity cleared", description: "Only activity stored by this browser was cleared. Cloud records and other devices were not changed." }); }
+    catch { toast({ title: "Could not clear activity", description: "Browser storage is unavailable. No deletion was confirmed.", variant: "destructive" }); }
+    finally { setActivityBusy(false); }
+  };
   const [activeSection, setActiveSection] = useState("appearance");
   // Compress the long-tail settings sections so the page is scannable at a
   // glance. The Account + Appearance sections are essential and stay open by
@@ -73,7 +93,6 @@ export function SettingsPage() {
         if (privacy) {
           if (typeof privacy.notifications === "boolean") next.notifications = privacy.notifications;
           if (typeof privacy.privateProfile === "boolean") next.privateProfile = privacy.privateProfile;
-          if (typeof privacy.dataCollection === "boolean") next.dataCollection = privacy.dataCollection;
         }
       } catch {
         // Best-effort; defaults are fine.
@@ -84,7 +103,6 @@ export function SettingsPage() {
       setBio(next.bio);
       setNotifications(next.notifications);
       setPrivateProfile(next.privateProfile);
-      setDataCollection(next.dataCollection);
     };
     void hydrate();
     return () => {
@@ -117,8 +135,7 @@ export function SettingsPage() {
     displayName !== savedSettings.displayName ||
     bio !== savedSettings.bio ||
     notifications !== savedSettings.notifications ||
-    privateProfile !== savedSettings.privateProfile ||
-    dataCollection !== savedSettings.dataCollection;
+    privateProfile !== savedSettings.privateProfile;
 
   useEffect(() => {
     window.__isAppDirty = isDirty;
@@ -132,7 +149,6 @@ export function SettingsPage() {
     setBio(savedSettings.bio);
     setNotifications(savedSettings.notifications);
     setPrivateProfile(savedSettings.privateProfile);
-    setDataCollection(savedSettings.dataCollection);
     toast({
       title: "Changes Discarded",
       description: "Settings reverted to their previously saved state.",
@@ -146,18 +162,20 @@ export function SettingsPage() {
       bio,
       notifications,
       privateProfile,
-      dataCollection,
     };
     try {
       // Persist profile fields through the auth layer (Firestore for signed-in
       // users, IndexedDB for guests). Privacy toggles are stored locally.
       await updateProfileData({ displayName: displayName.trim() || "Builder", bio });
       try {
+        // Preserve legacy fields, including an earlier saved-off activity
+        // preference, until the separate activity control is explicitly set.
+        const previous = await idb.get<Record<string, unknown>>("settings", "privacy-settings");
         await idb.put("settings", {
+          ...previous,
           id: "privacy-settings",
           notifications,
           privateProfile,
-          dataCollection,
         });
       } catch {
         // Privacy preferences are best-effort; profile save is the priority.
@@ -452,18 +470,23 @@ export function SettingsPage() {
                   <Switch checked={privateProfile} onCheckedChange={setPrivateProfile} />
                 </div>
 
-                <div className="p-6 flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <h3 className="font-medium">Analytics &amp; Telemetry</h3>
-                    <p className="text-sm text-muted-foreground">Saved preference only; it does not currently control analytics collection.</p>
+                <div className="p-6 space-y-4">
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="space-y-1">
+                      <h3 id="local-activity-label" className="font-medium flex items-center gap-2"><Shield className="w-4 h-4 text-primary" aria-hidden="true" /> Activity on this browser</h3>
+                      <p id="local-activity-description" className="text-sm text-muted-foreground">When off, this browser stops saving and sending app activity events and stops using saved activity for recommendations. Your followed topics still affect the feed.</p>
+                    </div>
+                    <Switch aria-labelledby="local-activity-label" aria-describedby="local-activity-description" checked={localActivity === true} disabled={localActivity === null || activityBusy} onCheckedChange={value => void changeLocalActivity(value)} />
                   </div>
-                  <Switch checked={dataCollection} onCheckedChange={setDataCollection} />
+                  {localActivity === null && <p role="status" className="text-sm text-muted-foreground">Activity setting unavailable on this browser.</p>}
+                  <p className="text-sm text-muted-foreground">This applies to this browser, including anyone using it. It does not delete activity already sent, control other devices, or stop other analytics services. Previously saved activity is kept until you clear it and can be used again if you turn this on.</p>
+                  <Button variant="outline" disabled={activityBusy} onClick={() => void clearLocalActivity()}>Clear saved browser activity</Button>
                 </div>
               </CardContent>
             </Card>
             ) : (
               <p className="text-sm text-muted-foreground italic px-1 py-2 leading-relaxed">
-                Local preferences saved on this device; privacy, push, and analytics controls are not yet enforced. <span className="not-italic font-medium text-foreground/70">Tap to expand.</span>
+                Manage browser activity and view the limitations of other privacy preferences. <span className="not-italic font-medium text-foreground/70">Tap to expand.</span>
               </p>
             )}
           </section>

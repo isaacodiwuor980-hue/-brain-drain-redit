@@ -1,13 +1,19 @@
 import { idb } from "./db";
 import { env } from "./env";
+import { LOCAL_ANALYTICS_CHANGE, getLocalAnalyticsControl, getVisibleAnalyticsEvents, recordLocalAnalytics } from "./local-analytics-control";
 
 // Global QueryClient reference — set by the React layer on app mount via
 // setQueryClientRef(). This lets trackEvent() (a plain function, not a
 // hook) invalidate the ["analytics_events"] query after each write so
 // the feed stays fresh without the old 30s polling refetch.
-let queryClientRef: { invalidateQueries: (args: { queryKey: string[] }) => void } | null = null;
+type AnalyticsQueryClient = {
+  invalidateQueries: (args: { queryKey: string[] }) => unknown;
+  cancelQueries?: (args: { queryKey: string[] }) => unknown;
+  setQueryData?: (key: string[], value: AnalyticsEvent[]) => unknown;
+};
+let queryClientRef: AnalyticsQueryClient | null = null;
 
-export function setQueryClientRef(qc: { invalidateQueries: (args: { queryKey: string[] }) => void } | null) {
+export function setQueryClientRef(qc: AnalyticsQueryClient | null) {
   queryClientRef = qc;
 }
 
@@ -66,7 +72,24 @@ const BACKEND_FLUSH_DELAY_MS = 1_500;
 // bound in memory.
 const MAX_QUEUE_SIZE = 200;
 
-let backendQueue: AnalyticsEvent[] = [];
+type QueuedEvent = { event: AnalyticsEvent; epoch: number };
+let backendQueue: QueuedEvent[] = [];
+let activeRequest: AbortController | null = null;
+
+function onPrivacyChange() {
+  backendQueue = [];
+  activeRequest?.abort();
+  if (flushTimer !== null && typeof window !== "undefined") window.clearTimeout(flushTimer);
+  flushTimer = null;
+  // Remove cached signals immediately, then re-read under the new preference.
+  void queryClientRef?.cancelQueries?.({ queryKey: ["analytics_events"] });
+  queryClientRef?.setQueryData?.(["analytics_events"], []);
+  void queryClientRef?.invalidateQueries({ queryKey: ["analytics_events"] });
+}
+if (typeof window !== "undefined") {
+  window.addEventListener(LOCAL_ANALYTICS_CHANGE, onPrivacyChange);
+  window.addEventListener("storage", event => { if (event.key === LOCAL_ANALYTICS_CHANGE) onPrivacyChange(); });
+}
 let flushTimer: number | null = null;
 let isFlushing = false;
 
@@ -142,13 +165,13 @@ function sanitizePayloadForBackend(payload?: Record<string, unknown>) {
   return sanitized;
 }
 
-function requeueBatch(batch: AnalyticsEvent[]) {
+function requeueBatch(batch: QueuedEvent[]) {
   // Put failed events back at the front of the queue for a later retry,
   // but cap total memory usage.
   backendQueue = [...batch, ...backendQueue].slice(0, MAX_QUEUE_SIZE);
 }
 
-function queueBackendEvent(event: AnalyticsEvent) {
+function queueBackendEvent(event: AnalyticsEvent, epoch: number) {
   if (!isAnalyticsEnabled()) return;
 
   const backendEvent: AnalyticsEvent = {
@@ -157,7 +180,7 @@ function queueBackendEvent(event: AnalyticsEvent) {
     payload: sanitizePayloadForBackend(event.payload),
   };
 
-  backendQueue.push(backendEvent);
+  backendQueue.push({ event: backendEvent, epoch });
   if (backendQueue.length > MAX_QUEUE_SIZE) {
     backendQueue = backendQueue.slice(-MAX_QUEUE_SIZE);
   }
@@ -174,13 +197,19 @@ export async function flushAnalyticsEvents() {
   if (!isAnalyticsEnabled()) return;
 
   isFlushing = true;
-  const batch = backendQueue.splice(0, MAX_BACKEND_BATCH_SIZE);
-
+  let batch = backendQueue.splice(0, MAX_BACKEND_BATCH_SIZE);
+  const controller = new AbortController();
+  activeRequest = controller;
   try {
+    const control = await getLocalAnalyticsControl();
+    if (controller.signal.aborted || !control.enabled) return;
+    batch = batch.filter(item => item.epoch === control.epoch);
+    if (batch.length === 0) return;
     const response = await fetch(getEventsEndpoint(), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ events: batch, clientSentAt: Date.now() }),
+      body: JSON.stringify({ events: batch.map(item => item.event), clientSentAt: Date.now() }),
+      signal: controller.signal,
       keepalive: true,
     });
 
@@ -199,30 +228,20 @@ export async function flushAnalyticsEvents() {
       }
       return;
     }
-    requeueBatch(batch);
+    if (!controller.signal.aborted) requeueBatch(batch);
   } catch {
-    // Network error — keep the events for a later attempt. Never block UX.
-    requeueBatch(batch);
+    // A privacy change discards the batch; storage/network errors never break UX.
+    if (!controller.signal.aborted) requeueBatch(batch);
   } finally {
+    if (activeRequest === controller) activeRequest = null;
     isFlushing = false;
     if (backendQueue.length > 0) scheduleBackendFlush();
   }
 }
 
-export function flushAnalyticsEventsWithBeacon() {
-  if (typeof navigator === "undefined" || backendQueue.length === 0 || !navigator.sendBeacon) return false;
-  if (!isAnalyticsEnabled()) return false;
-
-  const batch = backendQueue.splice(0, MAX_BACKEND_BATCH_SIZE);
-  const body = JSON.stringify({ events: batch, clientSentAt: Date.now() });
-  const sent = navigator.sendBeacon(getEventsEndpoint(), new Blob([body], { type: "application/json" }));
-
-  if (!sent) {
-    backendQueue = [...batch, ...backendQueue].slice(0, MAX_QUEUE_SIZE);
-  }
-
-  return sent;
-}
+// sendBeacon cannot check current IndexedDB consent or be cancelled. Use the
+// asynchronous flush instead; page-close delivery becomes best-effort.
+export function flushAnalyticsEventsWithBeacon() { return false; }
 
 export async function trackEvent(type: AnalyticsEventType, payload?: Record<string, unknown>) {
   const event: AnalyticsEvent = {
@@ -234,14 +253,15 @@ export async function trackEvent(type: AnalyticsEventType, payload?: Record<stri
     payload: sanitizePayload(payload),
   };
 
+  let epoch: number | null;
   try {
-    await idb.put(STORE, event);
-  } catch (error) {
-    // Analytics must never break the product experience.
-    console.warn("Analytics event was not persisted", error);
+    epoch = await recordLocalAnalytics(event);
+  } catch {
+    // If the local preference cannot be checked, do not collect or transmit.
+    return;
   }
-
-  queueBackendEvent(event);
+  if (epoch === null) return;
+  queueBackendEvent(event, epoch);
 
   // PERF: prune old events on every write to prevent unbounded growth.
   // Without this, the analytics_events store grows forever and
@@ -297,7 +317,8 @@ export async function pruneOldEvents(): Promise<void> {
  * that had decayed to near-zero weight but still cost O(n) to iterate).
  */
 export async function getAnalyticsEvents(): Promise<AnalyticsEvent[]> {
-  const all = await idb.getAll<AnalyticsEvent>(STORE);
+  let all: AnalyticsEvent[];
+  try { all = await getVisibleAnalyticsEvents<AnalyticsEvent>(); } catch { return []; }
   // Sort newest-first and cap — this bounds the work buildTopicScores
   // has to do, regardless of how many events accumulated before the
   // prune ran.

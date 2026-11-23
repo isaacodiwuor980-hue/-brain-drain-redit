@@ -2,8 +2,9 @@
 import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-const mock = vi.hoisted(() => ({ toast: vi.fn(), get: vi.fn(async () => undefined), getAllStrict: vi.fn(), clearAllStrict: vi.fn() }));
+const mock = vi.hoisted(() => ({ toast: vi.fn(), get: vi.fn(async () => undefined), getAllStrict: vi.fn(), clearAllStrict: vi.fn(), getLocalAnalyticsControl: vi.fn(async () => ({enabled:true,epoch:0})), setLocalAnalyticsEnabled: vi.fn(async (_value: boolean) => undefined), clearLocalAnalytics: vi.fn(async () => undefined) }));
 vi.mock("@/lib/db", () => ({ idb: mock }));
+vi.mock("@/lib/local-analytics-control", () => ({ getLocalAnalyticsControl: mock.getLocalAnalyticsControl, setLocalAnalyticsEnabled: mock.setLocalAnalyticsEnabled, clearLocalAnalytics: mock.clearLocalAnalytics, LOCAL_ANALYTICS_CHANGE: "test-activity-change" }));
 vi.mock("@/hooks/use-toast", () => ({ useToast: () => ({ toast: mock.toast }) }));
 vi.mock("@/lib/theme", () => ({ useTheme: () => ({ theme: "light", setTheme: vi.fn() }) }));
 vi.mock("@/components/auth/AuthContext", () => ({ useAuth: () => ({ user: null, profile: null, updateProfileData: vi.fn(), logOut: vi.fn() }) }));
@@ -27,12 +28,18 @@ describe("settings local data controls", () => {
     expect(confirm).toHaveBeenCalledWith(expect.stringContaining("cloud data will NOT be deleted"));
     expect(mock.clearAllStrict).not.toHaveBeenCalled();
   });
-  it("does not imply that local privacy or telemetry preferences are enforced", async () => {
+  it("explains browser-only activity and unimplemented profile controls", async () => {
     await act(async () => root.render(<SettingsPage />));
-    expect(container.textContent).toContain("privacy, push, and analytics controls are not yet enforced");
     await act(async () => container.querySelector<HTMLButtonElement>("#privacy > button")?.click());
     expect(container.textContent).toContain("does not restrict profile, post, or brain visibility");
-    expect(container.textContent).toContain("does not currently control analytics collection");
+    expect(container.textContent).toContain("does not delete activity already sent, control other devices, or stop other analytics services");
+    const activitySwitch = container.querySelector<HTMLButtonElement>('[aria-labelledby="local-activity-label"]');
+    expect(activitySwitch?.getAttribute("aria-checked")).toBe("true");
+    await act(async () => activitySwitch?.click());
+    expect(mock.setLocalAnalyticsEnabled).toHaveBeenCalledWith(false);
+    vi.stubGlobal("confirm", vi.fn().mockReturnValue(false));
+    await act(async () => [...container.querySelectorAll("button")].find(button => button.textContent?.includes("Clear saved browser activity"))?.click());
+    expect(mock.clearLocalAnalytics).not.toHaveBeenCalled();
   });
   it("reports an unreadable store instead of claiming a complete export", async () => {
     await act(async () => root.render(<SettingsPage />));
