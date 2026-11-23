@@ -1,7 +1,9 @@
 import { Router, type IRouter } from "express";
 import { z } from "zod";
 import { supabase, SupabaseError } from "../lib/supabase";
-import { optionalAuth } from "../middleware/auth";
+import { optionalAuth, requireAuth } from "../middleware/auth";
+import { requireMappedIdentity } from "../middleware/identity-map";
+import { requireServerFeature } from "../middleware/server-feature-flag";
 
 const router: IRouter = Router();
 
@@ -94,6 +96,35 @@ function renderFeedPosts(entry: CachedFeed, currentUserId: string | undefined) {
     };
   });
 }
+
+// Separate, default-off path: never switch the existing feed implicitly. The
+// flag and verified mapping must be provisioned before this can be exercised.
+// It deliberately does not use the shared feed cache.
+router.get("/feed/following-v2", (_req, res, next) => { res.setHeader("Cache-Control", "no-store"); next(); },
+  requireServerFeature("following_feed_v2"), requireAuth, requireMappedIdentity, async (req, res) => {
+    const parsed = FeedQuerySchema.safeParse(req.query);
+    if (!parsed.success) { res.status(400).json({ error: "Invalid feed query" }); return; }
+    try {
+      const following = await supabase.get<{ following_id: string }>("follows", {
+        select: "following_id", filters: { follower_id: `eq.${req.mappedUserId}` }, limit: 501,
+      });
+      // Do not silently return an incomplete graph; replace with a server-side
+      // paginated join before raising this cap. Deployment must verify that the
+      // PostgREST row limit is at least 501, or truncation remains possible.
+      if (following.length > 500) { res.status(503).json({ error: "Following graph exceeds supported size" }); return; }
+      const ids = following.map(row => row.following_id);
+      if (ids.some(id => typeof id !== "string" || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id))) {
+        res.status(502).json({ error: "Feed data source unavailable" }); return;
+      }
+      if (ids.length === 0) { res.json({ posts: [], hasMore: false, source: "following" }); return; }
+      const { topic, limit, offset } = parsed.data;
+      const page = await fetchFeedPage("following", topic, limit, offset, ids, false);
+      res.json({ posts: renderFeedPosts(page, req.mappedUserId), hasMore: page.hasMore, source: "following" });
+    } catch {
+      // Do not return or log upstream payloads which may contain user data.
+      res.status(502).json({ error: "Feed data source unavailable" });
+    }
+  });
 
 router.get("/feed", optionalAuth, async (req, res) => {
   const parsed = FeedQuerySchema.safeParse(req.query);
@@ -283,6 +314,7 @@ async function fetchFeedPage(
   limit: number,
   offset: number,
   followeeIds: string[] | null = null,
+  includeTags = true,
 ): Promise<CachedFeed> {
   const filters: Record<string, string> = {};
   if (topic) filters.topic_id = `eq.${topic}`;
@@ -296,7 +328,7 @@ async function fetchFeedPage(
   // apply local personalization signals.
   const rows = await supabase.get<PostRow>("posts", {
     select: `
-      id,user_id,topic_id,content,tags,post_type,event,media_urls,brain_id,
+      id,user_id,topic_id,content,${includeTags ? "tags," : ""}post_type,event,media_urls,brain_id,
       repost_count,created_at,comment_count,
       topic:topics(name),
       author:profiles(display_name,avatar_url)

@@ -4,7 +4,7 @@ import type { Server } from "node:http";
 
 const db = vi.hoisted(() => ({ get: vi.fn(), isConfigured: vi.fn(() => true) }));
 vi.mock("../lib/supabase", () => ({ supabase: db, SupabaseError: class extends Error { status = 500; body?: unknown; } }));
-vi.mock("../middleware/auth", () => ({ optionalAuth(req: express.Request, _res: express.Response, next: express.NextFunction) {
+vi.mock("../middleware/auth", () => ({ requireAuth(_req: express.Request, _res: express.Response, next: express.NextFunction) { next(); }, optionalAuth(req: express.Request, _res: express.Response, next: express.NextFunction) {
   const uid = req.headers.authorization?.replace("Bearer ", "");
   if (uid) req.auth = { uid } as express.Request["auth"];
   next();
