@@ -51,14 +51,19 @@ type AnalyticsEvent = z.infer<typeof AnalyticsEventSchema>;
 function sanitizePayload(payload: AnalyticsEvent["payload"]) {
   if (!payload) return undefined;
 
-  return Object.fromEntries(
-    Object.entries(payload).map(([key, value]) => {
-      if (typeof value === "string") return [key, value.slice(0, 160)];
-      if (typeof value === "number" || typeof value === "boolean" || value === null) return [key, value];
-      if (Array.isArray(value)) return [key, value.slice(0, 20)];
-      return [key, "[redacted]"];
-    }),
-  );
+  const entries: Array<[string, unknown]> = [];
+  for (const [key, value] of Object.entries(payload)) {
+    const field = key.toLowerCase();
+    // Do not trust old or third-party clients to remove these fields.
+    if (field === "search" || field === "referrer" || field === "query") continue;
+    if (field === "path" && typeof value === "string") {
+      entries.push([key, value.split(/[?#]/, 1)[0].slice(0, 160)]);
+    } else if (typeof value === "string") entries.push([key, value.slice(0, 160)]);
+    else if (typeof value === "number" || typeof value === "boolean" || value === null) entries.push([key, value]);
+    else if (Array.isArray(value)) entries.push([key, value.slice(0, 20)]);
+    else entries.push([key, "[redacted]"]);
+  }
+  return Object.fromEntries(entries);
 }
 
 const router: IRouter = Router();
@@ -76,6 +81,7 @@ router.post("/events", async (req, res) => {
 
   const events = parsed.data.events.map((event) => ({
     ...event,
+    route: event.route.split(/[?#]/, 1)[0],
     payload: sanitizePayload(event.payload),
   }));
 
@@ -99,8 +105,9 @@ router.post("/events", async (req, res) => {
 
     const response = AnalyticsEventsResponseSchema.parse({ accepted: events.length, storageMode });
     res.status(202).json(response);
-  } catch (error) {
-    logger.error({ err: error }, "Failed to store analytics events");
+  } catch {
+    // Upstream error bodies may contain event content; never log them here.
+    logger.error({}, "Failed to store analytics events");
     res.status(500).json({ accepted: 0, error: "Analytics storage unavailable" });
   }
 });

@@ -161,3 +161,11 @@ Full `CI=1 npx vitest run --coverage`: **416 tests / 79 files passed**, included
 Full `CI=1 npx vitest run --coverage`: **417 tests / 79 files passed**, included JS/TS coverage **63.9% statements / 56% branches / 60.78% functions / 64.86% lines**, not SQL or entire-repository coverage. Lint/typecheck/build and `git diff --check` passed; 0 errors / 2 existing warnings.
 
 **UNVERIFIED / limitation:** This client-side filter is not a server-side security boundary: old clients or direct callers can still send arbitrary payloads. Other field names, paths, arrays, older stored activity, server logs, third-party services and account-wide deletion require a separate inventory and enforcement. No database or live deployment was changed. Updated `FEED_DESIGN.md` to reflect the later successful read-only schema inspection and local-only ledger proposal.
+
+## Deferred stake pricing and server-side activity filtering
+
+**USER DECISION:** Stake pricing was explicitly deferred. Keep staking disabled and do not choose tier amounts or connect it to voting until that decision is made; the local ledger remains a prototype.
+
+**VERIFIED (ran it):** Added mocked HTTP tests that demonstrated older/direct clients could submit raw route queries, search/referrer/query fields and URL query fragments in path fields. The server now strips those specified fields and route/path query fragments before passing events to storage, regardless of client behavior. Analytics storage and route errors no longer log upstream error objects that may contain event payloads. Three new HTTP tests passed after the initially failing regression. Full `CI=1 npx vitest run --coverage`: **420 tests / 80 files passed**, included JS/TS coverage **64.15% statements / 56.18% branches / 61.04% functions / 65.17% lines**, not SQL or entire-repository coverage. Lint/typecheck/build and `git diff --check` passed, 0 errors / 2 existing warnings.
+
+**UNVERIFIED / limitations:** This is targeted filtering, not a full PII scrubber: arbitrary other strings, paths, arrays and identifiers may still include sensitive data. Old stored events, logs, server/cloud backups and third-party sources are not deleted, and server-side ownership/deletion, retention and consent are unimplemented. Tests mock storage and do not prove real database behavior. No live changes or deployments were performed.
