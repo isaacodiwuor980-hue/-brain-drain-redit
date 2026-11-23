@@ -15,7 +15,11 @@ beforeAll(async () => {
 beforeEach(async () => { await db.exec("DELETE FROM public.feed_interest_topics; DELETE FROM public.feed_personalization_preferences;"); });
 afterAll(async () => { await db?.close(); });
 async function setEnabled(uid: string, enabled: boolean) { return db.query("SELECT public.feed_set_personalization($1,$2)", [uid, enabled]); }
-async function write(uid: string, topic: string, score: number) { return (await db.query<{ accepted: boolean }>("SELECT public.feed_record_interest($1,$2,$3) AS accepted", [uid, topic, score])).rows[0].accepted; }
+async function epoch(uid: string): Promise<string> {
+  const result = await db.query<{ epoch: string }>("SELECT public.feed_interest_epoch($1)::text AS epoch", [uid]);
+  return result.rows[0].epoch;
+}
+async function write(uid: string, topic: string, score: number, generation?: string) { return (await db.query<{ accepted: boolean }>("SELECT public.feed_record_interest($1,$2,$3,$4) AS accepted", [uid, topic, score, generation ?? await epoch(uid)])).rows[0].accepted; }
 async function read(uid: string) { return (await db.query("SELECT topic_id,score::text FROM public.feed_read_interests($1) ORDER BY topic_id", [uid])).rows; }
 describe("local privacy SQL proposal, service-only and not wired", () => {
   it("defaults to off and stores no interest until opted in", async () => {
@@ -44,6 +48,24 @@ describe("local privacy SQL proposal, service-only and not wired", () => {
     await db.query("SELECT public.feed_clear_interests($1)", [a]);
     expect(await read(a)).toEqual([]); expect(await write(a, "science", 0.6)).toBe(true);
   });
+  it("rejects events collected before clear or disable even after re-enable", async () => {
+    await setEnabled(a, true);
+    const beforeClear = await epoch(a);
+    await write(a, "art", 0.8, beforeClear);
+    await db.query("SELECT public.feed_clear_interests($1)", [a]);
+    expect(await write(a, "art", 0.8, beforeClear)).toBe(false);
+    const afterClear = await epoch(a);
+    expect(await write(a, "science", 0.6, afterClear)).toBe(true);
+    await setEnabled(a, false); await setEnabled(a, true);
+    expect(await write(a, "art", 0.8, afterClear)).toBe(false);
+    expect(await read(a)).toEqual([]);
+    expect(await write(a, "art", 0.9, await epoch(a))).toBe(true);
+  });
+  it("does not invalidate queued events when the setting remains enabled", async () => {
+    await setEnabled(a, true); const generation = await epoch(a);
+    await setEnabled(a, true);
+    expect(await write(a, "art", 0.5, generation)).toBe(true);
+  });
   it("rejects malformed inputs and unknown topics without partial writes", async () => {
     await setEnabled(a, true);
     for (const score of [-1, 1.1]) await expect(write(a, "art", score)).rejects.toMatchObject({code:"22023"});
@@ -52,7 +74,7 @@ describe("local privacy SQL proposal, service-only and not wired", () => {
   });
   it("denies direct table access and function execution to untrusted roles", async () => {
     const rights = await db.query(`SELECT has_table_privilege('authenticated','public.feed_interest_topics','SELECT') AS read,
-      has_function_privilege('anon','public.feed_record_interest(uuid,text,numeric)','EXECUTE') AS anonymous,
+      has_function_privilege('anon','public.feed_record_interest(uuid,text,numeric,bigint)','EXECUTE') AS anonymous,
       has_function_privilege('authenticated','public.feed_set_personalization(uuid,boolean)','EXECUTE') AS authenticated,
       has_function_privilege('service_role','public.feed_set_personalization(uuid,boolean)','EXECUTE') AS service`);
     expect(rights.rows).toEqual([{read:false,anonymous:false,authenticated:false,service:true}]);
