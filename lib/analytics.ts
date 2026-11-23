@@ -151,8 +151,16 @@ function sanitizePayloadForBackend(payload?: Record<string, unknown>) {
 
   for (const [key, value] of Object.entries(payload)) {
     const lowerKey = key.toLowerCase();
-    if (lowerKey === "query" && typeof value === "string") {
-      sanitized.queryLength = value.length;
+    // Browser query strings and referrers can contain search terms, tokens or
+    // personal data. They remain local for legacy recommendations but are not
+    // included in the outbound activity payload.
+    if (lowerKey === "query") {
+      if (typeof value === "string") sanitized.queryLength = value.length;
+      continue;
+    }
+    if (lowerKey === "search" || lowerKey === "referrer") continue;
+    if (lowerKey === "path" && typeof value === "string") {
+      sanitized[key] = value.split(/[?#]/, 1)[0].slice(0, 80);
       continue;
     }
 

@@ -153,3 +153,11 @@ On a temporary socket-only PostgreSQL 17.12 cluster with synthetic accounts, `sc
 Full `CI=1 npx vitest run --coverage`: **416 tests / 79 files passed**, included-file JS/TS coverage **63.72% statements / 55.63% branches / 60.78% functions / 64.7% lines**, not SQL or entire-repo coverage. Lint/typecheck/build and `git diff --check` passed, 0 errors / 2 existing warnings.
 
 **UNVERIFIED / incomplete:** No burn/slashing, pricing, eligibility, UI, identity/authenticated API, flag or atomic vote coupling exists. Privileged owners can bypass controls; delete/retention rules are unresolved because restrictive FKs deliberately block account/post deletion. PGlite and isolated PostgreSQL are not actual Supabase/RLS or a full concurrency proof. The proposal is not deployed or connected; no live data or settings changed. See `FEED_SUPABASE_PLAN.md` for full gates.
+
+## Restrict outbound activity URL data
+
+**VERIFIED (ran it):** A new regression test demonstrated that `page_view` payloads could send the browser query string and full referrer even though the event route was stripped of query parameters. Updated the client-side backend payload sanitizer to omit `search` and `referrer`, replace raw `query` with length only, and strip query/hash from `path`. The regression now passes. This changes outbound telemetry, not local recommendation inputs; legacy local event records still contain their existing fields.
+
+Full `CI=1 npx vitest run --coverage`: **417 tests / 79 files passed**, included JS/TS coverage **63.9% statements / 56% branches / 60.78% functions / 64.86% lines**, not SQL or entire-repository coverage. Lint/typecheck/build and `git diff --check` passed; 0 errors / 2 existing warnings.
+
+**UNVERIFIED / limitation:** This client-side filter is not a server-side security boundary: old clients or direct callers can still send arbitrary payloads. Other field names, paths, arrays, older stored activity, server logs, third-party services and account-wide deletion require a separate inventory and enforcement. No database or live deployment was changed. Updated `FEED_DESIGN.md` to reflect the later successful read-only schema inspection and local-only ledger proposal.

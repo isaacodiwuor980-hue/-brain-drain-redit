@@ -46,6 +46,15 @@ describe("local activity privacy integration", () => {
     await setLocalAnalyticsEnabled(true); await flushAnalyticsEvents();
     expect(fetch).toHaveBeenCalledTimes(1);
   });
+  it("does not send raw search terms, URL queries, or referrer URLs to the backend", async () => {
+    await trackEvent("page_view", { search:"?q=private-search", query:"private-query", referrer:"https://example.test/private-referrer", path:"/search?q=private-path", visible:true });
+    await flushAnalyticsEvents();
+    const body = String(vi.mocked(fetch).mock.calls[0][1]?.body);
+    expect(body).not.toContain("private-search"); expect(body).not.toContain("private-query");
+    expect(body).not.toContain("private-referrer"); expect(body).not.toContain("private-path");
+    const payload = JSON.parse(body).events[0].payload;
+    expect(payload.path).toBe("/search"); expect(payload.visible).toBe(true);
+  });
   it("allows events again after explicit enable", async () => {
     await setLocalAnalyticsEnabled(false); await setLocalAnalyticsEnabled(true); await trackEvent("topic_selected", {topicId:"example"}); await flushAnalyticsEvents();
     expect(fetch).toHaveBeenCalledTimes(1); expect(await getAnalyticsEvents()).toHaveLength(1);
