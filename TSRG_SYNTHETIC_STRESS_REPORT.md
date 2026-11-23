@@ -32,3 +32,9 @@ Groups are artificial paired candidates: each pair has equal topic, source and c
 ## Next engineering work
 
 Investigate and regression-test the exposure imbalance using varied, permuted IDs and user seeds, without assuming a particular demographic attribute or silently forcing a quota. Evaluate objective quality using independently labeled synthetic cases and reviewed datasets. Add isolated concurrency, fault-injection and end-to-end tests only in approved environments; measure full service latency. Reconcile database schema and trusted Firebase/Supabase ownership, design reviewed expert-tag evidence and appeal, and validate server-side privacy and feature switches before any deployment. Do not invent stake prices or burn user points until the deferred policy and reliable outcome process are resolved.
+
+## Follow-up: tie-break mixing
+
+VERIFIED: the 2,000-user matched-fixture regression failed before changing the tie-breaker, with a 9.93% difference divided by total exposure. The raw hash exhibited an ordering pattern in this fixture. An additional integer mixing step was added to the **offline-only** seeded tie-breaker; this changes its order for tied scores but does not change live feeds or non-tied scores. The regression then passed.
+
+VERIFIED: repeating the 20,000-user fixture after the change produced 100,107 / 99,893 exposures (50.0535% / 49.9465%), zero ranking errors, mean synthetic quality 0.8383 and relevance 0.4700, and four distinct topics per cold and mature user on average. The fixed-order proxy was unchanged. Local p50/p95/p99 were 0.148 / 0.253 / 0.322 ms in that run. This is one paired synthetic fixture; it does not prove fairness for other IDs, distributions, users or real protected groups, and it does not assess gaming of the deterministic tie-breaker. No production fairness target has been approved.
