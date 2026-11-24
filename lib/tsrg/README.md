@@ -37,3 +37,7 @@ The no-vote score is explicitly zero to match the existing cold-start convention
 ## Offline personalized ordering V3
 
 `rankOfflinePersonalizedV3` combines caller-supplied topic interest and a supplied quality proxy using an explicit test weight, and delegates stable ordering to the existing offline pipeline. It has no default production weight, candidate retrieval, quota, eligibility or live wiring. Missing topic scores are neutral; with personalization off, the supplied interest map is not read. This local property alone is not backend opt-out, deletion, truthful quality, safety or expertise verification. The caller must provide trusted data and enforce permissions and privacy; no downvote is interpreted as disinterest by this function. No actual feed behavior is changed.
+
+## Offline Wilson-prior comparison V4
+
+`wilson-prior-v4.ts` is a separate, unwired comparison. It uses the same prior for no votes that V3 applies to nonempty votes, removing V3's explicit zero-vote jump. It delegates nonempty calculations to V3 and does not change legacy or V3. In 10,000 synthetic pairs including cold start, tested vote additions moved in the expected direction within tolerance. A positive initial value is a policy trade-off and not evidence of quality or truth; its impact on new posts, fairness, calibration and actual users is unverified. This candidate is not approved for production ranking.
