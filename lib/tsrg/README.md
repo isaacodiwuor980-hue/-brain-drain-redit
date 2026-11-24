@@ -29,3 +29,7 @@ The no-vote score is explicitly zero to match the existing cold-start convention
 ## Offline reviewed-answer summary V3
 
 `summarizeCalibrationV3` is an additive, unwired arithmetic experiment for synthetic reviewed answers in one topic. It reports the number of answers, fraction matching supplied keys, and mean uniform-guess baseline (`1/K` separately for each question), or no result when empty. It rejects duplicate IDs, wrong-topic records and invalid choice indexes. It uses no real data and does not compute a probability of expertise or a gate, grant public labels or change vote weights. A 10,000-question deterministic uniform-guess fixture tests the baseline; a separate test illustrates that correct answers alone cannot distinguish genuine knowledge from a leaked key. Real guesses may be biased. Authentication, genuinely independent key review, question quality, cross-topic evidence, cheating prevention, privacy, accessibility and real-world validation remain unresolved.
+
+## Offline interest V4
+
+`interest-v4.ts` is an unwired alternative to V3. It avoids halving tiny floating-point weights before division: with one positive exposure of weight `Number.MIN_VALUE` and an equal prior, V3 returns 1 rather than 0.75 due to underflow; V4 returns 0.75. The old export is unchanged. In 500 ordinary synthetic cases the two agree within test tolerance, not a proof of universal equivalence. Caller provenance, opt-out, downvote semantics and real-world feed validation remain unresolved.
