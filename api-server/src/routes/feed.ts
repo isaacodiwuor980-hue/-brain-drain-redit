@@ -358,6 +358,11 @@ async function fetchFeedPage(
 
   const page = rows.slice(0, limit);
   const postIds = page.map((r) => r.id);
+  // Database contents can be malformed or supplied by other writers. Never
+  // interpolate unchecked values into a PostgREST in-list filter.
+  if (postIds.some(id => typeof id !== "string" || !/^[A-Za-z0-9_-]{1,120}$/.test(id))) {
+    throw new SupabaseError("Invalid feed data", 502);
+  }
 
   let reactionsByPost: Record<string, ReactionRow[]> = {};
   if (postIds.length > 0) {

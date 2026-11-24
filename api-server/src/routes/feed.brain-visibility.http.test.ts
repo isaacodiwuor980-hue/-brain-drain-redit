@@ -45,4 +45,16 @@ describe("feed linked-brain privacy with mocked storage",()=>{
     expect(res.status).toBe(200); expect(body.posts.map((p:{brainId:string|null})=>p.brainId)).toEqual([null,null]);
     expect(JSON.stringify(body)).not.toContain("private upstream details");
   });
+  it("rejects malformed post IDs before building the reactions filter",async()=>{
+    db.get.mockImplementation(async(table:string)=>{
+      if(table==="posts") return [post('bad"),evil','synthetic-public')];
+      if(table==="reactions") return [];
+      if(table==="brains") return [];
+      throw new Error("unexpected table");
+    });
+    const {res,body}=await get("bad-post-id-regression");
+    expect(res.status).toBe(502);
+    expect(body).toEqual({error:"Feed data source unavailable"});
+    expect(db.get.mock.calls.some(call=>call[0]==="reactions")).toBe(false);
+  });
 });
