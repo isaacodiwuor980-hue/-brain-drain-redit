@@ -328,3 +328,7 @@ Full `CI=1 npx vitest run --coverage`: **417 tests / 79 files passed**, included
 
 ### Historical link repair plan
 - Prepared `HISTORICAL_BRAIN_LINK_DETACHMENT_PLAN.md` for review, including candidate SQL, exact field scope, writer freeze, restricted backup, privacy-aware recovery, validation and cleanup. It is not approval to execute; the latest authorized aggregate count was zero at that instant. Concurrency, live roles and embedded content remain unverified; no cloud writes, deployment or records changed.
+
+### Feed cache reconciliation
+- VERIFIED locally: extracted the existing voted-post cache behavior and reproduced a regression where a previously cached brain ID survived a successful server redaction because the entire old post was retained. Changed the local cache write to take fresh cloud fields while retaining local reactions and the existing solved fields. Focused regression failed before and passed after; full tests, typecheck, lint and build passed (two existing warnings).
+- UNVERIFIED: browser end-to-end behavior, offline/previously cached or local-only items, items not present in a response, account switching, content embeds, and live authorization remain unresolved. A successful page refresh only replaces matching cached posts; it is not a general privacy guarantee. No deployment or cloud changes; personalized 70/15/10/5 feed remains unintegrated.

@@ -22,6 +22,7 @@ import { getAuthSession, getAuthToken } from "../lib/auth-token";
 import { env } from "../lib/env";
 import { queueOfflineAction } from "../lib/offline-sync";
 import { orderFeed } from "../lib/tsrg/feed";
+import { reconcileCachedCloudPost } from "../lib/feed-cache-reconcile";
 import { useTsrgStatus } from "./use-tsrg-status";
 
 /** Posts fetched per page. Matches the server max (feed.ts limit.max = 50). */
@@ -137,23 +138,14 @@ export function useSocial(mode: "foryou" | "following" = "foryou", topicId: stri
             // refetch. The server does not track guest reactions, so a blind
             // putAll would erase the user's upvote/downvote every time the
             // feed refetches (staleTime expiry, window focus, vote onSuccess).
-            // Preserve local posts that carry userReactions; only cache server
-            // data for posts the user hasn't interacted with. Signed-in users
-            // get server-tracked userReactions so their voted posts still
-            // reconcile via the server response.
+            // Preserve local reactions, but always cache fresh server fields
+            // such as a redacted brainId instead of retaining an old post.
+            // This does not validate cached items missing from the response or
+            // prevent stale data being displayed before a successful refresh.
             const localById = new Map(cached.map((p) => [p.id, p]));
-            const toCache = response.posts.map((server) => {
-              const local = localById.get(server.id);
-              if (
-                local?.userReactions &&
-                Object.values(local.userReactions).some(
-                  (arr) => Array.isArray(arr) && arr.length > 0,
-                )
-              ) {
-                return local;
-              }
-              return server;
-            });
+            const toCache = response.posts.map((server) =>
+              reconcileCachedCloudPost(server, localById.get(server.id)),
+            );
             await idb.putAll("posts", toCache);
           } catch (idbErr) {
             console.warn("[feed] Could not cache posts locally (cloud data still shown)", idbErr);
