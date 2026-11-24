@@ -325,3 +325,6 @@ Full `CI=1 npx vitest run --coverage`: **417 tests / 79 files passed**, included
 ### Conditional cloud rehearsal approval
 - Owner approved only the displayed synthetic rehearsal, conditioned on first confirming a single session and safe rollback; otherwise stop. The available Supabase connector tool description does not specify those transaction/session guarantees. This is not sufficient evidence to meet the condition, so the cloud rehearsal was NOT run. No connected-project write or deployment occurred.
 - VERIFIED locally: added PGlite failure-path tests showing that a pre-existing same-named synthetic schema is preserved after a creation conflict and that an injected synthetic failure followed by explicit rollback removes the new test schema. These local tests do not verify connector behavior. Full tests, typecheck, lint and build passed with two existing lint warnings.
+
+### Historical link repair plan
+- Prepared `HISTORICAL_BRAIN_LINK_DETACHMENT_PLAN.md` for review, including candidate SQL, exact field scope, writer freeze, restricted backup, privacy-aware recovery, validation and cleanup. It is not approval to execute; the latest authorized aggregate count was zero at that instant. Concurrency, live roles and embedded content remain unverified; no cloud writes, deployment or records changed.
