@@ -6,10 +6,10 @@ This is a review checklist, not authorization to deploy or alter a live project.
 - Local baseline: 420 tests passed in 80 files; typecheck and build passed; lint had two warnings and no errors.
 - After the follow failure fix: 422 tests passed in 81 files; typecheck and build passed; lint had two warnings and no errors. Coverage run reported 62.20% statements, 54.94% branches, 59.46% functions and 63.02% lines for its configured scope; this is not database or complete-repository coverage.
 - Read-only live metadata inspection: `follows` and `reactions` exist with RLS enabled; several proposed identity, feature flag and TSRG tables are absent. Local migration numbering does not match the observed live history. See `LIVE_SCHEMA_SNAPSHOT.md`. This is a point-in-time observation, not proof of policy correctness.
-- No code under `lib/tsrg/` changed relative to session baseline `e22fd3c`.
+- Subsequent local TSRG changes and tests are documented in `FEED_PROGRESS_LOG.md`; some offline prototypes changed after baseline and are not production-wired.
 
 ## Release blockers — unresolved
-- Establish a trusted ownership proof linking each Firebase subject to its Supabase account; do not infer links from email. Implement and review provisioning and consistent identity handling, respecting legacy TEXT-keyed data. Test with two separate users.
+- The owner chose new-account provisioning only initially; existing accounts stay unlinked pending an approved recovery design. Implement and independently review trusted new-account eligibility/provisioning and consistent identity handling, respecting legacy TEXT-keyed data. Never infer links from email. Test with two separate users; see `IDENTITY_PROVISIONING_DESIGN.md`.
 - Reconcile the live schema and migration history with reviewed migration and rollback plans. The live `follows` table differs from the application's legacy `user_follows` expectation. Follow writes now fail closed if storage is missing, but following is not repaired.
 - Verify actual live RLS policy behavior, grants, functions and triggers using isolated test accounts and an explicitly approved test environment. A service-role test bypasses RLS and cannot establish user isolation.
 - The 70/15/10/5 feed is an offline design gap, not live functionality. Ring detection is a connected-component density heuristic, not clique detection; CUSUM does not define time windows. Review the fixed-point and invalid-number behavior before any live activation.

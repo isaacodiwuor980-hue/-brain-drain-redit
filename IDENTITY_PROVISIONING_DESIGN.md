@@ -1,6 +1,14 @@
 # Identity mapping provisioning design — not implemented or run
 
-This is a proposed operator-reviewed process, not an executable script. It does not authorize use of real data or any environment. Never map by email, display name, UUID shape, user-supplied values, or other untrusted attributes.
+The owner chose **new accounts only initially**. Do not link existing Firebase accounts or import legacy pairs until a separately approved recovery and ownership-proof process exists. The legacy operator-reviewed process below is deferred and is not permission to map existing accounts. This document is not an executable script and does not authorize use of real data or any environment. Never map by email, display name, UUID shape, user-supplied values, or other untrusted attributes.
+
+## New-account provisioning: proposed security requirements
+
+A verified Firebase session alone proves only control of that Firebase account; it does not prove ownership of an already existing Supabase user. A future server-side provisioner may create a **new** Supabase user and map its returned UUID to the verified Firebase subject only when it can establish that this subject is eligible for new-account provisioning and the user was created exclusively for that attempt. Do not let a browser provide the UUID or select/reuse a pre-existing Supabase user. Eligibility needs a trustworthy, concurrency-safe source: absence of a mapping alone cannot distinguish a new person from an unmapped existing account. Until that distinction is established, fail closed rather than create duplicates.
+
+The design must define recent authentication and revocation checks, a server-bound one-time creation request, idempotency, transactional uniqueness, conflict rejection, provider API authorization, account-takeover defenses, and auditing without tokens or personal details. Since Firebase and Supabase cannot share a single database transaction, define a secure resumable state machine for partial failures, retries and cleanup; never delete an existing provider account as compensation. Require an independent security review, local and approved isolated integration tests with two accounts, a recovery/deletion workflow and explicit rollout authorization. Neither this design nor the local planner creates users, verifies cross-provider ownership, or changes production.
+
+## Deferred operator-reviewed legacy process
 
 1. An authorized operator establishes a trusted, audited linkage between each authenticated Firebase subject and the corresponding Supabase auth.users UUID using an approved account-linking process. Ambiguous, missing or conflicting pairs are quarantined for manual resolution, never guessed. Choose the proof of linkage and account recovery policy before implementation.
 2. A future restricted admin-only tool consumes the reviewed pairs via a secure local input mechanism, validating subject length/charset, UUID syntax, existence of the auth user and uniqueness in both directions. No secrets or full identifiers in logs. It must run with least privilege, explicit operator authorization, and deny browser/service-key exposure.
