@@ -231,3 +231,7 @@ Full `CI=1 npx vitest run --coverage`: **417 tests / 79 files passed**, included
 ### Synthetic personalization comparison
 - VERIFIED: local `personalization-synthetic.ts` ran 20,001 sequential synthetic feed requests split equally into warm, cold and personalization-off groups, with no invalid outputs. Warm feeds selected all four available preferred-topic posts; cold/off averaged about 4.93 distinct topics in 10 slots, warm about 4.51. This is a fixture outcome, not real quality or privacy proof; no topic cap or exploration quota is implemented. See `TSRG_PERSONALIZATION_SIMULATION.md`.
 - VERIFIED: 460 tests in 94 files passed; coverage 63.90% statements / 57.36% branches / 60.76% functions / 64.52% lines in configured scope; lint/typecheck/build passed with two existing warnings. No live writes or deployment.
+
+### Synthetic soft-diversity comparison
+- VERIFIED: applied the existing offline best-effort diversity helper to the same 20,001 synthetic requests. In that fixture warm preferred-topic slots went from 26,668 to 20,001 and mean topics/page from 4.51 to 4.83. This was a test configuration, not an approved production cap, a 70/15/10/5 implementation, a fairness guarantee or real user satisfaction. See `TSRG_PERSONALIZATION_SIMULATION.md`.
+- VERIFIED: 461 tests in 95 files passed; coverage 63.96% statements / 57.36% branches / 60.90% functions / 64.56% lines in configured scope; lint/typecheck/build passed with two existing warnings. No live data or feed changed.
