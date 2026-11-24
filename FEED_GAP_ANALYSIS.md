@@ -33,3 +33,7 @@ The **complete 70/15/10/5 feed remains unimplemented**; the newly approved offli
 ## Offline brain-branch composition
 
 `brain-mixed-feed-v1.ts` now combines synthetic graph scores and the offline V4 mixed feed. Its explicitly supplied blend and score mapping are experimental, not production policy. It changes no legacy exports and is not a route or integration. It does not establish visibility, trusted quality, identity, moderation, pagination or real-world fairness. The earlier reference to an offline-only approval describes the original scope; the owner subsequently requested live feed integration, which still requires safe prerequisites and deployment approval.
+
+## Owner decisions after offline prototypes
+
+For a 10-post page the owner selected 6 top / 2 rising / 1 fairness / 1 discovery when eligible candidates exist (V5 short-page allocation). The owner selected shadow evaluation before any brain-branch blend affects live output; the current composition uses V4 and is not a live shadow path. Offline fallback should retain cached posts and hide brain links, with the acknowledged risk that text or other cached details may still contain sensitive information. The current partial implementation does not cover all stale display paths. These choices do not authorize deployment or resolve security, identity, scoring calibration, other page sizes or candidate availability.
