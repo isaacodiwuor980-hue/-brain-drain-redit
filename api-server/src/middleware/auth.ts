@@ -1,5 +1,5 @@
 import type { NextFunction, Request, Response } from "express";
-import { extractBearerToken, verifyFirebaseToken, type VerifiedAuth } from "../lib/firebase-auth";
+import { extractBearerToken, verifyFirebaseToken, FirebaseAuthUpstreamError, type VerifiedAuth } from "../lib/firebase-auth";
 import { logger } from "../lib/logger";
 
 // Augment Express Request with the authenticated user.
@@ -26,10 +26,10 @@ declare global {
  */
 function classifyAuthError(err: unknown): "auth" | "upstream" | "config" {
   const msg = err instanceof Error ? err.message : String(err);
-  // Upstream: JWKS fetch failed, network error, Google returned non-200.
-  if (/Failed to fetch Firebase public keys|fetch|network/i.test(msg)) return "upstream";
-  // Config: project ID unset, algorithm unsupported.
-  if (/Firebase project ID is not configured|Unsupported token algorithm/i.test(msg)) return "config";
+  // Classify failures at the provider boundary, never by untrusted token text.
+  if (err instanceof FirebaseAuthUpstreamError) return "upstream";
+  // Config: project ID unset, algorithm unsupported (legacy response status).
+  if (msg === "Firebase project ID is not configured" || msg.startsWith("Unsupported token algorithm:")) return "config";
   // Everything else is a client-side auth problem.
   return "auth";
 }

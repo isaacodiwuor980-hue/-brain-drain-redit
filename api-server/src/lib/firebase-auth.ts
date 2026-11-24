@@ -43,6 +43,9 @@ export interface VerifiedAuth {
   photoURL?: string;
 }
 
+// Distinguish provider failures from malformed, attacker-controlled token data.
+export class FirebaseAuthUpstreamError extends Error {}
+
 interface CachedKey {
   key: CryptoKey;
   expiresAt: number;
@@ -95,36 +98,26 @@ async function fetchPublicKey(kid: string): Promise<CryptoKey> {
     return cached.key;
   }
 
-  const response = await fetch(FIREBASE_JWKS_URL);
-  if (!response.ok) {
-    throw new Error(`Failed to fetch Firebase public keys: ${response.status}`);
-  }
-
-  const maxAge = parseCacheControlMaxAge(
-    response.headers.get("cache-control"),
-  );
-  const { keys } = (await response.json()) as {
-    keys: Array<JsonWebKey & { kid: string }>;
-  };
-
-  for (const jwk of keys) {
-    if (!jwk.kid) continue;
-    const publicKey = await crypto.subtle.importKey(
-      "jwk",
-      jwk,
-      { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
-      false,
-      ["verify"],
-    );
-    keyCache.set(jwk.kid, {
-      key: publicKey,
-      expiresAt: Date.now() + maxAge * 1000,
-    });
+  try {
+    const response = await fetch(FIREBASE_JWKS_URL);
+    if (!response.ok) throw new Error("JWKS response unavailable");
+    const maxAge = parseCacheControlMaxAge(response.headers.get("cache-control"));
+    const { keys } = (await response.json()) as { keys: Array<JsonWebKey & { kid: string }> };
+    for (const jwk of keys) {
+      if (!jwk.kid) continue;
+      const publicKey = await crypto.subtle.importKey(
+        "jwk", jwk, { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" }, false, ["verify"],
+      );
+      keyCache.set(jwk.kid, { key: publicKey, expiresAt: Date.now() + maxAge * 1000 });
+    }
+  } catch {
+    // Never propagate network responses, URLs, or untrusted token fields.
+    throw new FirebaseAuthUpstreamError("Firebase public keys unavailable");
   }
 
   const next = keyCache.get(kid);
   if (!next) {
-    throw new Error(`Firebase public key not found for kid: ${kid}`);
+    throw new Error("Firebase public key not found");
   }
   return next.key;
 }

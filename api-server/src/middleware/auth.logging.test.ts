@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { NextFunction, Request, Response } from "express";
 
-const mock = vi.hoisted(() => ({ verify: vi.fn(), warn: vi.fn(), error: vi.fn() }));
-vi.mock("../lib/firebase-auth", () => ({ extractBearerToken: () => "synthetic-token", verifyFirebaseToken: mock.verify }));
+const mock = vi.hoisted(() => ({ verify: vi.fn(), warn: vi.fn(), error: vi.fn(), UpstreamError: class extends Error {} }));
+vi.mock("../lib/firebase-auth", () => ({ extractBearerToken: () => "synthetic-token", verifyFirebaseToken: mock.verify, FirebaseAuthUpstreamError: mock.UpstreamError }));
 vi.mock("../lib/logger", () => ({ logger: { warn: mock.warn, error: mock.error } }));
 import { optionalAuth, requireAuth } from "./auth";
 
@@ -15,7 +15,7 @@ function setup() {
 }
 describe("authentication error log privacy", () => {
   it.each(["required", "optional"])("never logs upstream error details for %s auth", async kind => {
-    mock.verify.mockRejectedValue(new Error("fetch failure: synthetic-sensitive-token"));
+    mock.verify.mockRejectedValue(new mock.UpstreamError("fetch failure: synthetic-sensitive-token"));
     const { req, res, next } = setup();
     await (kind === "required" ? requireAuth(req, res, next) : optionalAuth(req, res, next));
     expect(mock.warn.mock.calls[0][0]).not.toHaveProperty("err");
