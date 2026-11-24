@@ -43,7 +43,24 @@ export function allocateOfflineMixV4(pageSize: number): Mix {
  * qualityWeight, minQuality and seed are explicit experiments, not policy.
  */
 export function buildOfflineMixedFeedV4(candidates: readonly MixedCandidateV4[], options: Options): {candidate: MixedCandidateV4; section: Section}[] {
-  const quotas=allocateOfflineMixV4(options.pageSize);
+  return buildOfflineMixedFeedInternal(candidates, options, false);
+}
+
+/** Offline comparison: on pages of five or more, reserve one discovery slot
+ * when largest-remainder rounding would give none, taking it from top. */
+export function allocateOfflineMixV5(pageSize: number): Mix {
+  const quotas = allocateOfflineMixV4(pageSize);
+  if (pageSize >= 5 && quotas.discovery === 0) { quotas.top--; quotas.discovery++; }
+  return quotas;
+}
+
+/** Same constraints and limitations as V4; this is NOT a live feed. */
+export function buildOfflineMixedFeedV5(candidates: readonly MixedCandidateV4[], options: Options): {candidate: MixedCandidateV4; section: Section}[] {
+  return buildOfflineMixedFeedInternal(candidates, options, true);
+}
+
+function buildOfflineMixedFeedInternal(candidates: readonly MixedCandidateV4[], options: Options, reserveDiscovery: boolean): {candidate: MixedCandidateV4; section: Section}[] {
+  const quotas=reserveDiscovery ? allocateOfflineMixV5(options.pageSize) : allocateOfflineMixV4(options.pageSize);
   if (!Array.isArray(candidates) || !Number.isInteger(options.seed) || options.seed < 0 || options.seed > 0xffffffff ||
       !unit(options.qualityWeight) || !unit(options.minQuality) || typeof options.personalized !== "boolean") throw new RangeError("Invalid mix inputs");
   let interests: Map<string,number> | undefined;
