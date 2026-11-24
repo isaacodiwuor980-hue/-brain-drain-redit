@@ -1,0 +1,5 @@
+-- REVIEW ONLY, intentionally not executable. Dropping the experimental event
+-- or preference tables destroys data and may restore tracking defaults; require
+-- explicit approval, a verified backup/restore plan, stopped writers and review
+-- of all dependencies before any rollback. Restoring backups must honor later
+-- opt-outs and account deletions. This proposal has never been applied live.
