@@ -1,0 +1,23 @@
+# Backup and restore review for the current project
+
+**Status: not verified.** The owner said they do not know whether a restorable backup exists and wants the current Supabase project used. No backup, export, restore, new project, deletion or change to the provider's settings has been performed or authorized by this document. Experimental accounts and data must not be reset or deleted without a separate exact plan and approval.
+
+## What to check without changing data
+
+1. In the Supabase Dashboard, select the existing project and open **Database → Backups**. Record privately whether a usable backup or point-in-time recovery (PITR) exists, its timestamps and retention window, and the plan/feature restrictions and current charges. Do not share keys, connection strings, post content or account identifiers. Provider documentation describes daily backups, plan-dependent retention and PITR; actual entitlements and available recovery points for this project are **unverified** ([Supabase backups](https://supabase.com/docs/guides/platform/backups)).
+2. Inventory what matters outside the database: Firebase Authentication/configuration, any actually used Firestore, Supabase Storage object contents, application settings, secrets in their managed stores, deployment configuration, background jobs, logs and other sinks. Do not read or export content merely to make the inventory. Database backups do **not** include Storage object contents; a database-only backup is not a complete app backup ([Supabase database overview](https://supabase.com/docs/guides/database/overview)). Firebase use and its recovery options remain unverified here.
+3. Agree on the acceptable recovery point, downtime, access controls, encryption, retention, deletion and ownership of backups and logs. Review privacy and account-erasure requirements for backups. A backup may contain experimental account and post data and stale private links, so treat it as sensitive. Provider pricing and exact capabilities can change; confirm them before any billable action.
+
+## How to verify restoration safely — requires separate authorization
+
+A backup listing or successful dump does not prove restore works. Prepare an exact restore drill that identifies the source snapshot and a **separate isolated destination**, costs, access restrictions, synthetic/non-production testing, and deletion/retention. Do not restore over the current project to test a backup: restoring to an earlier time replaces current database state and omits later changes ([Supabase backups](https://supabase.com/docs/guides/platform/backups)). The owner has not approved creating a destination project, copying data to it or paying for it. Supabase's restore-to-new-project feature has plan requirements and excludes several services including Storage objects, Auth settings and Edge Functions ([Supabase restore to a new project](https://supabase.com/docs/guides/platform/clone-project)); verify current availability and cost. If a separate destination is not acceptable, restoration remains unverified and must be disclosed before considering any live change.
+
+In an approved isolated destination, have an authorized operator verify schema, relevant constraints, row counts and representative **synthetic** workflows, access restrictions and application connections without exposing personal contents. Confirm handling of external services and document what is missing. Record aggregate evidence and exact cleanup scope; do not delete the destination or backups until separately authorized. Restore only specific records into production under a separate approved, visibility-aware recovery plan—never blindly overwrite newer work or privacy choices.
+
+## Existing repository script warning
+
+`scripts/backup-supabase.sh` is **not a verified production backup or restore procedure**. It invokes `pg_dump` with a database URL as a command argument, writes a local archive that can contain account/content data, excludes ownership and privileges, and automatically deletes older archives beyond its retention count. Its comments suggest restoring with `psql` against the target URL, which could overwrite or conflict with live state. Its scope and recovery completeness are unverified. Do not run it, add credentials to files/chat, rely on it, or execute its restore/deletion commands without a separately reviewed plan and explicit approval.
+
+## Stop conditions
+
+Stop before live migrations or destructive operations if the recovery point, restore target, access/retention, application dependencies, live permissions or impact are unknown. A production migration and a synthetic live rehearsal require their own exact approval and safety checks. There is no production-ready claim in this document.

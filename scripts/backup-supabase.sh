@@ -1,4 +1,9 @@
 #!/usr/bin/env bash
+# WARNING: UNVERIFIED FOR PRODUCTION. This script can expose a connection URL
+# in process arguments, writes sensitive data locally, and deletes old archives.
+# Its restore instructions are not a tested recovery plan and can affect live
+# data. Do not run it without the separately approved review in
+# BACKUP_AND_RESTORE_REVIEW.md. This warning does not change script behavior.
 # backup-supabase.sh — logical backup of all public tables to a timestamped file.
 #
 # Uses pg_dump against the Supabase Postgres connection string. The connection

@@ -1,6 +1,6 @@
 # Isolated validation and access plan — approval required
 
-**Status: PLAN ONLY.** The owner selected preparing this plan first. No project, write, test account, migration, cleanup, production deployment or live-data access is authorized by this document. The existing connected Supabase project is treated as live, not staging. No credentials, tokens, personal content or account identifiers should be pasted into chat or copied into logs.
+**Status: PLAN ONLY.** The owner later clarified that no separate test projects exist and wants work targeted at the current Supabase project. The separate-environment steps below are retained as a safety reference, not a claim that the owner chose or approved project creation. See `CURRENT_PROJECT_PRODUCTION_ROLLOUT.md` and `BACKUP_AND_RESTORE_REVIEW.md`. No project, write, test account, migration, cleanup, production deployment or live-data access is authorized by this document. The existing connected Supabase project is treated as live, not staging. No credentials, tokens, personal content or account identifiers should be pasted into chat or copied into logs.
 
 ## Environment and operator prerequisites
 
