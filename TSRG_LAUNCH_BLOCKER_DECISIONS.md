@@ -31,3 +31,10 @@ Owner responses to 20 risk questions. These are policy decisions, not proof of i
 20. Present one exact live stage at a time, with its scope, prerequisites, downtime, costs, verification and rollback, for separate approval. The target is the current Supabase project; no live migration, deployment, resource creation, destructive action or paid feature is approved by these answers.
 
 **Status:** the scoring and some prototypes have local synthetic evidence only. Backup recovery, verified identity linking, all-writer vote safety, recovery UI, real authorization, full feed and production deployment remain incomplete or unverified. No launch/readiness guarantee.
+
+## Additional privacy and recovery clarifications
+- On sign-out, retain unsynced local drafts, hidden and scoped to the same account; another person with browser-storage access may still find them. Account isolation and sign-out handling remain unverified. Do not delete unsynced work automatically.
+- Do not show cached private posts or brains offline, even to their owner. Identification and hiding of private cached content across all surfaces remain unimplemented/unverified; do not claim offline privacy is complete.
+- Hide vote totals from authors as well as the public, for posts and comments. Internal ranking access must be independently protected. Do not expose equivalent counts or individual voter identities through API/database/caches; this is not yet implemented.
+- Keep confidence results hidden for everyone until trustworthy criteria and appropriate review can detect credible minority disagreement. No existing synthetic test establishes such criteria.
+- If no free, safe recovery verification is available, owner will consider a read-only demonstration only after access and privacy are independently verified. A read-only demonstration is not necessarily a restore drill and does not by itself establish restorability, waive the prior backup/recovery gate, or authorize live migrations, deployment, paid services or creation of another project. Present any specific demonstration and its scope for approval where required.
