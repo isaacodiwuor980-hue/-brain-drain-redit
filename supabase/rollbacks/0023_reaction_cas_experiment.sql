@@ -1,0 +1,4 @@
+-- REVIEW ONLY; intentionally non-executable. Removing version/operation
+-- receipts or reverting to toggle writes can allow stale or duplicated votes.
+-- Any rollback needs separate review of all writers, account privacy,
+-- data/backup retention, queue reconciliation, recovery and explicit approval.
