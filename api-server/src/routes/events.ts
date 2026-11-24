@@ -60,7 +60,12 @@ function sanitizePayload(payload: AnalyticsEvent["payload"]) {
       entries.push([key, value.split(/[?#]/, 1)[0].slice(0, 160)]);
     } else if (typeof value === "string") entries.push([key, value.slice(0, 160)]);
     else if (typeof value === "number" || typeof value === "boolean" || value === null) entries.push([key, value]);
-    else if (Array.isArray(value)) entries.push([key, value.slice(0, 20)]);
+    else if (Array.isArray(value)) entries.push([key, value.slice(0, 20).map(item => {
+      // Nested objects/arrays can hide fields that the top-level filter removes.
+      if (typeof item === "string") return item.slice(0, 160);
+      if (typeof item === "number" || typeof item === "boolean" || item === null) return item;
+      return "[redacted]";
+    })]);
     else entries.push([key, "[redacted]"]);
   }
   return Object.fromEntries(entries);
