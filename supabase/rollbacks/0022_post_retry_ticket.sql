@@ -1,0 +1,4 @@
+-- REVIEW ONLY; intentionally non-executable. Stopping the issuing/consuming
+-- service or deleting permits can strand offline posts and remove retry
+-- protection. Any rollback requires a separately approved queue/recovery,
+-- retention, backup and forward-recovery plan; no live operation authorized.
