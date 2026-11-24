@@ -220,3 +220,6 @@ Full `CI=1 npx vitest run --coverage`: **417 tests / 79 files passed**, included
 ### Offline interest underflow comparison
 - VERIFIED: a regression showed V3 returned 1 instead of 0.75 for an extremely tiny positive observation with an equally tiny prior due to subnormal underflow. Added unwired `interestFromExposuresV4` without changing V3. Positive/negative subnormal cases, negligible evidence, duplicates and 500 ordinary comparisons passed. This extreme numeric example is not evidence of a real user impact.
 - VERIFIED: 455 tests in 92 files passed, coverage 63.67% statements / 56.88% branches / 60.42% functions / 64.28% lines in configured scope; lint/typecheck/build passed with two existing warnings. No live data, scoring flags or existing exports changed.
+
+### Feed gap analysis
+- Documented the 70/15/10/5 design gap, existing prototypes, dependencies and release blockers in `FEED_GAP_ANALYSIS.md`. No feed implementation, live writes or deployment.
