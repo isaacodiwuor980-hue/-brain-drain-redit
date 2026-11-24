@@ -154,6 +154,9 @@ export function queueOfflineAction(
 }
 
 /** Unowned legacy entries and other accounts' work must never be replayed. */
+/** Toggle requests are not idempotent: a lost response makes replay unsafe. */
+export function requiresManualSyncReview(action: QueuedAction): boolean { return action.type === "post_reaction"; }
+
 export function actionsForOwner(queue: QueuedAction[], ownerId: string | null | undefined): QueuedAction[] {
   return ownerId ? queue.filter((action) => action.ownerId === ownerId) : [];
 }

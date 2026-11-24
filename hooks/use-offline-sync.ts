@@ -7,6 +7,7 @@ import {
   partitionDueActions,
   quarantineActions,
   quarantineOutcome,
+  requiresManualSyncReview,
   recordFailure,
   reconcileSyncBatch,
   saveOfflineQueue,
@@ -21,7 +22,7 @@ import { env } from "@/lib/env";
 import { getAuthSession } from "@/lib/auth-token";
 import { validateOfflinePostReplay } from "@/lib/offline-post-replay";
 import { useAuth } from "@/components/auth/AuthContext";
-import { createPost, reactToPost, toCreatePostInput } from "@/lib/api/feed";
+import { createPost, toCreatePostInput } from "@/lib/api/feed";
 import { saveBrain } from "@/lib/api/brains";
 import type { Post, Brain, Node } from "@/lib/types";
 
@@ -98,6 +99,9 @@ export function useOfflineSync() {
           setAuthRetryAt(Date.now() + 30_000);
           break;
         }
+        // A toggle may already have been applied despite a lost response.
+        // Keep it for review rather than risking reversing the server state.
+        if (requiresManualSyncReview(action)) { dead.push(action); continue; }
         try {
           const result = await replayAction(action, active.token, active.uid);
           succeeded.push(action.id);
@@ -207,15 +211,9 @@ async function replayAction(
       return "synced";
     }
 
-    case "post_reaction": {
-      const { postId, reactionType } = (action.payload || {}) as {
-        postId?: string;
-        reactionType?: "upvote" | "downvote" | "repost";
-      };
-      if (!postId || !reactionType) return "skipped";
-      await reactToPost(postId, reactionType, token);
-      return "synced";
-    }
+    case "post_reaction":
+      // Defense in depth if a future caller bypasses the review gate above.
+      throw new Error("Reaction requires review");
 
     case "update_brain": {
       // Payload should be { brain, nodes } matching UpsertBrainInput.
