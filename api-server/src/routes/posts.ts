@@ -102,9 +102,11 @@ router.post("/posts", requireAuth, async (req, res) => {
     });
   } catch (error) {
     if (error instanceof SupabaseError) {
-      // Unique violation (duplicate id) → idempotent success.
+      // A 409 does not prove the existing row belongs to this caller or
+      // matches this request. Never acknowledge an unverified write as saved.
+      // Safe idempotent retries require a separately verified atomic design.
       if (error.status === 409) {
-        res.status(200).json({ id: row.id, deduped: true });
+        res.status(409).json({ error: "Post conflict could not be verified" });
         return;
       }
       res.status(502).json({ error: "Could not create post" });

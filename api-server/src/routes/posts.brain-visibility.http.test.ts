@@ -5,6 +5,7 @@ const db=vi.hoisted(()=>({isConfigured:vi.fn(()=>true),getOne:vi.fn(),insert:vi.
 vi.mock("../lib/supabase",()=>({supabase:db,SupabaseError:class extends Error {status=500;body?:unknown;}}));
 vi.mock("../middleware/auth",()=>({requireAuth(req:express.Request,_res:express.Response,next:express.NextFunction){req.auth={uid:"synthetic-user"};next();}}));
 import router from "./posts";
+import {SupabaseError} from "../lib/supabase";
 let server:Server,base:string;
 beforeAll(async()=>{const app=express();app.use(express.json());app.use("/api",router);await new Promise<void>(resolve=>{server=app.listen(0,"127.0.0.1",resolve);});const addr=server.address();if(!addr||typeof addr==="string") throw new Error("no port");base=`http://127.0.0.1:${addr.port}`;});
 afterAll(async()=>{await new Promise<void>((resolve,reject)=>server.close(err=>err?reject(err):resolve()));});
@@ -25,4 +26,11 @@ describe("public post attachment safety (mocked storage)",()=>{
     expect((await send("a),injected")).status).toBe(400); expect(db.getOne).toHaveBeenCalledTimes(1);
   });
   it("preserves creation without an attachment",async()=>{expect((await send()).status).toBe(201);expect(db.getOne).not.toHaveBeenCalled();expect(db.insert).toHaveBeenCalledWith("posts",expect.objectContaining({brain_id:null}));});
+  it("does not claim success for an unverified database conflict",async()=>{
+    const error=new SupabaseError("synthetic confidential upstream",409);error.status=409;
+    db.insert.mockRejectedValueOnce(error);
+    const response=await send();
+    expect(response.status).toBe(409);
+    expect(await response.json()).toEqual({error:"Post conflict could not be verified"});
+  });
 });
