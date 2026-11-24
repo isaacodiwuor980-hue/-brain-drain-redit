@@ -584,6 +584,21 @@ export const idb = {
     }, undefined);
   },
 
+  /** A missing record is undefined; storage errors are never converted to absence. */
+  async getStrict<T>(storeName: string, key: string): Promise<T | undefined> {
+    const db = await openDB();
+    return new Promise<T | undefined>((resolve, reject) => {
+      const tx = db.transaction(storeName, "readonly");
+      const request = tx.objectStore(storeName).get(key);
+      let result: T | undefined;
+      request.onsuccess = () => { result = request.result; };
+      request.onerror = () => reject(request.error ?? new Error("Local read failed"));
+      tx.oncomplete = () => resolve(result);
+      tx.onerror = () => reject(tx.error ?? new Error("Local read failed"));
+      tx.onabort = () => reject(tx.error ?? new Error("Local read aborted"));
+    });
+  },
+
   /** Read local export data without converting storage failures into empty lists. */
   async getAllStrict<T>(storeName: string): Promise<T[]> {
     const db = await openDB();

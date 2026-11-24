@@ -19,6 +19,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { idb } from "@/lib/db";
 import { env } from "@/lib/env";
 import { getAuthSession } from "@/lib/auth-token";
+import { validateOfflinePostReplay } from "@/lib/offline-post-replay";
 import { useAuth } from "@/components/auth/AuthContext";
 import { createPost, reactToPost, toCreatePostInput } from "@/lib/api/feed";
 import { saveBrain } from "@/lib/api/brains";
@@ -98,7 +99,7 @@ export function useOfflineSync() {
           break;
         }
         try {
-          const result = await replayAction(action, active.token);
+          const result = await replayAction(action, active.token, active.uid);
           succeeded.push(action.id);
           if (result === "skipped") skipped++;
         } catch {
@@ -188,20 +189,20 @@ export function useOfflineSync() {
 async function replayAction(
   action: QueuedAction,
   token: string | null,
+  activeUserId: string,
 ): Promise<"synced" | "skipped"> {
   switch (action.type) {
     case "create_post": {
       // The queue payload only has { postId } — read the full post from IDB.
-      const postId = action.payload?.postId as string | undefined;
-      if (!postId) return "skipped";
-      const post = await idb.get<Post>("posts", postId);
-      if (!post) {
-        // Post was deleted locally before sync — nothing to send.
-        return "skipped";
-      }
+      const postId = action.payload?.postId;
+      if (typeof postId !== "string" || !postId || postId.length > 120) throw new Error("Offline post requires review");
+      // Storage errors and missing rows cannot establish an intentional deletion.
+      const post = validateOfflinePostReplay(action, await idb.getStrict<Post>("posts", postId), activeUserId);
+      const session = await getAuthSession();
+      if (!session?.token || session.uid !== activeUserId) throw new Error("Offline session changed");
       await createPost(
         toCreatePostInput(post),
-        token,
+        session.token,
       );
       return "synced";
     }
