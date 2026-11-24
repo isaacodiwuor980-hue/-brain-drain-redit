@@ -23,6 +23,7 @@ import { env } from "../lib/env";
 import { queueOfflineAction } from "../lib/offline-sync";
 import { orderFeed } from "../lib/tsrg/feed";
 import { reconcileCachedCloudPost } from "../lib/feed-cache-reconcile";
+import { hideUnverifiedCachedBrainLinks } from "../lib/feed-cached-visibility";
 import { useTsrgStatus } from "./use-tsrg-status";
 
 /** Posts fetched per page. Matches the server max (feed.ts limit.max = 50). */
@@ -51,7 +52,8 @@ function mergeCloudWithLocal(
   // the next cloud refetch (F.1 fix).
   const localById = new Map(localPosts.map((p) => [p.id, p]));
   const cloudIds = new Set(cloudPosts.map((p) => p.id));
-  const localOnly = localPosts.filter((p) => !cloudIds.has(p.id));
+  // Local-only posts have no current server visibility proof.
+  const localOnly = hideUnverifiedCachedBrainLinks(localPosts.filter((p) => !cloudIds.has(p.id)));
   const merged = cloudPosts.map((cloud) => {
     const local = localById.get(cloud.id);
     if (!local) return cloud;
@@ -115,7 +117,7 @@ export function useSocial(mode: "foryou" | "following" = "foryou", topicId: stri
       // apiEnabled: empty base URL means SAME-ORIGIN (production serves /api
       // from this host) — see lib/env.ts. Local-only builds set VITE_LOCAL_ONLY=1.
       if (!env.apiEnabled) {
-        return { posts: cached, hasMore: false };
+        return { posts: hideUnverifiedCachedBrainLinks(cached), hasMore: false };
       }
 
       // Reset failure flag at the start of each attempt.
@@ -171,7 +173,7 @@ export function useSocial(mode: "foryou" | "following" = "foryou", topicId: stri
         // B3: Following failures (including the signed-out empty page) stay
         // empty — never fall back to the For-You universe under this tab.
         if (mode === "following") return { posts: [], hasMore: false };
-        return { posts: cached, hasMore: false };
+        return { posts: hideUnverifiedCachedBrainLinks(cached), hasMore: false };
       }
     },
     // B4: cursor = next offset while the server says there is more.
