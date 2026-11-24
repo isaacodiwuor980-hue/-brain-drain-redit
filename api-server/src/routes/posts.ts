@@ -22,7 +22,8 @@ const CreatePostSchema = z.object({
     })
     .optional(),
   mediaUrls: z.array(z.string().url().max(2000)).max(10).optional(),
-  brainId: z.string().max(120).optional(),
+  // PostgREST filters below accept only simple IDs, not filter syntax.
+  brainId: z.string().min(1).max(120).regex(/^[A-Za-z0-9_-]+$/).optional(),
   // Date.toISOString throws outside the JavaScript Date range.
   createdAt: z.number().int().positive().max(8_640_000_000_000_000).optional(),
 });
@@ -49,6 +50,23 @@ router.post("/posts", requireAuth, async (req, res) => {
 
   const { auth } = req;
   const input = parsed.data;
+
+  if (input.brainId) {
+    // Posts are currently public; never deliberately attach an unconfirmed or
+    // private brain through this API. Identical errors avoid an existence oracle.
+    // This separate lookup is not atomic with the insert or a visibility change;
+    // direct database writers and existing posts need independent protection.
+    try {
+      const brain = await supabase.getOne<{ id: string; is_public: boolean }>("brains", {
+        select: "id,is_public", filters: { id: `eq.${input.brainId}`, is_public: "eq.true" },
+      });
+      if (!brain || brain.id !== input.brainId || brain.is_public !== true) {
+        res.status(400).json({ error: "Brain attachment unavailable" }); return;
+      }
+    } catch {
+      res.status(503).json({ error: "Brain attachment unavailable" }); return;
+    }
+  }
 
   const row = {
     id: input.id,
