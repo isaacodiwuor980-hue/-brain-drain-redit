@@ -439,3 +439,7 @@ Full `CI=1 npx vitest run --coverage`: **417 tests / 79 files passed**, included
 
 ### Further privacy and recovery choices
 - Recorded account-scoped draft retention on sign-out, no offline private-content display, hiding vote totals from authors too, confidence hidden until minority-evidence criteria are trustworthy, and consideration of a verified-private read-only recovery demonstration. A read-only demonstration alone does not prove recovery or waive the migration gate. These controls are not yet verified end-to-end; documentation only, no tests or live changes.
+
+### Recovery planning after 15 clarifications
+- Owner reports a backup is listed and the plan is free, both independently unverified; listing alone does not prove a restore. Owner requests plans/documentation only while recovery is unverified. Updated `BACKUP_AND_RESTORE_REVIEW.md` and prepared `RECOVERY_VERIFICATION_PROPOSAL.md` with a safe dashboard summary, proposed exact-scope metadata review, service inventory, alternative recovery methods, stop conditions and approvals. No connector inspection, backup, export, restore, cloud change or test performed.
+- Owner can share a redacted screenshot; backup freshness, retention, actual recovery, Firebase/other service coverage and costs remain unknown. No free isolated destination currently approved. No migration/deployment approval or recovery-gate waiver was given.

@@ -1,6 +1,6 @@
 # Backup and restore review for the current project
 
-**Status: not verified.** The owner said they do not know whether a restorable backup exists and wants the current Supabase project used. No backup, export, restore, new project, deletion or change to the provider's settings has been performed or authorized by this document. Experimental accounts and data must not be reset or deleted without a separate exact plan and approval.
+**Status: recovery not verified.** The owner now reports that the dashboard shows a backup and that the project is on the free plan; neither report has been independently checked, and a listing does not prove restorability, freshness or coverage. The current Supabase project remains the target. No backup, export, restore, new project, deletion or change to provider settings has been performed or authorized by this document. Experimental accounts and data must not be reset or deleted without a separate exact plan and approval. The owner's current preference is plans and documentation only until recovery is verified; see `RECOVERY_VERIFICATION_PROPOSAL.md`.
 
 ## What to check without changing data
 
