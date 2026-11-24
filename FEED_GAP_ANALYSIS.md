@@ -1,6 +1,6 @@
 # TSRG feed gap analysis
 
-Status: **not implemented and not production-ready**. This analysis is not authorization to deploy or change the live database. No recommendation policy or score below is a claim that engagement proves factual accuracy or expertise.
+Status: **not implemented end-to-end and not production-ready**. The owner approved an offline-only 70/15/10/5 comparison using both creator and topic exposure; `feed-mix-v4.ts` now provides a preliminary allocator, not a production implementation. This analysis is not authorization to deploy or change the live database. No recommendation policy or score below is a claim that engagement proves factual accuracy or expertise.
 
 ## What exists
 
@@ -28,4 +28,4 @@ Status: **not implemented and not production-ready**. This analysis is not autho
 
 ## Decision
 
-The **complete 70/15/10/5 feed is deferred**, not implemented. Production should not depend on it until the requirements above are satisfied; document the gap rather than claim it exists. Existing feed production readiness is a separate question and is also not certified here. See `FEED_DESIGN.md`, `PRE_PRODUCTION_CHECKLIST.md`, and the progress log for broader blockers.
+The **complete 70/15/10/5 feed remains unimplemented**; the newly approved offline scaffold only works with assumed eligibility and supplied synthetic signals. Production should not depend on it until the requirements above are satisfied. Existing feed production readiness is a separate question and is also not certified here. See `FEED_DESIGN.md`, `PRE_PRODUCTION_CHECKLIST.md`, and the progress log for broader blockers.
