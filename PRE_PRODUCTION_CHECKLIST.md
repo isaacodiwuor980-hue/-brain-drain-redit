@@ -14,7 +14,7 @@ This is a review checklist, not authorization to deploy or alter a live project.
 - Verify actual live RLS policy behavior, grants, functions and triggers using isolated test accounts and an explicitly approved test environment. A service-role test bypasses RLS and cannot establish user isolation.
 - The 70/15/10/5 feed is an offline design gap, not live functionality. Ring detection is a connected-component density heuristic, not clique detection; CUSUM does not define time windows. Review the fixed-point and invalid-number behavior before any live activation.
 - Keep experimental flags off. The existing client status switch is not a security boundary. Do not enable staking, automatic penalties or experimental ranking.
-- Confirm revocation of the previously exposed GitHub token and review Firebase/Google API key restrictions; neither has been verified here.
+- The owner reports that the previously exposed GitHub token was revoked and Firebase/Google key restrictions were reviewed. These reports have not been independently verified here; do not record or request credentials.
 - Obtain approval for any isolated database/browser tests and later for any production change. Back up and establish rollback and monitoring before any approved mutation.
 
 ## Tools still needed
