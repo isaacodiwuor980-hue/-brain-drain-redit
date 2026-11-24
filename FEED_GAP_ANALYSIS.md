@@ -29,3 +29,7 @@ Status: **not implemented end-to-end and not production-ready**. The owner appro
 ## Decision
 
 The **complete 70/15/10/5 feed remains unimplemented**; the newly approved offline scaffold only works with assumed eligibility and supplied synthetic signals. Production should not depend on it until the requirements above are satisfied. Existing feed production readiness is a separate question and is also not certified here. See `FEED_DESIGN.md`, `PRE_PRODUCTION_CHECKLIST.md`, and the progress log for broader blockers.
+
+## Offline brain-branch composition
+
+`brain-mixed-feed-v1.ts` now combines synthetic graph scores and the offline V4 mixed feed. Its explicitly supplied blend and score mapping are experimental, not production policy. It changes no legacy exports and is not a route or integration. It does not establish visibility, trusted quality, identity, moderation, pagination or real-world fairness. The earlier reference to an offline-only approval describes the original scope; the owner subsequently requested live feed integration, which still requires safe prerequisites and deployment approval.
