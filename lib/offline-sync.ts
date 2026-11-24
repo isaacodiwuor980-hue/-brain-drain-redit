@@ -194,11 +194,35 @@ export function recordFailure(
   return { retry: { ...action, retryCount, nextAttemptAt }, dead: null };
 }
 
-/** Move quarantined actions to the dead-letter store (bounded to 50). */
-export function quarantineActions(actions: QueuedAction[]): void {
-  if (actions.length === 0) return;
-  const existing = getDeadLetterQueue();
-  writeQueue(DEAD_LETTER_KEY, [...actions, ...existing].slice(0, 50));
+/** Persist without evicting earlier work; callers must retain failures if this fails. */
+export function quarantineActions(actions: QueuedAction[]): boolean {
+  if (actions.length === 0) return true;
+  try {
+    const raw = localStorage.getItem(DEAD_LETTER_KEY);
+    const parsed: unknown = raw === null ? [] : JSON.parse(raw);
+    if (!Array.isArray(parsed)) return false;
+    const existing = getDeadLetterQueue();
+    // Do not overwrite malformed/partially unrecognized recovery records.
+    if (existing.length !== parsed.length) return false;
+    const byId = new Map(existing.map(item => [item.id, item]));
+    for (const action of actions) {
+      const prior = byId.get(action.id);
+      if (prior && JSON.stringify(prior) !== JSON.stringify(action)) return false;
+      byId.set(action.id, action);
+    }
+    const combined = [...byId.values()];
+    if (combined.length > 50) return false;
+    localStorage.setItem(DEAD_LETTER_KEY, JSON.stringify(combined));
+    try { window.dispatchEvent(new CustomEvent("brainbuilder_queue_change", {detail:combined.length})); } catch { /* storage write already succeeded */ }
+    return true;
+  } catch { return false; }
+}
+
+/** Preserve work in the pending queue if quarantine cannot be persisted. */
+export function quarantineOutcome(actions: QueuedAction[], persisted: boolean): {deadIds:string[]; held:QueuedAction[]} {
+  return persisted
+    ? {deadIds:actions.map(action => action.id),held:[]}
+    : {deadIds:[],held:actions.map(action => ({...action,nextAttemptAt:Number.MAX_SAFE_INTEGER}))};
 }
 
 export function clearDeadLetterQueue(): void {

@@ -5,6 +5,7 @@ import {
   getDeadLetterQueue,
   partitionDueActions,
   quarantineActions,
+  quarantineOutcome,
   recordFailure,
   reconcileSyncBatch,
   saveOfflineQueue,
@@ -99,13 +100,11 @@ export function useOfflineSync() {
           const result = await replayAction(action, active.token);
           succeeded.push(action.id);
           if (result === "skipped") skipped++;
-        } catch (err) {
+        } catch {
           const { retry, dead: quarantined } = recordFailure(action);
           if (quarantined) {
-            console.warn(
-              `Offline action ${action.id} (${action.type}) quarantined after repeated failures:`,
-              err,
-            );
+            // Do not log request identifiers, payloads or upstream errors.
+            console.warn("An offline action needs attention after repeated failures.");
             dead.push(quarantined);
           } else if (retry) {
             retries.push(retry);
@@ -118,8 +117,9 @@ export function useOfflineSync() {
       const latest = getOfflineQueue();
       const latestIds = new Set(latest.map((action) => action.id));
       const stillDead = dead.filter((action) => latestIds.has(action.id));
-      if (stillDead.length > 0) quarantineActions(stillDead);
-      const nextQueue = reconcileSyncBatch(latest, succeeded, retries, stillDead.map((action) => action.id));
+      const stored = quarantineActions(stillDead);
+      const {deadIds, held} = quarantineOutcome(stillDead, stored);
+      const nextQueue = reconcileSyncBatch(latest, succeeded, [...retries, ...held], deadIds);
       saveOfflineQueue(nextQueue);
       setQueue(nextQueue);
 
@@ -139,7 +139,9 @@ export function useOfflineSync() {
         triggerHaptic("warning");
         toast({
           title: "Sync partially complete",
-          description: `${syncedCount} synced; ${nextQueue.length} pending${stillDead.length ? `, ${stillDead.length} need attention` : ""}.`,
+          description: !stored && stillDead.length
+            ? "Some items could not be moved to recovery storage and remain pending. Avoid clearing browser data."
+            : `${syncedCount} synced; ${nextQueue.length} pending${stillDead.length ? `, ${stillDead.length} need attention` : ""}.`,
           variant: "destructive",
         });
       }
@@ -152,7 +154,9 @@ export function useOfflineSync() {
   // Auto-sync when coming back online
   useEffect(() => {
     if (!isOnline || isSyncing || !currentUserId || !env.apiEnabled) return;
-    const eligible = actionsForOwner(queue, currentUserId);
+    // Held items require manual attention and must not schedule an overflowing
+    // browser timeout or be automatically replayed.
+    const eligible = actionsForOwner(queue, currentUserId).filter(action => action.nextAttemptAt !== Number.MAX_SAFE_INTEGER);
     if (eligible.length === 0) return;
     const nextAt = Math.min(...eligible.map((action) => action.nextAttemptAt ?? 0));
     const delay = Math.max(0, nextAt - Date.now(), authRetryAt - Date.now());
