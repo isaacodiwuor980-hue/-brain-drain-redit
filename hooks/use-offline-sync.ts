@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import {
   getOfflineQueue,
   actionsForOwner,
+  summarizeOwnedQueue,
   getDeadLetterQueue,
   partitionDueActions,
   quarantineActions,
@@ -123,9 +124,13 @@ export function useOfflineSync() {
       saveOfflineQueue(nextQueue);
       setQueue(nextQueue);
 
+      // Do not show a prior account's sync outcome after an account switch.
+      const currentSession = await getAuthSession().catch(() => null);
+      if (!currentSession?.token || currentSession.uid !== currentUserId) return;
       const syncedCount = succeeded.length - skipped;
+      const {pending:ownPending, attention:ownAttention} = summarizeOwnedQueue(nextQueue, getDeadLetterQueue(), currentUserId);
 
-      if (nextQueue.length === 0 && stillDead.length === 0) {
+      if (ownPending === 0 && ownAttention === 0) {
         triggerHaptic("success");
         toast({
           title: "Sync complete",
@@ -141,7 +146,7 @@ export function useOfflineSync() {
           title: "Sync partially complete",
           description: !stored && stillDead.length
             ? "Some items could not be moved to recovery storage and remain pending. Avoid clearing browser data."
-            : `${syncedCount} synced; ${nextQueue.length} pending${stillDead.length ? `, ${stillDead.length} need attention` : ""}.`,
+            : `${syncedCount} synced; ${ownPending} pending${ownAttention ? `, ${ownAttention} need attention` : ""}.`,
           variant: "destructive",
         });
       }
@@ -164,11 +169,12 @@ export function useOfflineSync() {
     return () => window.clearTimeout(timer);
   }, [isOnline, isSyncing, queue, currentUserId, authRetryAt, syncNow]);
 
+  const summary = summarizeOwnedQueue(queue, getDeadLetterQueue(), currentUserId);
   return {
     isOnline,
-    pendingCount: queue.length,
-    /** Actions that exhausted their retry budget (need attention). */
-    deadLetterCount: getDeadLetterQueue().length,
+    pendingCount: summary.pending,
+    /** Held and quarantined actions for the current account only. */
+    deadLetterCount: summary.attention,
     isSyncing,
     syncNow,
   };

@@ -158,6 +158,12 @@ export function actionsForOwner(queue: QueuedAction[], ownerId: string | null | 
   return ownerId ? queue.filter((action) => action.ownerId === ownerId) : [];
 }
 
+/** Status only; unknown-owner entries remain untouched and are not attributed. */
+export function summarizeOwnedQueue(pending: QueuedAction[], dead: QueuedAction[], ownerId: string | null | undefined): {pending:number;attention:number} {
+  const owned=actionsForOwner(pending,ownerId);
+  return {pending:owned.length,attention:owned.filter(action=>action.nextAttemptAt===Number.MAX_SAFE_INTEGER).length+actionsForOwner(dead,ownerId).length};
+}
+
 /**
  * Split the queue into the actions that may run now and the ones still
  * waiting out their backoff. Pure — unit-tested.
