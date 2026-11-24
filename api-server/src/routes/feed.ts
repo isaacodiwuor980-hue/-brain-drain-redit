@@ -73,8 +73,24 @@ function normalizePostType(raw: string | null | undefined): "post" | "question" 
   return "post";
 }
 
-/** Attach aggregate counts and only the requesting user's reaction types. */
-function renderFeedPosts(entry: CachedFeed, currentUserId: string | undefined) {
+/** Attach aggregate counts and only the requesting user's reaction types.
+ * The cache is shared; verify linked brains on every response, not when cached.
+ * Until ownership mapping is proven, even an author's private brain is omitted.
+ */
+async function renderFeedPosts(entry: CachedFeed, currentUserId: string | undefined) {
+  const ids = [...new Set(entry.posts.map(row => row.brainId).filter((id): id is string =>
+    typeof id === "string" && /^[A-Za-z0-9_-]{1,120}$/.test(id)))];
+  const publicIds = new Set<string>();
+  if (ids.length) {
+    try {
+      const rows = await supabase.get<{id: string; is_public: boolean}>("brains", {
+        select: "id,is_public", filters: { id: `in.(${ids.map(id => `"${id}"`).join(",")})`, is_public: "eq.true" }, limit: ids.length,
+      });
+      for (const row of rows) if (row && row.is_public === true && ids.includes(row.id)) publicIds.add(row.id);
+    } catch {
+      // Missing metadata or an upstream failure means no links can be proven public.
+    }
+  }
   return entry.posts.map((row) => {
     const reactions = entry.reactionsByPost[(row as { id: string }).id] || [];
     const own: Record<string, string[]> = {};
@@ -87,6 +103,7 @@ function renderFeedPosts(entry: CachedFeed, currentUserId: string | undefined) {
     }
     return {
       ...row,
+      brainId: typeof row.brainId === "string" && publicIds.has(row.brainId) ? row.brainId : null,
       reactions: {
         upvote: reactions.filter((r) => r.reaction_type === "upvote").length,
         downvote: reactions.filter((r) => r.reaction_type === "downvote").length,
@@ -119,7 +136,7 @@ router.get("/feed/following-v2", (_req, res, next) => { res.setHeader("Cache-Con
       if (ids.length === 0) { res.json({ posts: [], hasMore: false, source: "following" }); return; }
       const { topic, limit, offset } = parsed.data;
       const page = await fetchFeedPage("following", topic, limit, offset, ids, false);
-      res.json({ posts: renderFeedPosts(page, req.mappedUserId), hasMore: page.hasMore, source: "following" });
+      res.json({ posts: await renderFeedPosts(page, req.mappedUserId), hasMore: page.hasMore, source: "following" });
     } catch {
       // Do not return or log upstream payloads which may contain user data.
       res.status(502).json({ error: "Feed data source unavailable" });
@@ -245,8 +262,8 @@ router.get("/feed", optionalAuth, async (req, res) => {
   }
 
   /** Render a per-user response from a cached feed entry (HIT + STALE paths). */
-  function renderFromCache(entry: CachedFeed, header: "HIT" | "STALE") {
-    const posts = renderFeedPosts(entry, currentUserId);
+  async function renderFromCache(entry: CachedFeed, header: "HIT" | "STALE") {
+    const posts = await renderFeedPosts(entry, currentUserId);
     // res.header (not res.set) so the value does not get appended to Vary,
     // which caused cache fragmentation for compressed responses.
     res.header("X-Feed-Cache", header);
@@ -261,13 +278,13 @@ router.get("/feed", optionalAuth, async (req, res) => {
     // B3: per-user followee filtering can't use the shared cross-user cache
     // (keyed only by mode/topic/limit/offset) — following pages fetch live.
     if (mode !== "following" && cached && cacheAge < FEED_CACHE_TTL_MS) {
-      renderFromCache(cached, "HIT");
+      await renderFromCache(cached, "HIT");
       return;
     }
 
     if (mode !== "following" && cached && cacheAge < FEED_CACHE_STALE_MAX_MS) {
       // PERF: stale-while-revalidate — serve instantly, refresh in background.
-      renderFromCache(cached, "STALE");
+      await renderFromCache(cached, "STALE");
       triggerBackgroundRefresh(cacheKey, mode, topic, limit, offset, req.log);
       return;
     }
@@ -283,7 +300,7 @@ router.get("/feed", optionalAuth, async (req, res) => {
 
     // Per-user rendering identical to renderFromCache, but here we have the
     // live rows (with currentUserId reactions applied the same way).
-    const posts = renderFeedPosts(fresh, currentUserId);
+    const posts = await renderFeedPosts(fresh, currentUserId);
 
     res.header("X-Feed-Cache", "MISS");
     res.json({
