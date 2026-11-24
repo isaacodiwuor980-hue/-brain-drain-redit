@@ -50,12 +50,13 @@ export async function requireAuth(
   } catch (err) {
     const kind = classifyAuthError(err);
     if (kind === "upstream") {
-      logger.warn({ err }, "Auth verification failed — upstream JWKS unavailable");
+      // Error messages can contain untrusted token fields or upstream details.
+      logger.warn({ kind }, "Auth verification failed — upstream JWKS unavailable");
       res.status(502).json({ error: "Authentication service temporarily unavailable" });
       return;
     }
     if (kind === "config") {
-      logger.error({ err }, "Auth verification failed — server misconfiguration");
+      logger.error({ kind }, "Auth verification failed — server misconfiguration");
       res.status(500).json({ error: "Authentication misconfigured" });
       return;
     }
@@ -86,7 +87,7 @@ export async function optionalAuth(
       // block the request (the caller proceeds as a guest).
       const kind = classifyAuthError(err);
       if (kind !== "auth") {
-        logger.warn({ err, kind }, "Optional auth verification failed — proceeding as guest");
+        logger.warn({ kind }, "Optional auth verification failed — proceeding as guest");
       }
       // Ignore invalid tokens for optional auth; the request proceeds as guest.
     }

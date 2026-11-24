@@ -261,3 +261,7 @@ Full `CI=1 npx vitest run --coverage`: **417 tests / 79 files passed**, included
 ### Identity map write-grant proposal
 - VERIFIED: in synthetic PGlite, local migration 0007 allows the service role to insert an identity link without an ownership check; a regression failed before hardening. Review-only proposal 0017 removes explicit service-role direct mutation privileges, retains lookup, and passes local insert/update/delete denial and repeat-application tests. Its rollback restores unsafe DML; it was not executed. This is not an ownership-proof or provisioning solution and does not cover inherited/column grants, owners, privileged functions, existing incorrect links or live permissions.
 - VERIFIED: full tests, typecheck, lint and build passed; two pre-existing lint warnings. No live database changes or deployment.
+
+### Authentication error log privacy
+- VERIFIED: unit regressions showed that required and optional auth middleware passed raw error objects to logs; those errors may include untrusted token fields or upstream details. Both paths now log only their classification and a fixed message; the tests failed before and passed afterward. Existing response classifications are unchanged and remain based on message text, which warrants separate hardening. This is not proof of ownership, revocation checking, or complete log privacy elsewhere.
+- VERIFIED: full tests, typecheck, lint and build passed; two existing lint warnings. No deployment or live access or changes.
