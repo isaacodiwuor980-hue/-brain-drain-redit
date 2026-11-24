@@ -223,3 +223,7 @@ Full `CI=1 npx vitest run --coverage`: **417 tests / 79 files passed**, included
 
 ### Feed gap analysis
 - Documented the 70/15/10/5 design gap, existing prototypes, dependencies and release blockers in `FEED_GAP_ANALYSIS.md`. No feed implementation, live writes or deployment.
+
+### Offline personalization composition
+- VERIFIED: added a separate, unwired prototype combining supplied topic interest and a supplied quality proxy with an explicit experiment weight. No production weights, score meaning or existing route changed. The new tests failed before implementation because the module did not exist; focused tests pass for interest ordering, neutral cold start, shuffled candidates, invalid configuration, and no interest-map access with personalization off. This does not establish backend privacy or deletion.
+- VERIFIED: 459 tests in 93 files passed; coverage 63.78% statements / 57.16% branches / 60.51% functions / 64.38% lines in configured scope; lint/typecheck/build passed with two existing warnings. No live writes or deployment.

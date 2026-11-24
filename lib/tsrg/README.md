@@ -33,3 +33,7 @@ The no-vote score is explicitly zero to match the existing cold-start convention
 ## Offline interest V4
 
 `interest-v4.ts` is an unwired alternative to V3. It avoids halving tiny floating-point weights before division: with one positive exposure of weight `Number.MIN_VALUE` and an equal prior, V3 returns 1 rather than 0.75 due to underflow; V4 returns 0.75. The old export is unchanged. In 500 ordinary synthetic cases the two agree within test tolerance, not a proof of universal equivalence. Caller provenance, opt-out, downvote semantics and real-world feed validation remain unresolved.
+
+## Offline personalized ordering V3
+
+`rankOfflinePersonalizedV3` combines caller-supplied topic interest and a supplied quality proxy using an explicit test weight, and delegates stable ordering to the existing offline pipeline. It has no default production weight, candidate retrieval, quota, eligibility or live wiring. Missing topic scores are neutral; with personalization off, the supplied interest map is not read. This local property alone is not backend opt-out, deletion, truthful quality, safety or expertise verification. The caller must provide trusted data and enforce permissions and privacy; no downvote is interpreted as disinterest by this function. No actual feed behavior is changed.
