@@ -25,6 +25,9 @@ import { orderFeed } from "../lib/tsrg/feed";
 import { reconcileCachedCloudPost } from "../lib/feed-cache-reconcile";
 import { hideUnverifiedCachedBrainLinks } from "../lib/feed-cached-visibility";
 import { useTsrgStatus } from "./use-tsrg-status";
+import { useOnlineStatus } from "./use-online-status";
+import { useToast } from "./use-toast";
+import { mayStartVote } from "../lib/online-vote-policy";
 
 /** Posts fetched per page. Matches the server max (feed.ts limit.max = 50). */
 const PAGE_SIZE = 30;
@@ -93,6 +96,8 @@ export function shouldSurfaceFeedError(error: unknown): boolean {
 
 export function useSocial(mode: "foryou" | "following" = "foryou", topicId: string | null = null) {
   const queryClient = useQueryClient();
+  const onlineStatus = useOnlineStatus();
+  const { toast } = useToast();
   const tsrgAvailable = useTsrgStatus(mode === "foryou" && env.features.experimentalTsrgFeed);
 
   // Tracks whether the LAST cloud fetch failed with a non-auth error.
@@ -431,10 +436,15 @@ export function useSocial(mode: "foryou" | "following" = "foryou", topicId: stri
   // on every useSocial re-render. The mutation's mutateAsync is itself
   // stable across renders, so the wrapper only needs to be memoized once.
   const reactToPost = useCallback(
-    (postId: string, reactionType: string) =>
-      reactToPostMutation.mutateAsync({ postId, reactionType }),
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- mutateAsync is referentially stable (TanStack Query guarantee); the parent mutation object's identity changes each render, so listing it would defeat the useCallback memoization.
-    [reactToPostMutation.mutateAsync],
+    (postId: string, reactionType: string) => {
+      if (!mayStartVote(onlineStatus, typeof navigator === "undefined" || navigator.onLine !== false)) {
+        toast({title:"Internet required",description:"Connect before voting or reposting.",variant:"destructive"});
+        return Promise.resolve();
+      }
+      return reactToPostMutation.mutateAsync({ postId, reactionType });
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mutateAsync is referentially stable; the parent mutation object changes each render.
+    [reactToPostMutation.mutateAsync, onlineStatus, toast],
   );
 
   return {
