@@ -1,0 +1,5 @@
+-- REVIEW ONLY; intentionally not executable.
+-- Removing the deletion trigger or receipts can allow delayed requests to
+-- resurrect deleted posts. Requires stopping/reconciling all consumers and
+-- queues, reviewing account erasure and retention, verified backups and a
+-- separately approved rollback/forward-recovery plan. No deployment approved.
