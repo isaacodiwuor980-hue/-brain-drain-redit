@@ -1,6 +1,6 @@
 # Identity mapping provisioning design — not implemented or run
 
-The owner chose **new accounts only initially**. Do not link existing Firebase accounts or import legacy pairs until a separately approved recovery and ownership-proof process exists. The legacy operator-reviewed process below is deferred and is not permission to map existing accounts. This document is not an executable script and does not authorize use of real data or any environment. Never map by email, display name, UUID shape, user-supplied values, or other untrusted attributes.
+The owner chose **new accounts only initially**, restricted to new sign-ups through a trusted controlled flow. Do not link existing Firebase accounts or import legacy pairs until a separately approved recovery and ownership-proof process exists. The legacy operator-reviewed process below is deferred and is not permission to map existing accounts. This document is not an executable script and does not authorize use of real data or any environment. Never map by email, display name, UUID shape, user-supplied values, or other untrusted attributes.
 
 ## New-account provisioning: proposed security requirements
 
