@@ -37,6 +37,9 @@ export function useReputation() {
 
   const addXPEventMutation = useMutation({
     mutationFn: async ({ type, xpGained, description }: { type: XPEvent["type"], xpGained: number, description: string }) => {
+      // Do not award vote-dependent points while vote identity, eligibility,
+      // and all-writer enforcement are unverified. Preserve prior records.
+      if (type === "vote_bonus") throw new Error("Vote rewards unavailable");
       const event: XPEvent = {
         id: crypto.randomUUID(),
         type,
