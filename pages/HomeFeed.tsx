@@ -19,14 +19,12 @@ import { selectChronologicalHomePosts } from "@/lib/home-feed-chronological";
 import { triggerHaptic } from "@/lib/device";
 import { useToast } from "@/hooks/use-toast";
 import { QuickDecision } from "@/components/ui/quick-decision";
-import { ToastAction } from "@/components/ui/toast";
 import { useDatabase } from "@/hooks/use-database";
 import { instantiateSample, SAMPLE_BRAINS } from "@/lib/sample-brains";
 import { ReasoningTree } from "@/components/ui/reasoning-tree";
 import { ConfidenceBadge } from "@/components/ui/confidence-badge";
 import { computeConfidence } from "@/lib/reasoning-view";
 import { ViewErrorBoundary } from "@/components/ui/view-error-boundary";
-import { isGuestUser } from "@/lib/user-data";
 
 import { DailyChallengesSection } from "@/feed/DailyChallengesSection";
 import { LiveSessionBanner } from "@/feed/LiveSessionBanner";
@@ -60,7 +58,7 @@ export function HomeFeed() {
   const [location, setLocation] = useLocation();
   const { toast } = useToast();
   // Phase 2: real user identity.
-  const { user, signIn } = useAuth();
+  const { user } = useAuth();
   const currentUserId = userIdOr(user);
   const currentDisplayName = displayNameOr(user);
   // PHASE 3 — instant value: persisted brain library + sample templates so a
@@ -75,32 +73,8 @@ export function HomeFeed() {
       if (!sample) throw new Error("Sample not found.");
       quickDecisionSaving.current = true;
       try {
-        // GUEST-TRAP FIX (#17): this used to abort the save for guests and ask
-        // for an account FIRST — so a first-time visitor who had just finished
-        // a real decision tree clicked "Keep this brain" and had their work
-        // thrown away to get a login prompt. That is the exact Quora/Reddit
-        // wall we set out to beat, and it contradicts local-first: the brain
-        // can be written to IndexedDB instantly and synced later.
-        // Now: save locally always. Auth is requested only for the part that
-        // genuinely needs an account — cloud sync.
+        // The hook reports that cloud saving is paused after the local transaction.
         await saveBrainData(instantiateSample(sample));
-        const isRealAccount = !!user && !isGuestUser(user);
-        if (isRealAccount) {
-          toast({
-            title: "Brain saved",
-            description: `"${sample.title}" is saved on this device. Cloud sync may be delayed.`,
-          });
-        } else {
-          toast({
-            title: "Brain saved on this device",
-            description: `"${sample.title}" is in your library now. Sign in to sync it across devices — everything you built so far is kept.`,
-            action: (
-              <ToastAction altText="Sign in to sync this brain" onClick={() => void signIn().catch(() => {})}>
-                Sync
-              </ToastAction>
-            ),
-          });
-        }
       } catch (error) {
         console.error("Quick decision save failed", error);
         toast({
@@ -113,7 +87,7 @@ export function HomeFeed() {
         quickDecisionSaving.current = false;
       }
     },
-    [saveBrainData, toast, user, signIn],
+    [saveBrainData, toast],
   );
   // B3: the Following view gets its own honest empty state instead of the
   // For-You dry state (whose "Share Your First Brain" CTA makes no sense

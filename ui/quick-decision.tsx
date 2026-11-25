@@ -165,7 +165,7 @@ export function QuickDecision({
             <Button size="sm" onClick={handleSave} disabled={saved || saving || !onSaveBrain} className="gap-2">
               {saved ? (
                 <>
-                  <CheckCircle2 className="h-4 w-4" aria-hidden /> Saved to your library
+                  <CheckCircle2 className="h-4 w-4" aria-hidden /> Saved on this device
                 </>
               ) : saving ? (
                 "Saving…"

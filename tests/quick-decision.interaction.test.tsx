@@ -37,10 +37,10 @@ describe("quick decision save feedback", () => {
     await act(async () => root.render(<QuickDecision onSaveBrain={save} />));
     await reachOutcome();
     await act(async () => button("Keep this brain").click());
-    expect(container.textContent).not.toContain("Saved to your library");
+    expect(container.textContent).not.toContain("Saved on this device");
     expect(button("Keep this brain").disabled).toBe(false);
     await act(async () => button("Keep this brain").click());
-    expect(container.textContent).toContain("Saved to your library");
+    expect(container.textContent).toContain("Saved on this device");
     expect(save).toHaveBeenCalledTimes(2);
   });
 });
