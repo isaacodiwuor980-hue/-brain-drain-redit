@@ -488,3 +488,7 @@ Full `CI=1 npx vitest run --coverage`: **417 tests / 79 files passed**, included
 
 ### Final algorithm clarifications
 - Recorded owner confirmation of symmetric bridging despite the reference conflict, hidden confidence while minority evidence is unreliable, authorized human topic review, and presentation of serious shadow-test failures before any rollout decision. Documentation only; no scoring behavior change, tests, cloud operations or deployment. TSRG remains not production-ready because identity, all-writer safety, authorization, live feed integration and validated shadow evaluation are incomplete.
+
+### Recent sign-in building block
+- VERIFIED locally: Firebase token verification now retains a strictly valid, signed `auth_time` without changing legacy authentication behavior for absent/malformed claims. Added an additive, currently unwired five-minute recent-sign-in middleware for future reviewed sensitive routes. Signed synthetic JWT tests cover valid, missing, invalid, future and tampered claims; mocked HTTP tests cover fresh/stale/missing/future cases. Initial tests failed before implementation; focused/full tests/typecheck/lint/build passed, with two existing warnings.
+- This is not provider revocation, MFA, identity ownership proof, deletion, account recovery or live enforcement. The middleware is not attached to sensitive routes yet; existing token verification does not check provider revocation. No live data access or deployment.

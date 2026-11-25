@@ -41,6 +41,8 @@ export interface VerifiedAuth {
   emailVerified?: boolean;
   displayName?: string;
   photoURL?: string;
+  /** Verified Firebase auth_time in Unix seconds, when present and valid. */
+  authTime?: number;
 }
 
 // Distinguish provider failures from malformed, attacker-controlled token data.
@@ -168,6 +170,11 @@ function verifyClaims(decoded: DecodedToken): VerifiedAuth {
     emailVerified: payload.email_verified === true,
     displayName: payload.name,
     photoURL: payload.picture,
+    // Missing/malformed freshness does not change legacy authentication, but
+    // cannot authorize a sensitive action that requires recent sign-in.
+    ...(typeof payload.auth_time === "number" && Number.isSafeInteger(payload.auth_time) &&
+        payload.auth_time > 0 && payload.auth_time <= now && payload.auth_time <= payload.iat
+      ? { authTime: payload.auth_time } : {}),
   };
 }
 

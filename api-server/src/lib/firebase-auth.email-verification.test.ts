@@ -33,6 +33,25 @@ describe("signed Firebase email verification claim", () => {
 });
 
 
+describe("signed authentication time", () => {
+  it("retains a signed valid auth_time for sensitive-action checks", async () => {
+    const now = Math.floor(Date.now() / 1000);
+    expect((await verifyFirebaseToken(await token(true, { auth_time: now - 100 }))).authTime).toBe(now - 100);
+  });
+  it("does not accept missing, malformed or future authentication times as proof of freshness", async () => {
+    const now = Math.floor(Date.now() / 1000);
+    for (const auth_time of [undefined, null, "123", -1, 1.5, now + 60]) {
+      expect((await verifyFirebaseToken(await token(true, { auth_time }))).authTime).toBeUndefined();
+    }
+  });
+  it("rejects a modified auth_time with an invalid signature", async () => {
+    const parts = (await token(true, { auth_time: 1 })).split(".");
+    const payload = JSON.parse(Buffer.from(parts[1], "base64url").toString());
+    payload.auth_time = Math.floor(Date.now() / 1000);
+    await expect(verifyFirebaseToken(`${parts[0]}.${encode(payload)}.${parts[2]}`)).rejects.toThrow("Invalid token signature");
+  });
+});
+
 describe("signed Firebase token required claims", () => {
   it.each([
     { exp: undefined }, { iat: undefined }, { exp: "9999999999" }, { iat: "1" },
