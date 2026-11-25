@@ -54,12 +54,11 @@ export function useOfflineSync() {
    * FAKE sync that silently discarded every queued action. Offline posts and
    * reactions were lost when the user came back online.
    *
-   * Now: replay each queued action by calling the corresponding API. Actions
-   * that succeed are removed from the queue. Actions that fail are kept with
-   * an incremented retryCount (max 5 retries before they're dropped to avoid
-   * an unbounded poison-queue). Actions with no server equivalent
-   * (add_comment, save_profile) are treated as auto-success (they're already
-   * saved in IDB and have no REST endpoint to sync to).
+   * Unsafe posts, brain edits and reaction toggles are held for manual review.
+   * Other actions with no server replay (add_comment, save_profile) are
+   * marked skipped; their separate local/Firestore behavior is not verified.
+   * Failed actions are retained for retry or moved to attention storage.
+   * Queue and quarantine storage are not atomic, and recovery UI is incomplete.
    */
   const syncNow = useCallback(async () => {
     const currentQueue = getOfflineQueue();
@@ -99,8 +98,8 @@ export function useOfflineSync() {
           setAuthRetryAt(Date.now() + 30_000);
           break;
         }
-        // A toggle may already have been applied despite a lost response.
-        // Keep it for review rather than risking reversing the server state.
+        // Unsafe/ambiguous writes remain held until an account-scoped review
+        // flow and the required server-side concurrency protections exist.
         if (requiresManualSyncReview(action)) { dead.push(action); continue; }
         try {
           const result = await replayAction(action, active.token, active.uid);
@@ -195,6 +194,9 @@ async function replayAction(
   token: string | null,
   activeUserId: string,
 ): Promise<"synced" | "skipped"> {
+  // Defense in depth if this function gains another caller; no currently held
+  // action is safe to replay merely because a client-side check was bypassed.
+  if (requiresManualSyncReview(action)) throw new Error("Offline action requires review");
   switch (action.type) {
     case "create_post": {
       // The queue payload only has { postId } — read the full post from IDB.

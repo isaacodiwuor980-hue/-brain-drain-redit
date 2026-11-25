@@ -153,10 +153,14 @@ export function queueOfflineAction(
   saveOfflineQueue(queue);
 }
 
-/** Unowned legacy entries and other accounts' work must never be replayed. */
-/** Toggle requests are not idempotent: a lost response makes replay unsafe. */
-export function requiresManualSyncReview(action: QueuedAction): boolean { return action.type === "post_reaction"; }
+/** Posts lack a trusted retry permit/review flow, brain edits lack versioned
+ * conflict handling, and toggles can reverse an already-applied reaction.
+ * Keep these actions for review; this is not a complete recovery interface. */
+export function requiresManualSyncReview(action: QueuedAction): boolean {
+  return action.type === "post_reaction" || action.type === "create_post" || action.type === "update_brain";
+}
 
+/** Unowned legacy entries and other accounts' work must never be replayed. */
 export function actionsForOwner(queue: QueuedAction[], ownerId: string | null | undefined): QueuedAction[] {
   return ownerId ? queue.filter((action) => action.ownerId === ownerId) : [];
 }
