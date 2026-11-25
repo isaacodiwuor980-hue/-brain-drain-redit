@@ -367,6 +367,7 @@ export function PostCreator({
   };
 
   const submitPost = async (post: Post) => {
+    if (!window.confirm("If published, this post will be public. Private or Room-only audiences are not verified. Some posts may remain on this device for review. Continue?")) return;
     setIsPublishing(true);
     try {
       await onPostCreated(post);
@@ -1557,7 +1558,7 @@ export function PostCreator({
           </div>
 
           <p className="px-4 pb-2 text-xs text-muted-foreground" role="status">
-            Automatic editor draft saving is paused. Keep this editor open until you save; image, note and Room deposit posts are saved on this device for review, not uploaded.
+            Automatic editor draft saving is paused. Keep this editor open until you save. Some fields and Room or image posts are held on this device for review, not published.
           </p>
 
           {/* Hidden File Input — single shared picker for all post types.

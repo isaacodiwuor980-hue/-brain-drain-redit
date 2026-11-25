@@ -105,6 +105,22 @@ describe("post sending on account change",()=>{
     expect(m.create).not.toHaveBeenCalled();
     expect(m.queue).toHaveBeenCalledWith("create_post",{postId:"p"},"a");
   });
+  it.each([
+    { title:"synthetic title" },
+    { postType:"question" as const, questionDetails:"synthetic details" },
+    { postType:"answer" as const, answeredPostId:"question" },
+    { communityId:"room" },
+    { roomId:"room" },
+    { editPolicy:"public" as const },
+    { event:{title:"event",startsAt:1,communityId:"room"} },
+  ])("does not publish a partial or potentially mis-scoped post: %o",async(fields)=>{
+    m.session.mockResolvedValue({uid:"a",token:"token-a"});
+    const full={...post,...fields};
+    await act(async()=>{await api.addPost(full);});
+    expect(m.putStrict).toHaveBeenCalledWith("posts",full);
+    expect(m.create).not.toHaveBeenCalled();
+    expect(m.queue).toHaveBeenCalledWith("create_post",{postId:"p"},"a");
+  });
   it("sends only when both checks match the post owner",async()=>{
     m.session.mockResolvedValue({uid:"a",token:"token-a"});
     await act(async()=>{await api.addPost(post);});
