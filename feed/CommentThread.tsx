@@ -169,9 +169,6 @@ export function CommentThread({
     return sorted;
   }, [tree, sortMode, votesEnabled]);
 
-  // Fossilized comments (rendered at the crown as a Consensus Summary Block).
-  const fossilized = visibleComments.filter((c) => c.isFossilized);
-
   // Now safe to early-return — all hooks above have been called.
   if (isLoadingComments) {
     return <div className="p-4 text-sm text-muted-foreground text-center">Loading replies...</div>;
@@ -295,7 +292,7 @@ export function CommentThread({
 
     return (
       <div className="flex flex-col mt-2 group" style={{ paddingLeft: `${paddingLeft}rem` }}>
-        <div className={`flex gap-3 relative rounded-lg ${node.isFossilized ? "hive-fossilized p-3" : ""}`}>
+        <div className="flex gap-3 relative rounded-lg">
           <div className="flex flex-col items-center shrink-0">
             <Avatar className="w-8 h-8 border z-10 bg-background">
               <AvatarFallback className="text-[12px] bg-muted font-medium">
@@ -312,7 +309,6 @@ export function CommentThread({
               <span className="text-[12px] text-muted-foreground ml-2 shrink-0">
                 {formatDistanceToNow(node.createdAt, { addSuffix: true }).replace('about ', '').replace(' minutes', 'm').replace(' hours', 'h').replace(' days', 'd')}
                 {node.editedAt && <span className="italic text-[10px] ml-1">· edited</span>}
-                {node.isFossilized && <span className="ml-1 text-amber-500 font-semibold text-[10px]">· FOSSILIZED</span>}
               </span>
             </div>
 
@@ -482,33 +478,6 @@ export function CommentThread({
   return (
     <div className="pt-4">
       <p className="text-xs text-muted-foreground mb-3">Confidential replies are unavailable. Existing confidential replies remain stored but are hidden here.</p>
-      {/* Fossilized Consensus Summary Block (crown of the post) */}
-      {fossilized.length > 0 && (
-        <div className="mb-4 p-4 rounded-xl border-2 border-amber-500/30 bg-gradient-to-br from-amber-500/5 to-amber-500/2">
-          <div className="flex items-center gap-2 mb-3">
-            <span className="text-amber-500 text-lg">🔒</span>
-            <h3 className="text-sm font-bold text-amber-600 dark:text-amber-400 tracking-wide uppercase">Community Wiki</h3>
-            <span className="text-[11px] text-muted-foreground">Consensus Summary Block · {fossilized.length} entries</span>
-          </div>
-          <div className="space-y-2">
-            {fossilized.map((c) => {
-              return (
-                <div key={c.id} className="hive-fossilized p-3 rounded-lg">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="text-[11px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">Community highlight</span>
-                    <span className="text-[11px] text-muted-foreground">· {c.authorName}</span>
-                    {(c.sourceLinks ?? 0) > 0 && (
-                      <span className="text-[11px] text-blue-500 font-semibold inline-flex items-center gap-0.5"><LinkIcon className="w-2.5 h-2.5" />{c.sourceLinks}</span>
-                    )}
-                  </div>
-                  <p className="text-[14px] text-foreground/90 leading-relaxed">{c.content}</p>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
       {/* Sort toggle */}
       {visibleComments.length > 1 && (
         <div className="flex items-center justify-end mb-2">
