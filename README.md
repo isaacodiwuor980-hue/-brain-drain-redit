@@ -1,5 +1,7 @@
 # Brain Drain
 
+> **Release status:** This branch includes temporary privacy and data-safety pauses. Local saves are not automatically backed up or synced; library, publication and other features may be unavailable. Do not run production migrations, the backup script or deployment instructions without reviewing `LAUNCH_REMEDIATION_EXECUTION_PLAN.md`, live schema compatibility and the exact operational effects. Local test success is not production verification.
+
 > A human knowledge engine where experts drain their reasoning into structured decision brains. Local-first PWA (IndexedDB) with optional cloud sync (Supabase + Firebase Auth).
 
 ## Quick Start
@@ -40,7 +42,7 @@ NODE_ENV=production npm start
 | `npm run typecheck` | TypeScript strict type-check |
 | `bash scripts/deploy.sh` | Build + graceful restart (zero-downtime) |
 | `bash scripts/ensure-server.sh` | Start auto-restarting server (setsid) |
-| `bash scripts/backup-supabase.sh` | Backup Supabase DB to `backups/` |
+| `scripts/backup-supabase.sh` | Legacy script: unsafe/unverified; do not run as a recovery plan |
 | `k6 run scripts/load-test.js` | Run load test (smoke/load/stress/spike) |
 | `npm run lint` | ESLint (0 errors enforced) + TypeScript typecheck |
 | `npm run test` | Vitest unit suites |
@@ -88,7 +90,7 @@ See [`.env.example`](.env.example) for the full list with descriptions. Key vari
 └───────────────┘      └───────────────────────────────┘
 ```
 
-**Data flow:** Browser writes to IndexedDB first (instant UX), then syncs to Supabase via the API server. Firebase Auth provides the ID token that the API server verifies on every authenticated request.
+**Data flow:** Some operations save to IndexedDB; automatic brain upload and offline replay are paused. Selected public API reads use Supabase via the Express server, while Firebase Auth supplies tokens for protected routes. Identity mapping, account isolation, other writers, and actual cloud persistence remain unverified. Local data is not automatically a cloud backup.
 
 ## Testing
 

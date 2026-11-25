@@ -1,0 +1,26 @@
+# Netlify beta deployment rehearsal — planning only
+
+The owner selected Netlify as the intended beta host. The connected-app lookup for Netlify reported **unsupported**, so this session cannot inspect the actual Netlify site, settings, deploy history, environment, build hooks or domains through that connector. Do not claim a deployment occurred, request credentials, use a guessed site ID, create a site, or change settings. A production deployment or PR merge still requires the exact separately authorized operation.
+
+## Repository facts to reconcile with the real host
+
+- `npm run build` creates the Vite browser build and an Express Node server bundle (`dist/server.cjs`). The Express server mounts `/api/*`, handles health checks and SPA fallback, and uses server-only configuration. A static Netlify publish of the browser files does **not** by itself run that Node server. No Netlify config or verified Netlify Functions adapter is present in this checkout.
+- The browser defaults to same-origin `/api`; absent an actual reviewed backend route/proxy, a static-host SPA fallback may return HTML or 404 for API requests. A green static build is not evidence that feed, authorization, persistence or health routes work. Server CSP, CORS, proxy trust, rate limits, caching and secrets handling must be tested against the actual architecture; never embed service-role secrets in a client bundle.
+- `dist/` includes server output as well as browser output. Do not expose server artifacts or source maps via a static site without reviewing the publish directory and contents. Supabase Storage images are not yet integrated or verified.
+- PR #3 was MERGEABLE at recent heads; checks vary by head. Supabase Preview was skipped, not a pass. Live schema contains differently typed follow tables; identity migration and effective permissions are not verified. The existing backup script is unsafe/unverified.
+
+## Local-only rehearsal sequence
+
+1. Inventory required UI routes, `/api/*` endpoints, runtime dependencies, environment variable *names* and expected health behavior from source; do not retrieve or print values. Identify separately which public assets and server outputs are produced by build.
+2. Propose a concrete architecture: either an independently reviewed serverless adapter or an existing separately hosted Express API behind an appropriately configured same-origin proxy. Do not create or modify infrastructure during planning. Compare request/response handling, cold starts, timeouts, stream/body limits, concurrent requests, availability, CORS, auth and cost against the existing Express app. No architecture is selected or proven by this document.
+3. Use synthetic identities and data against local or separately approved isolated infrastructure. Verify SPA deep links, `/api/healthz`, `/api/ready`, unknown API paths returning JSON rather than HTML, authenticated/anonymous authorization, privacy, static caching, HTTP errors, upload limits, graceful failures and safe log redaction. Simulate network failures, account changes and concurrent actions. No production content or live writes.
+4. Review build artifact exposure, secret isolation, public/private caching and browser security headers with independent security review. Measure baseline latency and bundle sizes before optimization; record results and retain rollback/canary and monitoring plans. Provider functionality, free-tier limits and pricing are not established.
+5. Once the owner/operator has identified the exact existing Netlify site and backend, establish deploy target and build command, branch/commit SHA, required environment variable names, reviewed routing, trusted proxy configuration, scope, rollback and health verification. Do not access or reveal secret values. Verify recovery and schema compatibility and seek explicit approval for that exact stage before modifying live systems. Do not merge PR #3 without separate authorization.
+
+## Migration coupling
+
+Browser-local and Firebase data were identified as potential sources, not evidence of their contents, ownership or safe mapping. Migrate only after a reviewed inventory, verified identity bindings, data-preserving behavior, isolated rehearsal and a specific stage plan. Do not infer links from email, clear local data, automatically replay uncertain writes, or assume a database backup covers image objects. No live data was inspected or moved in this rehearsal.
+
+## Local Express rehearsal result
+
+A production build was run locally with a scrubbed environment and no configured Supabase or Firebase credentials; the process was stopped afterward. `/api/healthz` and `/api/ready` returned 200 JSON, but readiness explicitly skips Supabase when it is unconfigured, so this is **not** evidence of backend availability. Unknown `/api` paths returned 404 JSON. `/server.cjs`, an encoded spelling, `/server.cjs.map` and an asset sourcemap path returned 404/no-store after adding an Express static guard; `/` and `/.well-known/assetlinks.json` still returned 200. This was not Netlify, a remote environment, a live security test or a load benchmark. The Express guard does not apply to a Netlify static publish; isolate/inspect the actual publish artifact before any deployment.

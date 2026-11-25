@@ -8,6 +8,7 @@ import compression from "compression";
 import { createServer as createViteServer } from "vite";
 import apiApp from "./api-server/src/app";
 import { renderDataQualityPage } from "./lib/data-quality-page";
+import { isPrivateBuildArtifact } from "./lib/static-artifact-policy";
 import { initSentry, captureException, sentryRequestHandler, sentryErrorHandler } from "./api-server/src/lib/sentry";
 
 async function startServer() {
@@ -156,6 +157,13 @@ ${urls.map((u) => `  <url>\n    <loc>${origin}${u.loc}</loc>\n    <lastmod>${u.l
     // worse — an OLD sw-killer.js that no longer unregisters a stale service
     // worker. Only Vite's content-hashed output (assets/<name>-<hash>.js) is
     // safe to pin forever; everything else must revalidate.
+    // The build places the Node bundle alongside browser assets. Never serve
+    // server code or source maps through this Express static host.
+    app.use((req, res, next) => {
+      if (!isPrivateBuildArtifact(req.path)) return next();
+      res.setHeader("Cache-Control", "no-store");
+      return res.status(404).type("text/plain").send("Not found");
+    });
     app.use(
       express.static(distPath, {
         index: false,
