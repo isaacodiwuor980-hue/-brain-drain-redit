@@ -1,6 +1,6 @@
 # Local migration and identity review
 
-This is a preliminary static review, not proof of live schema, grants, policy correctness or route authorization. No staging or production was accessed. The user states none of the migrations is applied anywhere; independently verify history before any execution. The following migrations exist:
+This is a preliminary static review, not proof of live schema, grants, policy correctness or route authorization. No staging or production was accessed. Historical reports about prior SQL execution conflict; actual migration history is unknown. An authorized operator must verify it before any execution. Do not treat existing migrations as safely unapplied or rewrite potentially applied files; use independently reviewed forward fixes. The following migrations exist:
 
 | Migration | Principal objects / dependencies | RLS status in repository |
 | --- | --- | --- |

@@ -15,7 +15,7 @@ import { BrainDrawer } from "@/components/BrainDrawer";
 import { useSkills } from "@/hooks/use-skills";
 import { useUserSearch, useFollowUser } from "@/hooks/use-discover";
 import { safeStorage } from "@/lib/safe-storage";
-import { useDatabase } from "@/hooks/use-database";
+import { deleteBrainData } from "@/lib/delete-brain";
 
 export function SearchPage() {
   // Lazy init from URL `q` param + persisted recent searches — both are
@@ -45,7 +45,6 @@ export function SearchPage() {
   const [, setLocation] = useLocation();
   const search = useSearch();
   const { toast } = useToast();
-  const { deleteBrain: deleteStoredBrain } = useDatabase();
 
   /**
    * BUG FIX (dead query param): /profile?userId=<id> was accepted by the
@@ -68,7 +67,7 @@ export function SearchPage() {
   // Search Results State
   const [brains, setBrains] = useState<Brain[]>([]);
   const [topics, setTopics] = useState<Topic[]>([]);
-  const [posts, setPosts] = useState<Post[]>([]);
+  const [posts] = useState<Post[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
   // Part 2 Task 6: Skills search (local IDB — server API is also available
@@ -89,14 +88,10 @@ export function SearchPage() {
     async function loadData() {
       setIsLoading(true);
       try {
-        const [allBrains, allTopics, allPosts] = await Promise.all([
-          idb.getAll<Brain>("brains"),
-          idb.getAll<Topic>("topics"),
-          idb.getAll<Post>("posts"),
-        ]);
-        setBrains(allBrains || []);
+        // Shared local records have no reliable current visibility or owner.
+        // Do not display them as search results until authorization is verified.
+        const allTopics = await idb.getAll<Topic>("topics");
         setTopics(allTopics || []);
-        setPosts(allPosts || []);
       } catch (err) {
         console.error("Failed to load search index data", err);
       } finally {
@@ -155,7 +150,7 @@ export function SearchPage() {
   };
 
   const deleteBrain = async (brainId: string) => {
-    const result = await deleteStoredBrain(brainId);
+    const result = await deleteBrainData(brainId);
     setBrains(prev => prev.filter(b => b.id !== brainId));
     return result;
   };
@@ -256,6 +251,8 @@ export function SearchPage() {
           )}
         </form>
       </div>
+
+      <p role="status" className="mt-2 text-sm text-muted-foreground">Brain and post search is temporarily unavailable while privacy is reviewed. Existing data is retained.</p>
 
       {!query ? (
         <div className="mt-4">
