@@ -12,12 +12,11 @@ import { useCommunities } from "@/hooks/use-communities";
 import { MomentumWidget } from "@/components/momentum/MomentumWidget";
 import { useLocation } from "wouter";
 import { trackEvent } from "@/lib/analytics";
-import { getPostUpvoteCount } from "@/lib/types";
 import { useAuth } from "@/components/auth/AuthContext";
 import { userIdOr, displayNameOr } from "@/lib/user-data";
-import { FeedMode, rankHomeFeedPosts, rankRelatedTopics } from "@/lib/recommendations";
+import type { FeedMode } from "@/lib/recommendations";
+import { selectChronologicalHomePosts } from "@/lib/home-feed-chronological";
 import { triggerHaptic } from "@/lib/device";
-import { useAnalyticsEvents } from "@/hooks/use-recommendations";
 import { useToast } from "@/hooks/use-toast";
 import { QuickDecision } from "@/components/ui/quick-decision";
 import { ToastAction } from "@/components/ui/toast";
@@ -66,7 +65,6 @@ export function HomeFeed() {
   const { posts, isLoading, addPost, reactToPost, refreshPosts, feedFailed, refetchFeed, fetchNextPage, hasNextPage, isFetchingNextPage } = useSocial(activeFeed, null);
   const { topics, addTopic, refreshTopics } = useTopics();
   const { communities } = useCommunities();
-  const { data: analyticsEvents = [] } = useAnalyticsEvents();
   const [location, setLocation] = useLocation();
   const { toast } = useToast();
   // Phase 2: real user identity.
@@ -138,9 +136,6 @@ export function HomeFeed() {
   );
 
   const [selectedTopicId, setSelectedTopicId] = useState<string | null>(null);
-  // FRAGMENT C: Reddit-style sort modes.
-  type FeedSort = "hot" | "new" | "top" | "rising";
-  const [sortMode] = useState<FeedSort>("hot");
   const [isCreatorOpen, setIsCreatorOpen] = useState(false);
   const [creatorPostType, setCreatorPostType] = useState<PostType>("post");
   const [selectedQuestionForAnswer, setSelectedQuestionForAnswer] = useState<{
@@ -253,16 +248,6 @@ export function HomeFeed() {
   const [displayLimit, setDisplayLimit] = useState(5);
   const [observerRef, setObserverRef] = useState<HTMLDivElement | null>(null);
 
-  // A clock value read in an effect (not during render) so the "rising" sort
-  // and any time-relative filtering stay pure during render. Refreshed on a
-  // 60s timer — the only consumer is a 24h "recent" threshold, so sub-minute
-  // staleness is behaviorally equivalent to the previous per-render Date.now().
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => {
-    const id = setInterval(() => setNow(Date.now()), 60_000);
-    return () => clearInterval(id);
-  }, []);
-
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- legitimate event-driven reset: reset displayLimit to 5 when the feed mode or selected topic changes; refactoring to derived state would change behavior (displayLimit is user-incremented via IntersectionObserver).
     setDisplayLimit(5);
@@ -281,10 +266,8 @@ export function HomeFeed() {
     void trackEvent("topic_selected", { topicId: topicId || "all" });
   };
 
-  const recommendedTopics = useMemo(
-    () => rankRelatedTopics(posts, topics, analyticsEvents),
-    [posts, topics, analyticsEvents],
-  );
+  // Avoid learning topic preferences from local behavioral events.
+  const recommendedTopics = topics.slice(0, 5);
 
   useEffect(() => {
     if (typeof IntersectionObserver === "undefined") return undefined;
@@ -334,65 +317,20 @@ export function HomeFeed() {
     await addPost(post);
   }, [addPost]);
 
-  // Memoize the displayed posts list so we don't re-run the full O(N log N)
-  // rankHomeFeedPosts sort + analytics-event iteration on every render /
-  // scroll tick. Re-runs only when the inputs change (posts, topics,
-  // analyticsEvents, activeFeed, selectedTopicId, displayLimit, AND
-  // location — so in-page navigation to /?postId=... is picked up).
+  // This is ordering only, not a proof of visibility or topic authorization.
   const displayedPosts = useMemo(() => {
     const searchParams = new URLSearchParams(
-      typeof location === "string" && location.includes("?")
-        ? location.split("?")[1] ?? ""
-        : ""
+      typeof location === "string" && location.includes("?") ? location.split("?")[1] ?? "" : ""
     );
-    const postIdFromUrl = searchParams.get("postId");
-
-    // Filter out hidden posts (user clicked "Hide Post" in PostCard).
+    const postId = searchParams.get("postId");
     let hiddenIds: string[] = [];
     try {
       const raw = localStorage.getItem("brainDrain_hiddenPosts");
       if (raw) hiddenIds = JSON.parse(raw) as string[];
     } catch { /* ignore */ }
     const visiblePosts = hiddenIds.length > 0 ? posts.filter(p => !hiddenIds.includes(p.id)) : posts;
-
-    let allDisplayedPosts = postIdFromUrl
-      ? visiblePosts.filter(p => p.id === postIdFromUrl)
-      : rankHomeFeedPosts({
-          posts: visiblePosts,
-          topics,
-          events: analyticsEvents,
-          mode: activeFeed,
-          selectedTopicId,
-        });
-
-    // FRAGMENT C: Apply Reddit-style sort mode on top of the ranked feed.
-    if (!postIdFromUrl) {
-      if (sortMode === "new") {
-        allDisplayedPosts = [...allDisplayedPosts].sort((a, b) => b.createdAt - a.createdAt);
-      } else if (sortMode === "top") {
-        allDisplayedPosts = [...allDisplayedPosts].sort((a, b) =>
-          (getPostUpvoteCount(b) + (b.commentCount || 0) * 2) -
-          (getPostUpvoteCount(a) + (a.commentCount || 0) * 2)
-        );
-      } else if (sortMode === "rising") {
-        // Rising = high velocity: posts < 24h old with above-median engagement.
-        const dayMs = 24 * 60 * 60 * 1000;
-        const recent = allDisplayedPosts.filter(p => now - p.createdAt < dayMs);
-        if (recent.length > 0) {
-          const medianEngagement = recent.sort((a, b) =>
-            getPostUpvoteCount(a) - getPostUpvoteCount(b)
-          )[Math.floor(recent.length / 2)];
-          const threshold = getPostUpvoteCount(medianEngagement);
-          allDisplayedPosts = recent
-            .filter(p => getPostUpvoteCount(p) >= threshold)
-            .sort((a, b) => getPostUpvoteCount(b) - getPostUpvoteCount(a));
-        }
-      }
-      // "hot" = default gravity ranking from rankHomeFeedPosts (no re-sort)
-    }
-
-    return allDisplayedPosts.slice(0, displayLimit);
-  }, [posts, topics, analyticsEvents, activeFeed, selectedTopicId, displayLimit, location, sortMode, now]);
+    return selectChronologicalHomePosts(visiblePosts, selectedTopicId, postId, displayLimit);
+  }, [posts, selectedTopicId, displayLimit, location]);
 
   if (isLoading || isSeeding) {
     // PHASE 1/3 — the old loading state was a wall of skeletons: on Slow 3G
@@ -485,10 +423,10 @@ export function HomeFeed() {
           <div className="flex items-start gap-3">
             <div className="flex-1">
               <p className="text-sm font-medium text-foreground">
-                Discovering posts for you — follow topics to personalize.
+                Browse recent posts and explore topics.
               </p>
               <p className="mt-0.5 text-xs text-muted-foreground">
-                Showing curated starter content. Follow 3+ topics to tune your feed.
+                Personalized feed ranking is currently unavailable.
               </p>
             </div>
             <button
@@ -531,12 +469,7 @@ export function HomeFeed() {
             </TabsTrigger>
           </TabsList>
         </Tabs>
-        {/* Sort mode chips (Hot/New/Top/Rising) intentionally removed from
-            the home feed UI per the dry-state design goal — the app should
-            feel calm and natural, not like an engagement-optimised Reddit
-            feed. The sortMode state and ranking logic are preserved for
-            future use (e.g. the Topics page can surface them as needed);
-            the home feed just always renders in the default "hot" order. */}
+
       </div>
 
       {/* Topic filter chips removed — the homepage now feels like a
