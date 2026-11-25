@@ -21,7 +21,6 @@ import { getAuthSession, getAuthToken } from "../lib/auth-token";
 import { env } from "../lib/env";
 import { queueOfflineAction } from "../lib/offline-sync";
 import { orderLiveFeed } from "../lib/tsrg/live-feed-gate";
-import { reconcileCachedCloudPost } from "../lib/feed-cache-reconcile";
 import { useOnlineStatus } from "./use-online-status";
 import { useToast } from "./use-toast";
 import { mayStartVote } from "../lib/online-vote-policy";
@@ -83,11 +82,6 @@ export function useSocial(mode: "foryou" | "following" = "foryou", topicId: stri
     queryFn: async ({ pageParam, signal }) => {
       const offset = pageParam as number;
 
-      // Read local data only for non-destructive cache reconciliation, not display.
-      const cached = (await idb.getAll<Post>("posts")).sort(
-        (a, b) => b.createdAt - a.createdAt,
-      );
-
       // apiEnabled: empty base URL means SAME-ORIGIN (production serves /api
       // from this host) — see lib/env.ts. Local-only builds set VITE_LOCAL_ONLY=1.
       if (!env.apiEnabled) {
@@ -102,31 +96,8 @@ export function useSocial(mode: "foryou" | "following" = "foryou", topicId: stri
         const response = await fetchFeed({ mode, topic: topicId, limit: PAGE_SIZE, offset, signal });
         // Cloud fetch succeeded — clear any previously-surfaced failure.
         setFeedFailed(false);
-        // Cache cloud posts locally for offline use. PREVIEW FIX: this write
-        // is wrapped separately — a cache-write failure (quota, storage
-        // blocked, private mode) must NEVER discard the cloud posts we just
-        // fetched. Previously putAll threw inside the outer try and the
-        // catch returned `cached` ([]) → blank feed in blocked-storage
-        // contexts (sandboxed preview iframe / Safari ITP).
-        if (response.posts.length > 0) {
-          try {
-            // GUEST VOTE FIX: don't clobber locally-voted posts on background
-            // refetch. The server does not track guest reactions, so a blind
-            // putAll would erase the user's upvote/downvote every time the
-            // feed refetches (staleTime expiry, window focus, vote onSuccess).
-            // Preserve local reactions, but always cache fresh server fields
-            // such as a redacted brainId instead of retaining an old post.
-            // This does not validate cached items missing from the response or
-            // prevent stale data being displayed before a successful refresh.
-            const localById = new Map(cached.map((p) => [p.id, p]));
-            const toCache = response.posts.map((server) =>
-              reconcileCachedCloudPost(server, localById.get(server.id)),
-            );
-            await idb.putAll("posts", toCache);
-          } catch {
-            console.warn("[feed] Could not cache posts locally (cloud data still shown)");
-          }
-        }
+        // Do not rewrite the unscoped device cache from a feed read. It may
+        // contain another account's draft or fields with uncertain provenance.
         if (mode === "following") {
           // B3: keep the Following tab honest — cloud results ONLY. The IDB
           // cache is the For-You universe (cold-start seeds, demo posts and

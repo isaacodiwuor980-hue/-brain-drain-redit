@@ -20,6 +20,12 @@ beforeEach(async()=>{
 });
 afterEach(async()=>{await act(async()=>root.unmount());client.clear();el.remove();});
 describe("feed query cache privacy",()=>{
+  it("does not read or rewrite unscoped local posts when fetching the feed",async()=>{
+    await vi.waitFor(()=>expect(client.getQueryData(["posts","foryou",null])).toBeDefined());
+    expect(m.getAll).not.toHaveBeenCalled();
+    expect(m.putAll).not.toHaveBeenCalled();
+    expect(JSON.stringify(client.getQueryData(["posts","foryou",null]))).toContain("server");
+  });
   it("does not include an unverified local-only post in an online feed",async()=>{
     m.getAll.mockResolvedValue([{...cached,id:"local-private",content:"sensitive cached draft"}]);
     await act(async()=>{await client.refetchQueries({queryKey:["posts","foryou",null]});});
