@@ -353,32 +353,11 @@ export async function runReactivation(): Promise<void> {
 }
 
 /**
- * runHiveMindMaintenance — single entry point called from App.tsx on
- * boot. Runs all 4 maintenance functions in sequence. Each function
- * is rate-limited by its own localStorage timestamp so calling on
- * every boot is safe — only runs when due.
- *
- * Errors in any single function don't block the others.
+ * Hard-disabled: automatic pruning, fossilization, point awards, forks and
+ * notifications have not been reviewed for consent, identity or data safety.
+ * Existing data and timers are untouched. Individual legacy functions above
+ * remain exported for analysis and are not made safe by this gate.
  */
 export async function runHiveMindMaintenance(): Promise<void> {
-  try {
-    await runPruning();
-  } catch (err) {
-    console.warn("runPruning failed:", err);
-  }
-  try {
-    await runFossilization();
-  } catch (err) {
-    console.warn("runFossilization failed:", err);
-  }
-  try {
-    await runForkCheck();
-  } catch (err) {
-    console.warn("runForkCheck failed:", err);
-  }
-  try {
-    await runReactivation();
-  } catch (err) {
-    console.warn("runReactivation failed:", err);
-  }
+  return;
 }

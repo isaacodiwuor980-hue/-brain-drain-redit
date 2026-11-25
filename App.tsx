@@ -18,7 +18,6 @@ import NotFound from "@/pages/not-found";
 import { reportError } from "@/lib/error-monitor";
 import { safeStorage } from "@/lib/safe-storage";
 import { unregisterStaleServiceWorkers } from "@/lib/sw-cleanup";
-import { runHiveMindMaintenance } from "@/lib/hive-mind";
 import { setQueryClientRef } from "@/lib/analytics";
 
 const QUERY_RETRY_ATTEMPTS = 1;
@@ -382,15 +381,6 @@ function App() {
     // burning CPU on a timer.
     setQueryClientRef(queryClient);
     return () => setQueryClientRef(null);
-  }, []);
-
-  useEffect(() => {
-    // Run Hive-Mind maintenance on app boot: 14-day pruning, 30-day
-    // fossilization, thread fork checks, 90-day reactivation.
-    // Each check is rate-limited by its own localStorage timestamp
-    // so calling on every boot is safe — only runs when due.
-    void runHiveMindMaintenance();
-    // No cleanup — maintenance is fire-and-forget.
   }, []);
 
   // PREVIEW FIX: Do NOT register a service worker when running inside an
