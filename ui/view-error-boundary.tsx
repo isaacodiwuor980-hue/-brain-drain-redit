@@ -26,8 +26,8 @@ interface State {
  * blanks the feed" failure. This boundary isolates a single view: its
  * fallback replaces just that region, the rest of the page keeps working.
  *
- * It also reports to the error monitor (one line, no stack spam) so issues
- * stay visible in /api/client-errors.
+ * It also reports to the local error monitor. Server-side client error
+ * ingestion is paused pending a privacy and retention review.
  */
 export class ViewErrorBoundary extends Component<Props, State> {
   state: State = { hasError: false, error: null };
