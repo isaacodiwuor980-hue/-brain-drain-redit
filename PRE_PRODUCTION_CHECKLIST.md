@@ -54,3 +54,4 @@ Migration application, RLS verification and identity-map population scripts requ
 
 - [ ] Comment thread ancestry: local display filter hides private/deleted ancestors and descendants, orphans, ambiguous IDs and cycles (synthetic tests only). Server/database authorization, account-scoped storage, post-deletion behavior and recovery remain unverified; no records deleted.
 - [ ] API client `refreshAuthOn401` is currently unused, but its retry accounting and account-switch behavior are unsafe; do not enable for writes without identity binding, idempotency and regression tests.
+- [ ] API retry containment locally verified with mocked fetch: 401 refresh option ignored; non-GET/HEAD never automatically replayed even if retry count/idempotency header supplied. Lost-response outcomes, account-switch/in-flight cancellation, other retry loops, real server receipts and cross-device idempotency remain unverified. Old clients are not protected.

@@ -19,18 +19,14 @@ export class ApiError extends Error {
 export interface RequestOptions extends Omit<RequestInit, "signal"> {
   /** Per-request timeout in milliseconds. */
   timeoutMs?: number;
-  /** Number of retries on network/5xx errors. Defaults to 0 (no retry). */
+  /** Number of retries on network/5xx errors for GET/HEAD only. Defaults to 0. Writes are never retried automatically. */
   retries?: number;
   /** AbortSignal from the caller. */
   signal?: AbortSignal;
   /** JSON body — serialized automatically. */
   json?: unknown;
-  /**
-   * On a 401, force-refresh the Firebase ID token once and retry. This is
-   * what keeps long-lived sessions alive: an expired token used to fail the
-   * write permanently (the user saw "could not save" and the queued offline
-   * action was retried with the SAME dead token forever).
-   */
+  /** Reserved for compatibility; currently ignored. Refresh/replay requires
+   * trusted account binding and operation-specific server guarantees. */
   refreshAuthOn401?: boolean;
   /** Coalesce concurrent identical GETs into one network request. */
   dedupe?: boolean;
@@ -120,13 +116,16 @@ function createClient(): ApiClient {
       json,
       headers,
       body,
-      refreshAuthOn401 = false,
+      refreshAuthOn401: _refreshAuthOn401,
       dedupe = false,
       ...init
     } = options;
 
     const url = buildUrl(path);
     const method = (init.method || "GET").toUpperCase();
+    // A timeout, network error or 5xx can occur after a write committed. An
+    // arbitrary idempotency header is not proof of server-side deduplication.
+    const safeRetries = method === "GET" || method === "HEAD" ? retries : 0;
     const dedupeKey = `${method} ${url}`;
 
     // Requests with explicit headers may represent different users or content
@@ -164,7 +163,7 @@ function createClient(): ApiClient {
     let lastError: unknown;
 
     try {
-      for (let attempt = 0; attempt <= retries; attempt++) {
+      for (let attempt = 0; attempt <= safeRetries; attempt++) {
         try {
           response = await fetch(url, {
             ...init,
@@ -179,26 +178,7 @@ function createClient(): ApiClient {
             return (await parseResponseBody(response)) as T;
           }
 
-          // EXPIRED TOKEN RECOVERY: refresh the Firebase ID token once and
-          // retry immediately. Without this, a session that outlived its
-          // 1-hour token failed every write with 401 until a page reload.
-          if (response.status === 401 && refreshAuthOn401 && !finalHeaders.has("x-token-refreshed")) {
-            try {
-              const { auth } = await import("./firebase-auth");
-              const user = auth.currentUser;
-              const fresh = user ? await user.getIdToken(true) : null;
-              if (fresh) {
-                finalHeaders.set("Authorization", `Bearer ${fresh}`);
-                finalHeaders.set("x-token-refreshed", "1");
-                continue; // same attempt, one extra round trip
-              }
-            } catch {
-              // Refresh failed (offline / revoked) — fall through to the
-              // normal error path so callers can queue for later.
-            }
-          }
-
-          if (!shouldRetry(response, attempt, retries, !isOffline())) {
+          if (!shouldRetry(response, attempt, safeRetries, !isOffline())) {
             const parsed = await parseResponseBody(response);
             const message =
               (parsed as { error?: string } | null)?.error ||
@@ -218,7 +198,7 @@ function createClient(): ApiClient {
             throw new ApiError("Request timed out or was aborted", 0);
           }
           if (error instanceof ApiError) throw error;
-          if (!shouldRetry(null, attempt, retries, !isOffline())) throw error;
+          if (!shouldRetry(null, attempt, safeRetries, !isOffline())) throw error;
           await delay(computeBackoffMs(attempt));
         }
       }
