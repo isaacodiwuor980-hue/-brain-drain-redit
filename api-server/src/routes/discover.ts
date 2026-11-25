@@ -1,4 +1,4 @@
-import { Router, type IRouter } from "express";
+import { Router, type IRouter, type RequestHandler } from "express";
 import { supabase, SupabaseError } from "../lib/supabase";
 import { requireAuth } from "../middleware/auth";
 import { logger } from "../lib/logger";
@@ -123,7 +123,15 @@ router.get("/discover/follower-count", requireAuth, async (req, res) => {
 /**
  * POST /api/discover/follow — follow a user. Body: { userId }
  */
-router.post("/discover/follow", requireAuth, async (req, res) => {
+// Mounted route is fail-closed until follow identity and database permissions
+// are verified end-to-end. Direct DB/privileged and old clients are unaffected.
+router.post("/discover/follow", requireAuth, (_req, res) => {
+  res.setHeader("Cache-Control", "no-store");
+  res.status(503).json({ error: "Follow service unavailable" });
+});
+
+/** Historical implementation retained for audit; never mount as a route. */
+export const legacyFollowHandlerForAudit: RequestHandler = async (req, res) => {
   const auth = req.auth;
   if (!auth) {
     res.status(401).json({ error: "Authentication required" });
@@ -169,7 +177,7 @@ router.post("/discover/follow", requireAuth, async (req, res) => {
     logger.warn({}, "Follow user failed");
     res.status(502).json({ error: "Could not follow user" });
   }
-});
+};
 
 /**
  * GET /api/discover/search-users?q=... — Phase 4 (Username Search).
