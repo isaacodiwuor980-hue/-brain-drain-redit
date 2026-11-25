@@ -1536,6 +1536,10 @@ export function PostCreator({
             )}
           </div>
 
+          <p className="px-4 pb-2 text-xs text-muted-foreground" role="status">
+            Image and note publishing is paused. Drafts with images or notes are kept on this device for review, not uploaded to cloud storage.
+          </p>
+
           {/* Hidden File Input — single shared picker for all post types.
               The previous second <input> with capture="environment" was dead
               code (no caller ever invoked its ref) and just added a second

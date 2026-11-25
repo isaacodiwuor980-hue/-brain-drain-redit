@@ -203,6 +203,14 @@ export function useSocial(mode: "foryou" | "following" = "foryou", topicId: stri
         toast({ title: "Post not published", description: "This item remains on this device and needs review.", variant: "destructive" });
         return;
       }
+      // Media has no verified upload pipeline. Notes are not represented by
+      // the mounted create API; never silently drop their attachments. Keep
+      // the complete local draft and hold it for review instead of sending.
+      if ((post.mediaUrls?.length ?? 0) > 0 || post.postType === "note" || (post.noteAttachments?.length ?? 0) > 0) {
+        holdPostForReview(session.uid);
+        toast({ title: "Post not published", description: "Image and note publishing is paused. This draft remains on this device and needs review.", variant: "destructive" });
+        return;
+      }
       // Offline posts are drafts for explicit review, not automatic sends.
       // Recheck navigator before sending too, since connectivity can change
       // while token acquisition is pending.

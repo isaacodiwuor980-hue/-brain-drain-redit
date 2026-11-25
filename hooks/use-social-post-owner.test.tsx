@@ -80,6 +80,23 @@ describe("post sending on account change",()=>{
     await act(async()=>{await expect(api.addPost(post)).rejects.toThrow("quota");});
     expect(m.create).not.toHaveBeenCalled();expect(m.queue).not.toHaveBeenCalled();
   });
+  it("preserves an image post for review without sending unverified media",async()=>{
+    m.session.mockResolvedValue({uid:"a",token:"token-a"});
+    const withImage={...post,mediaUrls:["data:image/png;base64,c3ludGhldGlj"]};
+    await act(async()=>{await api.addPost(withImage);});
+    expect(m.putStrict).toHaveBeenCalledWith("posts",withImage);
+    expect(m.create).not.toHaveBeenCalled();
+    expect(m.queue).toHaveBeenCalledWith("create_post",{postId:"p"},"a");
+    expect(m.toast).toHaveBeenCalledWith(expect.objectContaining({title:"Post not published"}));
+  });
+  it("does not silently omit unsupported note attachments",async()=>{
+    m.session.mockResolvedValue({uid:"a",token:"token-a"});
+    const note={...post,postType:"note" as const,noteAttachments:[{type:"text" as const,data:"synthetic"}]};
+    await act(async()=>{await api.addPost(note);});
+    expect(m.putStrict).toHaveBeenCalledWith("posts",note);
+    expect(m.create).not.toHaveBeenCalled();
+    expect(m.queue).toHaveBeenCalledWith("create_post",{postId:"p"},"a");
+  });
   it("sends only when both checks match the post owner",async()=>{
     m.session.mockResolvedValue({uid:"a",token:"token-a"});
     await act(async()=>{await api.addPost(post);});
