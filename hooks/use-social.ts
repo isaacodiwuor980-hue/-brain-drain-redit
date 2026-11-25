@@ -123,7 +123,7 @@ export function useSocial(mode: "foryou" | "following" = "foryou", topicId: stri
       // apiEnabled: empty base URL means SAME-ORIGIN (production serves /api
       // from this host) — see lib/env.ts. Local-only builds set VITE_LOCAL_ONLY=1.
       if (!env.apiEnabled) {
-        return { posts: hideUnverifiedCachedBrainLinks(cached), hasMore: false };
+        return { posts: hideCachedVoteDetailsV1(hideUnverifiedCachedBrainLinks(cached)), hasMore: false };
       }
 
       // Reset failure flag at the start of each attempt.
@@ -164,9 +164,9 @@ export function useSocial(mode: "foryou" | "following" = "foryou", topicId: stri
           // cache is the For-You universe (cold-start seeds, demo posts and
           // everything ever cached); merging it here would show content from
           // people the user does not follow.
-          return { posts: response.posts, hasMore: response.hasMore };
+          return { posts: hideCachedVoteDetailsV1(response.posts), hasMore: response.hasMore };
         }
-        return { posts: mergeCloudWithLocal(response.posts, cached), hasMore: response.hasMore };
+        return { posts: hideCachedVoteDetailsV1(mergeCloudWithLocal(response.posts, cached)), hasMore: response.hasMore };
       } catch (error) {
         // On network error, fall back to the local cache rather than failing.
         // BUT: surface the failure to the UI so the user can distinguish a
@@ -179,7 +179,7 @@ export function useSocial(mode: "foryou" | "following" = "foryou", topicId: stri
         // B3: Following failures (including the signed-out empty page) stay
         // empty — never fall back to the For-You universe under this tab.
         if (mode === "following") return { posts: [], hasMore: false };
-        return { posts: hideUnverifiedCachedBrainLinks(cached), hasMore: false };
+        return { posts: hideCachedVoteDetailsV1(hideUnverifiedCachedBrainLinks(cached)), hasMore: false };
       }
     },
     // B4: cursor = next offset while the server says there is more.
@@ -233,7 +233,7 @@ export function useSocial(mode: "foryou" | "following" = "foryou", topicId: stri
           ...old,
           pages: old.pages.map((page, index) =>
             index === 0
-              ? { ...page, posts: [post, ...page.posts.filter((p) => p.id !== post.id)] }
+              ? { ...page, posts: [hideCachedVoteDetailsV1([post])[0], ...page.posts.filter((p) => p.id !== post.id)] }
               : page,
           ),
         };
