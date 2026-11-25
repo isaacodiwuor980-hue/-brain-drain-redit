@@ -100,7 +100,7 @@ export function CommentThread({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const [isConfidentialReply, setIsConfidentialReply] = useState(false);
-  const [sortMode, setSortMode] = useState<SortMode>("gravity");
+  const [sortMode, setSortMode] = useState<SortMode>("newest");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState("");
   const { toast } = useToast();
@@ -135,7 +135,10 @@ export function CommentThread({
   // buildCommentTree order (pinned-first, newest).
   const sortedRoots = useMemo(() => {
     const sorted = [...tree];
-    if (sortMode === "gravity") {
+    if (!votesEnabled && sortMode !== "qa") {
+      // Avoid inferring cached vote totals through rank while voting is paused.
+      sorted.sort((a, b) => b.createdAt - a.createdAt);
+    } else if (sortMode === "gravity") {
       sorted.sort((a, b) => computeCommentRank(b) - computeCommentRank(a));
     } else if (sortMode === "newest") {
       sorted.sort((a, b) => b.createdAt - a.createdAt);
@@ -165,7 +168,7 @@ export function CommentThread({
       sorted.sort((a, b) => b.children.length - a.children.length);
     }
     return sorted;
-  }, [tree, sortMode]);
+  }, [tree, sortMode, votesEnabled]);
 
   // Fossilized comments (rendered at the crown as a Consensus Summary Block).
   const fossilized = visibleComments.filter((c) => c.isFossilized);
@@ -512,10 +515,10 @@ export function CommentThread({
           <div className="inline-flex items-center gap-1 text-[12px] text-muted-foreground">
             <ArrowDownUp className="w-3.5 h-3.5" />
             <span className="font-medium">Sort:</span>
-            <button type="button" onClick={() => setSortMode("gravity")} className={`px-2 py-0.5 rounded-full font-semibold transition-colors ${sortMode === "gravity" ? "bg-foreground/10 text-foreground" : "hover:bg-muted/50 hover:text-foreground"}`}>Gravity</button>
+            <button type="button" disabled={!votesEnabled} title={!votesEnabled ? "Vote-based sorting temporarily unavailable" : undefined} onClick={() => setSortMode("gravity")} className={`px-2 py-0.5 rounded-full font-semibold transition-colors ${sortMode === "gravity" ? "bg-foreground/10 text-foreground" : "hover:bg-muted/50 hover:text-foreground"}`}>Gravity</button>
             <button type="button" onClick={() => setSortMode("newest")} className={`px-2 py-0.5 rounded-full font-semibold transition-colors ${sortMode === "newest" ? "bg-foreground/10 text-foreground" : "hover:bg-muted/50 hover:text-foreground"}`}>Newest</button>
-            <button type="button" onClick={() => setSortMode("top")} className={`px-2 py-0.5 rounded-full font-semibold transition-colors ${sortMode === "top" ? "bg-foreground/10 text-foreground" : "hover:bg-muted/50 hover:text-foreground"}`}>Top</button>
-            <button type="button" onClick={() => setSortMode("controversial")} className={`px-2 py-0.5 rounded-full font-semibold transition-colors ${sortMode === "controversial" ? "bg-foreground/10 text-foreground" : "hover:bg-muted/50 hover:text-foreground"}`}>Controversial</button>
+            <button type="button" disabled={!votesEnabled} title={!votesEnabled ? "Vote-based sorting temporarily unavailable" : undefined} onClick={() => setSortMode("top")} className={`px-2 py-0.5 rounded-full font-semibold transition-colors ${sortMode === "top" ? "bg-foreground/10 text-foreground" : "hover:bg-muted/50 hover:text-foreground"}`}>Top</button>
+            <button type="button" disabled={!votesEnabled} title={!votesEnabled ? "Vote-based sorting temporarily unavailable" : undefined} onClick={() => setSortMode("controversial")} className={`px-2 py-0.5 rounded-full font-semibold transition-colors ${sortMode === "controversial" ? "bg-foreground/10 text-foreground" : "hover:bg-muted/50 hover:text-foreground"}`}>Controversial</button>
             <button type="button" onClick={() => setSortMode("qa")} className={`px-2 py-0.5 rounded-full font-semibold transition-colors ${sortMode === "qa" ? "bg-foreground/10 text-foreground" : "hover:bg-muted/50 hover:text-foreground"}`}>Q&A</button>
           </div>
         </div>

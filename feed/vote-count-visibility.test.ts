@@ -11,5 +11,10 @@ describe("feed vote control markup", () => {
     expect(source).not.toContain("{(node.upvotes ?? 0) - (node.downvotes ?? 0)}");
     expect(source).not.toContain("{node.houseVotes}");
     expect(source).not.toContain("{node.mouthVotes}");
+    expect(source).toContain('useState<SortMode>("newest")');
+    expect(source).toContain('if (!votesEnabled && sortMode !== "qa")');
+    for (const mode of ["gravity", "top", "controversial"]) {
+      expect(source).toContain(`disabled={!votesEnabled} title={!votesEnabled ? "Vote-based sorting temporarily unavailable" : undefined} onClick={() => setSortMode("${mode}")}`);
+    }
   });
 });

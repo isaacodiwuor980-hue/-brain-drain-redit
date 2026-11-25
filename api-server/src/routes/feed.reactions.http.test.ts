@@ -30,17 +30,26 @@ async function get(path: string, user?: string) {
   return { res, body: await res.json() };
 }
 describe("feed personalization with mocked database", () => {
-  it("returns all of the viewer's reaction types on cold and shared cached responses, without exposing other users", async () => {
+  it("never reads or returns vote data on cold and shared cached responses", async () => {
     db.get.mockResolvedValueOnce([post]).mockResolvedValueOnce(reactions);
     const alice = await get("/api/feed?topic=test-multiple-reactions", "alice");
     expect(alice.res.headers.get("x-feed-cache")).toBe("MISS");
-    expect(alice.body.posts[0].userReactions).toEqual({ repost: ["alice"], upvote: ["alice"] });
+    expect(alice.body.posts[0].userReactions).toBeUndefined();
+    expect(db.get).toHaveBeenCalledWith("reactions", expect.objectContaining({select: "target_id,reaction_type", filters: expect.objectContaining({reaction_type: "eq.repost"})}));
+    // Even an upstream fixture ignoring the filter must not put voter IDs in
+    // the shared cache (post author identity is intentionally separate).
+    const cache = (router as unknown as {__feedCache: Map<string, unknown>}).__feedCache;
+    const entry = cache.get("foryou:test-multiple-reactions:20:0");
+    expect(JSON.stringify(entry)).not.toContain("alice");
+    expect(JSON.stringify(entry)).not.toContain("bob");
+    expect(JSON.stringify(entry)).not.toContain("upvote");
+    expect(JSON.stringify(entry)).not.toContain("downvote");
     expect(alice.body.posts[0].reactions).toEqual({ repost: 1 });
     expect(alice.body.posts[0].reactions).not.toHaveProperty("upvote");
     expect(alice.body.posts[0].reactions).not.toHaveProperty("downvote");
     const bob = await get("/api/feed?topic=test-multiple-reactions", "bob");
     expect(bob.res.headers.get("x-feed-cache")).toBe("HIT");
-    expect(bob.body.posts[0].userReactions).toEqual({ downvote: ["bob"] });
+    expect(bob.body.posts[0].userReactions).toBeUndefined();
     expect(JSON.stringify(bob.body)).not.toContain("alice");
     const guest = await get("/api/feed?topic=test-multiple-reactions");
     expect(guest.body.posts[0].userReactions).toBeUndefined();
@@ -53,7 +62,7 @@ describe("feed personalization with mocked database", () => {
     const second = await get("/api/feed?mode=following&topic=test-following", "bob");
     expect(first.res.headers.get("x-feed-cache")).toBe("MISS");
     expect(second.res.headers.get("x-feed-cache")).toBe("MISS");
-    expect(second.body.posts[0].userReactions).toEqual({ downvote: ["bob"] });
+    expect(second.body.posts[0].userReactions).toBeUndefined();
     expect(db.get.mock.calls.filter(call => call[0] === "posts")).toHaveLength(2);
   });
   it("returns a controlled error when the following lookup fails", async () => {

@@ -93,12 +93,12 @@ export function PostCard({
   const { addPost } = useSocial();
   const { communities } = useCommunities();
   const { addConversation, addMessage } = useMessages();
-  const isUpvoted = Boolean(
+  const isUpvoted = votesEnabled && Boolean(
     post.userReactions?.upvote?.includes(currentUserId) ||
     post.userReactions?.like?.includes(currentUserId) ||
     post.userReactions?.love?.includes(currentUserId),
   );
-  const isDownvoted = post.userReactions?.downvote?.includes(currentUserId) || false;
+  const isDownvoted = votesEnabled && (post.userReactions?.downvote?.includes(currentUserId) || false);
 
   const isBookmarked = profile?.bookmarkedPostIds?.includes(post.id) || false;
 

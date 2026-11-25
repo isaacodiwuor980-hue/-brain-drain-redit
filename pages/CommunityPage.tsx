@@ -41,50 +41,8 @@ function useCheckins() {
     }
   });
 
-  const { mutateAsync: updateCheckin } = useMutation({
-    mutationFn: async (checkin: CircleCheckIn) => {
-      await idb.put("checkins", checkin);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["checkins"] });
-    }
-  });
-
-  return { checkins, addCheckin, updateCheckin };
+  return { checkins, addCheckin };
 }
-
-/**
- * Quora-style toggle vote for circle check-ins — replaces the old
- * always-increment buttons (every tap was +1, up/down stacked, no
- * un-vote). Mirrors togglePostReaction semantics: mutual exclusion,
- * click the active vote again to remove it. My-state lives on the
- * record (myUpvote/myDownvote) since this build is local-first.
- */
-function toggleCheckinVote(c: CircleCheckIn, direction: "up" | "down"): CircleCheckIn {
-  const up = c.myUpvote ?? false;
-  const down = c.myDownvote ?? false;
-  const upvotes = c.upvotes ?? 0;
-  const downvotes = c.downvotes ?? 0;
-  if (direction === "up") {
-    if (up) return { ...c, upvotes: Math.max(0, upvotes - 1), myUpvote: false };
-    return {
-      ...c,
-      upvotes: upvotes + 1,
-      myUpvote: true,
-      downvotes: down ? Math.max(0, downvotes - 1) : downvotes,
-      myDownvote: false,
-    };
-  }
-  if (down) return { ...c, downvotes: Math.max(0, downvotes - 1), myDownvote: false };
-  return {
-    ...c,
-    downvotes: downvotes + 1,
-    myDownvote: true,
-    upvotes: up ? Math.max(0, upvotes - 1) : upvotes,
-    myUpvote: false,
-  };
-}
-
 
 /**
  * B/C/D: Membership-state-aware button.
@@ -203,7 +161,7 @@ function MembershipButton({
 
 export function CommunityPage() {
   const { communities, joinCommunity, leaveCommunity, cancelJoinRequest, isJoining, isLeaving, isCancelling } = useCommunities();
-  const { checkins, addCheckin, updateCheckin } = useCheckins();
+  const { checkins, addCheckin } = useCheckins();
   const { addXPEvent } = useReputation();
   const { addConversation, addMessage } = useMessages();
   const { toast } = useToast();
@@ -395,12 +353,7 @@ export function CommunityPage() {
   const activeComm = communities.find(c => c.id === selectedCommunity);
   const commCheckins = checkins
     .filter(c => c.circleId === selectedCommunity)
-    .sort((a, b) => {
-      const scoreA = (a.upvotes || 0) - (a.downvotes || 0);
-      const scoreB = (b.upvotes || 0) - (b.downvotes || 0);
-      if (scoreA !== scoreB) return scoreB - scoreA;
-      return b.createdAt - a.createdAt;
-    })
+    .sort((a, b) => b.createdAt - a.createdAt)
     .slice(0, 5);
 
   const moodEmojis = [
@@ -1019,16 +972,7 @@ export function CommunityPage() {
                           topicId: c.circleId || "community",
                           content: `${moodEmoji} ${c.message || "Checked in"}`,
                           postType: "post",
-                          reactions: {
-                            upvote: c.upvotes || 0,
-                            downvote: c.downvotes || 0,
-                            repost: 0,
-                          },
-                          userReactions: c.myUpvote
-                            ? { upvote: [currentUserId] }
-                            : c.myDownvote
-                              ? { downvote: [currentUserId] }
-                              : {},
+                          reactions: { repost: 0 },
                           commentCount: c.replies?.length || 0,
                           repostCount: 0,
                           createdAt: c.createdAt,
@@ -1040,17 +984,7 @@ export function CommunityPage() {
                           <PostCard
                             key={c.id}
                             post={post}
-                            onReact={(_postId: string, type: string) => {
-                              // Check-in votes must update the CHECKIN record —
-                              // reactToPost would idb.get("posts", …) and throw
-                              // POST_NOT_FOUND for every check-in card.
-                              if (type !== "upvote" && type !== "downvote") return;
-                              void Promise.resolve(
-                                updateCheckin(toggleCheckinVote(c, type === "upvote" ? "up" : "down")),
-                              ).catch((error: unknown) =>
-                                toast({ title: "Couldn't update check-in", description: error instanceof Error ? error.message : "Please try again.", variant: "destructive" })
-                              );
-                            }}
+                            onReact={() => { /* Voting is unavailable for check-ins too. */ }}
                             authorName={post.authorName}
                           />
                         );

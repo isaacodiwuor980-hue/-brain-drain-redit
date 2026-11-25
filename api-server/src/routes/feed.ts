@@ -39,22 +39,11 @@ interface PostRow {
   author: { display_name: string; avatar_url: string | null } | null;
 }
 
-interface ReactionRow {
-  target_id: string;
-  reaction_type: string;
-  user_id: string;
-}
-
-/**
- * Cache entry for one feed page: base posts WITHOUT per-user reactions
- * (myReaction is computed per-request on top), the reactions index, and
- * freshness metadata. Module-level so both the request handler and the
- * SWR background refresher share the shape.
- */
+/** Shared cache stores aggregate repost counts only, never voter identities. */
 interface CachedFeed {
   posts: Array<Record<string, unknown>>;
   hasMore: boolean;
-  reactionsByPost: Record<string, Array<{ target_id: string; reaction_type: string; user_id: string }>>;
+  repostsByPost: Record<string, number>;
   cachedAt: number;
 }
 
@@ -73,12 +62,12 @@ function normalizePostType(raw: string | null | undefined): "post" | "question" 
   return "post";
 }
 
-/** Attach repost totals and only the requesting user's reaction types.
+/** Attach repost totals without returning individual reactions.
  * Vote totals are deliberately not exposed; this does not restrict direct DB
  * access or other routes. The cache is shared; verify linked brains per response.
  * Until ownership mapping is proven, even an author's private brain is omitted.
  */
-async function renderFeedPosts(entry: CachedFeed, currentUserId: string | undefined) {
+async function renderFeedPosts(entry: CachedFeed) {
   const ids = [...new Set(entry.posts.map(row => row.brainId).filter((id): id is string =>
     typeof id === "string" && /^[A-Za-z0-9_-]{1,120}$/.test(id)))];
   const publicIds = new Set<string>();
@@ -93,22 +82,12 @@ async function renderFeedPosts(entry: CachedFeed, currentUserId: string | undefi
     }
   }
   return entry.posts.map((row) => {
-    const reactions = entry.reactionsByPost[(row as { id: string }).id] || [];
-    const own: Record<string, string[]> = {};
-    if (currentUserId) {
-      for (const reaction of reactions) {
-        if (reaction.user_id === currentUserId && ["upvote", "downvote", "repost"].includes(reaction.reaction_type)) {
-          own[reaction.reaction_type] = [currentUserId];
-        }
-      }
-    }
     return {
       ...row,
       brainId: typeof row.brainId === "string" && publicIds.has(row.brainId) ? row.brainId : null,
       reactions: {
-        repost: ((row as { repostCount?: number }).repostCount ?? 0) + reactions.filter((r) => r.reaction_type === "repost").length,
+        repost: ((row as { repostCount?: number }).repostCount ?? 0) + (entry.repostsByPost[(row as { id: string }).id] ?? 0),
       },
-      userReactions: Object.keys(own).length ? own : undefined,
     };
   });
 }
@@ -135,7 +114,7 @@ router.get("/feed/following-v2", (_req, res, next) => { res.setHeader("Cache-Con
       if (ids.length === 0) { res.json({ posts: [], hasMore: false, source: "following" }); return; }
       const { topic, limit, offset } = parsed.data;
       const page = await fetchFeedPage("following", topic, limit, offset, ids, false);
-      res.json({ posts: await renderFeedPosts(page, req.mappedUserId), hasMore: page.hasMore, source: "following" });
+      res.json({ posts: await renderFeedPosts(page), hasMore: page.hasMore, source: "following" });
     } catch {
       // Do not return or log upstream payloads which may contain user data.
       res.status(502).json({ error: "Feed data source unavailable" });
@@ -199,8 +178,7 @@ router.get("/feed", optionalAuth, async (req, res) => {
   // Posts don't change frequently, so a 30-second TTL gives a good balance
   // between freshness and Supabase round-trip cost (each uncached call is
   // ~500-1000ms due to two REST queries; cached calls are <5ms).
-  // The cache stores the base rows + reactions; per-user myReaction is
-  // computed on top of the cached data, so it stays personalized.
+  // The shared cache stores no individual reaction identities.
   //
   // B-11 fix: the map is bounded with a simple LRU-eviction policy
   // (oldest entry dropped when capacity exceeded). Without this, an attacker
@@ -260,9 +238,9 @@ router.get("/feed", optionalAuth, async (req, res) => {
       });
   }
 
-  /** Render a per-user response from a cached feed entry (HIT + STALE paths). */
+  /** Render a response from a cached feed entry (HIT + STALE paths). */
   async function renderFromCache(entry: CachedFeed, header: "HIT" | "STALE") {
-    const posts = await renderFeedPosts(entry, currentUserId);
+    const posts = await renderFeedPosts(entry);
     // res.header (not res.set) so the value does not get appended to Vary,
     // which caused cache fragmentation for compressed responses.
     res.header("X-Feed-Cache", header);
@@ -297,9 +275,8 @@ router.get("/feed", optionalAuth, async (req, res) => {
     const fresh = await fetchFeedPage(mode, topic, limit, offset, followeeIds);
     if (mode !== "following") feedCacheTouch(feedCache, cacheKey, fresh);
 
-    // Per-user rendering identical to renderFromCache, but here we have the
-    // live rows (with currentUserId reactions applied the same way).
-    const posts = await renderFeedPosts(fresh, currentUserId);
+    // Render live rows with the same redactions as cached responses.
+    const posts = await renderFeedPosts(fresh);
 
     res.header("X-Feed-Cache", "MISS");
     res.json({
@@ -319,9 +296,8 @@ router.get("/feed", optionalAuth, async (req, res) => {
 
 /**
  * Fetch one page of the feed from Supabase: posts (with topic + author
- * embedded), then reactions for those posts. Returns the cache-shaped
- * entry (base posts WITHOUT per-user reactions + reactionsByPost index +
- * hasMore + cachedAt). Used by both the live request path and the
+ * embedded), then repost-only counts for those posts. Returns a cache-shaped
+ * entry with no voter identities. Used by both the live request path and the
  * stale-while-revalidate background refresher.
  */
 async function fetchFeedPage(
@@ -363,21 +339,22 @@ async function fetchFeedPage(
     throw new SupabaseError("Invalid feed data", 502);
   }
 
-  let reactionsByPost: Record<string, ReactionRow[]> = {};
+  const repostsByPost: Record<string, number> = {};
   if (postIds.length > 0) {
-    const allReactions = await supabase.get<ReactionRow>("reactions", {
+    const reposts = await supabase.get<{target_id: string; reaction_type: string}>("reactions", {
+      select: "target_id,reaction_type",
       filters: {
         target_type: "eq.post",
         target_id: `in.(${postIds.map((id) => `"${id}"`).join(",")})`,
+        reaction_type: "eq.repost",
       },
     });
-    reactionsByPost = allReactions.reduce(
-      (acc, r) => {
-        (acc[r.target_id] ||= []).push(r);
-        return acc;
-      },
-      {} as Record<string, ReactionRow[]>,
-    );
+    // Validate again even if a mock or upstream violates the requested filter.
+    for (const row of reposts) {
+      if (row.reaction_type === "repost" && postIds.includes(row.target_id)) {
+        repostsByPost[row.target_id] = (repostsByPost[row.target_id] ?? 0) + 1;
+      }
+    }
   }
 
   return {
@@ -399,9 +376,7 @@ async function fetchFeedPage(
       topicName: row.topic?.name,
     })),
     hasMore: rows.length > limit,
-    reactionsByPost: Object.fromEntries(
-      Object.entries(reactionsByPost).map(([k, v]) => [k, v.map((r) => ({ target_id: r.target_id, reaction_type: r.reaction_type, user_id: r.user_id }))])
-    ),
+    repostsByPost,
     cachedAt: Date.now(),
   };
 }

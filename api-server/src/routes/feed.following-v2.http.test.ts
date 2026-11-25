@@ -34,7 +34,7 @@ describe("following v2 (mocked auth and database; default off)", () => {
     expect(db.get).toHaveBeenCalledWith("follows", expect.objectContaining({ filters: { follower_id: `eq.${alice}` } }));
     expect(db.get).toHaveBeenCalledWith("posts", expect.objectContaining({ filters: { user_id: `in.("${author}")` }, limit: 2, offset: 2 }));
     const postQuery = db.get.mock.calls.find(call => call[0] === "posts")?.[1]; expect(postQuery.select).not.toMatch(/\btags\b/);
-    expect(first.body.posts[0].tags).toEqual([]); expect(first.body.posts[0].userReactions).toEqual({ upvote: [alice] });
+    expect(first.body.posts[0].tags).toEqual([]); expect(first.body.posts[0].userReactions).toBeUndefined();
     const second = await get("bob"); expect(second.body.posts).toEqual([]); expect(db.get.mock.calls.filter(call => call[0] === "posts")).toHaveLength(1);
   });
   it("rejects malformed follows and fails closed on lookup or mapping failures", async () => {
