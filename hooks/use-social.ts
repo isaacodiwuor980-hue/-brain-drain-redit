@@ -257,6 +257,12 @@ export function useSocial(mode: "foryou" | "following" = "foryou", topicId: stri
       // Same-origin API when VITE_API_BASE_URL is empty — see lib/env.ts.
       if (!env.apiEnabled) return;
 
+      const holdPostForReview = (ownerId: string) => {
+        const queued = queueOfflineAction("create_post", { postId: post.id }, ownerId);
+        if (!queued) {
+          toast({ title: "Review storage unavailable", description: "The post remains on this device, but its review entry could not be saved. Do not clear browser data.", variant: "destructive" });
+        }
+      };
       const session = await getAuthSession();
       // Do not attribute a saved local draft to whichever account happens to
       // be active after the preceding asynchronous storage/analytics work.
@@ -268,7 +274,7 @@ export function useSocial(mode: "foryou" | "following" = "foryou", topicId: stri
       // Recheck navigator before sending too, since connectivity can change
       // while token acquisition is pending.
       if (!session.token || onlineStatus === "offline" || (typeof navigator !== "undefined" && navigator.onLine === false)) {
-        queueOfflineAction("create_post", { postId: post.id }, session.uid);
+        holdPostForReview(session.uid);
         toast({ title: "Post not published", description: "This item remains on this device and needs review.", variant: "destructive" });
         return;
       }
@@ -278,7 +284,7 @@ export function useSocial(mode: "foryou" | "following" = "foryou", topicId: stri
         return;
       }
       if (typeof navigator !== "undefined" && navigator.onLine === false) {
-        queueOfflineAction("create_post", { postId: post.id }, session.uid);
+        holdPostForReview(session.uid);
         toast({ title: "Post not published", description: "This item remains on this device and needs review.", variant: "destructive" });
         return;
       }
@@ -289,7 +295,7 @@ export function useSocial(mode: "foryou" | "following" = "foryou", topicId: stri
         );
       } catch {
         // Keep the local copy for review; save status may be unknown.
-        queueOfflineAction("create_post", { postId: post.id }, session.uid);
+        holdPostForReview(session.uid);
         console.warn("Post cloud status needs review.");
       }
     },

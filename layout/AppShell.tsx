@@ -55,7 +55,7 @@ export function AppShell({ children }: AppShellProps) {
   const closeMobileDrawer = useCallback(() => setIsMobileDrawerOpen(false), []);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const isOffline = useOnlineStatus() === "offline";
-  const { pendingCount, deadLetterCount, isSyncing } = useOfflineSync();
+  const { pendingCount, deadLetterCount, isSyncing, storageUnavailable } = useOfflineSync();
 
   // SAFETY NET: clear __isAppDirty on every route change. The dirty flag
   // is set by WizardModal/SettingsPage when the user has unsaved changes.
@@ -380,7 +380,7 @@ export function AppShell({ children }: AppShellProps) {
 
       {/* Main Content */}
       <main id="main-content" tabIndex={-1} className="flex-1 flex flex-col min-w-0 bg-background overflow-x-hidden outline-none pt-[env(safe-area-inset-top)] pb-[calc(5rem+env(safe-area-inset-bottom))] md:pt-0 md:pb-0">
-        <SyncAttentionNotice count={deadLetterCount} />
+        <SyncAttentionNotice count={deadLetterCount} storageUnavailable={storageUnavailable} />
         {/* Mobile Top Bar — phone-only header with logo + create button.
             Desktop has its own sidebar; this gives phone users a recognizable
             top bar and pushes content below the iOS notch / Dynamic Island

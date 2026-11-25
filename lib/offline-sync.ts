@@ -16,8 +16,7 @@
  *  - A poison action can no longer block the queue forever: after
  *    MAX_RETRIES it is quarantined (kept in `deadLetter` for inspection)
  *    rather than silently dropped.
- *  - Corrupt queue JSON is discarded rather than throwing on every read
- *    (a single bad localStorage value used to break every sync attempt).
+ *  - Unreadable queue data is preserved; writes fail closed for recovery.
  */
 
 export interface QueuedAction {
@@ -37,53 +36,53 @@ const DEAD_LETTER_KEY = "brainbuilder_offline_queue_dead";
 /** Retries before an action is quarantined instead of retried forever. */
 export const MAX_RETRIES = 5;
 
-function readQueue(key: string): QueuedAction[] {
+/** Null means unreadable or malformed, never an empty confirmed queue. */
+function readQueueStrict(key: string): QueuedAction[] | null {
   try {
     const raw = localStorage.getItem(key);
-    if (!raw) return [];
+    if (raw === null) return [];
     const parsed: unknown = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
-    // Validate the shape — a single corrupt entry must not poison the queue.
-    return parsed.filter((item): item is QueuedAction => {
-      if (!item || typeof item !== "object") return false;
+    if (!Array.isArray(parsed)) return null;
+    const ids = new Set<string>();
+    for (const item of parsed) {
+      if (!item || typeof item !== "object" || Array.isArray(item)) return null;
       const a = item as Partial<QueuedAction>;
-      return (
-        typeof a.id === "string" &&
-        typeof a.type === "string" &&
-        typeof a.createdAt === "number" &&
-        typeof a.retryCount === "number" &&
-        a.payload !== null &&
-        typeof a.payload === "object"
-      );
-    });
-  } catch {
-    // Corrupt JSON / storage blocked → start clean rather than throwing on
-    // every subsequent read (which used to wedge the whole sync loop).
-    return [];
-  }
+      if (typeof a.id !== "string" || !a.id || ids.has(a.id) ||
+          typeof a.type !== "string" || typeof a.createdAt !== "number" ||
+          typeof a.retryCount !== "number" || a.payload === null ||
+          typeof a.payload !== "object" || Array.isArray(a.payload)) return null;
+      ids.add(a.id);
+    }
+    return parsed as QueuedAction[];
+  } catch { return null; }
 }
 
+export function getOfflineQueueStrict(): QueuedAction[] | null {
+  return readQueueStrict(STORAGE_KEY);
+}
+
+/** For display only: a failure is not evidence that storage is empty. */
 export function getOfflineQueue(): QueuedAction[] {
-  return readQueue(STORAGE_KEY);
+  return getOfflineQueueStrict() ?? [];
 }
 
 /** Quarantined actions — kept for diagnostics, never replayed. */
 export function getDeadLetterQueue(): QueuedAction[] {
-  return readQueue(DEAD_LETTER_KEY);
+  return readQueueStrict(DEAD_LETTER_KEY) ?? [];
 }
 
-function writeQueue(key: string, queue: QueuedAction[]): void {
+function writeQueue(key: string, queue: QueuedAction[]): boolean {
   try {
     localStorage.setItem(key, JSON.stringify(queue));
-    window.dispatchEvent(new CustomEvent("brainbuilder_queue_change", { detail: queue.length }));
-  } catch {
-    // Ignore storage quota / private-mode errors. The in-memory queue the
-    // caller holds is still authoritative for THIS session.
-  }
+    try { window.dispatchEvent(new CustomEvent("brainbuilder_queue_change", { detail: queue.length })); } catch { /* persisted already */ }
+    return true;
+  } catch { return false; }
 }
 
-export function saveOfflineQueue(queue: QueuedAction[]): void {
-  writeQueue(STORAGE_KEY, queue);
+export function saveOfflineQueue(queue: QueuedAction[]): boolean {
+  // Do not replace damaged or unreadable storage with a partial/empty view.
+  if (getOfflineQueueStrict() === null) return false;
+  return writeQueue(STORAGE_KEY, queue);
 }
 
 export function clearOfflineQueue(): void {
@@ -151,9 +150,11 @@ export function queueOfflineAction(
   type: QueuedAction["type"],
   payload: Record<string, unknown>,
   ownerId?: string,
-): void {
-  const queue = enqueueAction(getOfflineQueue(), { type, payload, ownerId });
-  saveOfflineQueue(queue);
+): boolean {
+  const current = getOfflineQueueStrict();
+  if (current === null) return false;
+  const queue = enqueueAction(current, { type, payload, ownerId });
+  return saveOfflineQueue(queue);
 }
 
 /** Posts lack a trusted retry permit/review flow, brain edits lack versioned

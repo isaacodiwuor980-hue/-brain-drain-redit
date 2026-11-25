@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import {
   getOfflineQueue,
+  getOfflineQueueStrict,
   actionsForOwner,
   summarizeOwnedQueue,
   getDeadLetterQueue,
@@ -30,6 +31,7 @@ export function useOfflineSync() {
   const status = useOnlineStatus();
   const isOnline = status === "online";
   const [queue, setQueue] = useState<QueuedAction[]>(getOfflineQueue);
+  const [storageUnavailable, setStorageUnavailable] = useState(() => getOfflineQueueStrict() === null);
   const [isSyncing, setIsSyncing] = useState(false);
   const [authRetryAt, setAuthRetryAt] = useState(0);
   const syncingRef = useRef(false);
@@ -41,10 +43,16 @@ export function useOfflineSync() {
   // Listen to queue changes
   useEffect(() => {
     const handleQueueChange = () => {
-      setQueue(getOfflineQueue());
+      const current = getOfflineQueueStrict();
+      setStorageUnavailable(current === null);
+      if (current !== null) setQueue(current);
     };
     window.addEventListener("brainbuilder_queue_change", handleQueueChange);
-    return () => window.removeEventListener("brainbuilder_queue_change", handleQueueChange);
+    window.addEventListener("storage", handleQueueChange);
+    return () => {
+      window.removeEventListener("brainbuilder_queue_change", handleQueueChange);
+      window.removeEventListener("storage", handleQueueChange);
+    };
   }, []);
 
   /**
@@ -61,7 +69,12 @@ export function useOfflineSync() {
    * Queue and quarantine storage are not atomic, and recovery UI is incomplete.
    */
   const syncNow = useCallback(async () => {
-    const currentQueue = getOfflineQueue();
+    const currentQueue = getOfflineQueueStrict();
+    if (currentQueue === null) {
+      setStorageUnavailable(true);
+      toast({ title: "Sync needs attention", description: "Recovery storage cannot be read. Do not clear browser data.", variant: "destructive" });
+      return;
+    }
     if (currentQueue.length === 0 || !isOnline || syncingRef.current) return;
     if (!env.apiEnabled) {
       // A local-only build cannot replay these actions. Preserve them for a
@@ -119,13 +132,22 @@ export function useOfflineSync() {
 
       // An enqueue may have happened during the network requests. Re-read the
       // queue and only update entries that are still present by their unique id.
-      const latest = getOfflineQueue();
+      const latest = getOfflineQueueStrict();
+      if (latest === null) {
+        setStorageUnavailable(true);
+        toast({ title: "Sync needs attention", description: "Recovery storage cannot be read. Do not clear browser data.", variant: "destructive" });
+        return;
+      }
       const latestIds = new Set(latest.map((action) => action.id));
       const stillDead = dead.filter((action) => latestIds.has(action.id));
       const stored = quarantineActions(stillDead);
       const {deadIds, held} = quarantineOutcome(stillDead, stored);
       const nextQueue = reconcileSyncBatch(latest, succeeded, [...retries, ...held], deadIds);
-      saveOfflineQueue(nextQueue);
+      if (!saveOfflineQueue(nextQueue)) {
+        setStorageUnavailable(true);
+        toast({ title: "Sync needs attention", description: "Recovery storage could not be updated. Do not clear browser data.", variant: "destructive" });
+        return;
+      }
       setQueue(nextQueue);
 
       // Do not show a prior account's sync outcome after an account switch.
@@ -176,6 +198,7 @@ export function useOfflineSync() {
   const summary = summarizeOwnedQueue(queue, getDeadLetterQueue(), currentUserId);
   return {
     isOnline,
+    storageUnavailable,
     pendingCount: summary.pending,
     /** Held and quarantined actions for the current account only. */
     deadLetterCount: summary.attention,

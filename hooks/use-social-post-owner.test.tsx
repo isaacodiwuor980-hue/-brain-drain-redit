@@ -18,7 +18,7 @@ function Probe(){const value=useSocial();useEffect(()=>{api=value;});return null
 const post={id:"p",userId:"a",content:"synthetic",topicId:"t",createdAt:1,reactions:{}} as Post;
 beforeEach(async()=>{
   (globalThis as typeof globalThis & {IS_REACT_ACT_ENVIRONMENT:boolean}).IS_REACT_ACT_ENVIRONMENT=true;
-  vi.clearAllMocks();m.online=true;m.getAll.mockResolvedValue([]);m.putStrict.mockResolvedValue(undefined);m.track.mockResolvedValue(undefined);m.create.mockResolvedValue({});
+  vi.clearAllMocks();m.online=true;m.queue.mockReturnValue(true);m.getAll.mockResolvedValue([]);m.putStrict.mockResolvedValue(undefined);m.track.mockResolvedValue(undefined);m.create.mockResolvedValue({});
   client=new QueryClient({defaultOptions:{queries:{retry:false},mutations:{retry:false}}});el=document.createElement("div");document.body.append(el);root=createRoot(el);
   await act(async()=>root.render(<QueryClientProvider client={client}><Probe/></QueryClientProvider>));
 });
@@ -31,6 +31,14 @@ describe("post sending on account change",()=>{
     await act(async()=>{await api.addPost(post);});
     expect(m.putStrict).toHaveBeenCalled();expect(m.create).not.toHaveBeenCalled();
     expect(m.queue).toHaveBeenCalledWith("create_post",{postId:"p"},"a");
+  });
+  it("warns when the review entry cannot be stored",async()=>{
+    m.online=false; m.queue.mockReturnValue(false);
+    await act(async()=>root.render(<QueryClientProvider client={client}><Probe/></QueryClientProvider>));
+    m.session.mockResolvedValue({uid:"a",token:"token-a"});
+    await act(async()=>{await api.addPost(post);});
+    expect(m.create).not.toHaveBeenCalled();
+    expect(m.toast).toHaveBeenCalledWith(expect.objectContaining({title:"Review storage unavailable"}));
   });
   it("holds the post if connectivity drops while the session is rechecked",async()=>{
     const status=vi.spyOn(navigator,"onLine","get").mockReturnValue(true);
