@@ -64,7 +64,7 @@ export function useComments(postId?: string) {
     return roots;
   };
 
-  const { mutateAsync: addComment } = useMutation({
+  const { mutateAsync: addCommentMutation } = useMutation({
     // Optimistic UI: pre-write the new comment into the React Query cache so
     // it appears in the thread BEFORE the IDB write resolves.
     onMutate: async (variables: {
@@ -445,6 +445,10 @@ export function useComments(postId?: string) {
    * voteMouth). Old records may still carry a `stream` property in
    * local data; it is ignored everywhere.
    */
+
+  // Reject before React Query's optimistic callbacks, IndexedDB or analytics.
+  const addComment = (args: { postId: string; parentId: string | null; content: string; authorName: string; isConfidential?: boolean }) =>
+    args.isConfidential ? Promise.reject(new Error("Confidential replies are unavailable")) : addCommentMutation(args);
 
   return {
     comments,

@@ -38,6 +38,7 @@ import { computeCommentRank } from "@/lib/hive-mind";
 import { useAuth } from "@/components/auth/AuthContext";
 import { displayNameOr, userIdOr } from "@/lib/user-data";
 import { votingAvailable } from "@/lib/vote-availability";
+import { visibleCommentsWhilePrivacyUnverified } from "@/lib/confidential-comment-safety";
 
 interface CommentThreadProps {
   postId: string;
@@ -113,11 +114,9 @@ export function CommentThread({
   // render"). Now the useMemo is always called; the early return just
   // changes what gets rendered.
 
-  // Filter confidential comments at the source.
-  const visibleComments: Comment[] = comments.filter((c) => {
-    if (!c.isConfidential) return true;
-    return c.authorId === currentUserId || postAuthorId === currentUserId || c.authorId === postAuthorId;
-  });
+  // Shared local records cannot prove current-account access. Keep stored
+  // confidential replies intact but do not display them, even to the author.
+  const visibleComments: Comment[] = visibleCommentsWhilePrivacyUnverified(comments);
 
   // Build ONE tree (rivers removed). Deps are [comments] only —
   // buildCommentTree is a pure function of its input, so its identity
@@ -448,7 +447,7 @@ export function CommentThread({
                   <div className="flex-1 flex flex-col gap-2">
                     <Textarea value={inlineContent} onChange={(e) => setInlineContent(e.target.value)} placeholder="Reply..." className="min-h-[50px] text-[14px] resize-none py-2 px-3 bg-transparent border border-border/50 rounded-xl" autoFocus />
                     <div className="flex items-center justify-between flex-wrap gap-2">
-                      <button type="button" onClick={() => setIsConfidentialReply((v) => !v)} className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold transition-all active:scale-95 ${isConfidentialReply ? "bg-amber-500/15 text-amber-600 border border-amber-500/40" : "text-muted-foreground hover:text-foreground hover:bg-muted/50 border border-transparent"}`}>
+                      <button type="button" disabled title="Confidential replies are unavailable" className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold transition-all active:scale-95 ${isConfidentialReply ? "bg-amber-500/15 text-amber-600 border border-amber-500/40" : "text-muted-foreground hover:text-foreground hover:bg-muted/50 border border-transparent"}`}>
                         {isConfidentialReply ? <Lock className="w-3 h-3" /> : <Shield className="w-3 h-3" />} {isConfidentialReply ? "Confidential" : "Public"}
                       </button>
                       <div className="flex gap-2">
@@ -482,6 +481,7 @@ export function CommentThread({
 
   return (
     <div className="pt-4">
+      <p className="text-xs text-muted-foreground mb-3">Confidential replies are unavailable. Existing confidential replies remain stored but are hidden here.</p>
       {/* Fossilized Consensus Summary Block (crown of the post) */}
       {fossilized.length > 0 && (
         <div className="mb-4 p-4 rounded-xl border-2 border-amber-500/30 bg-gradient-to-br from-amber-500/5 to-amber-500/2">
@@ -537,7 +537,7 @@ export function CommentThread({
               className="min-h-[50px] text-[14px] resize-none py-2 px-3 bg-transparent border border-border/50 rounded-xl"
             />
             <div className="flex justify-between items-center flex-wrap gap-2">
-              <button type="button" onClick={() => setIsConfidentialReply((v) => !v)} className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold transition-all active:scale-95 ${isConfidentialReply ? "bg-amber-500/15 text-amber-600 border border-amber-500/40" : "text-muted-foreground hover:text-foreground hover:bg-muted/50 border border-transparent"}`}>
+              <button type="button" disabled title="Confidential replies are unavailable" className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold transition-all active:scale-95 ${isConfidentialReply ? "bg-amber-500/15 text-amber-600 border border-amber-500/40" : "text-muted-foreground hover:text-foreground hover:bg-muted/50 border border-transparent"}`}>
                 {isConfidentialReply ? <Lock className="w-3 h-3" /> : <Shield className="w-3 h-3" />} {isConfidentialReply ? "Confidential" : "Public"}
               </button>
               <Button type="submit" size="sm" className="rounded-full px-4 font-semibold" disabled={!content.trim()}>Post</Button>
