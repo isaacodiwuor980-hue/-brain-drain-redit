@@ -10,6 +10,7 @@ import { mergeCloudWithLocal } from "@/lib/brain-merge";
 import { loadBrainData } from "@/lib/load-brain-data";
 import { deleteBrainData } from "@/lib/delete-brain";
 import { useToast } from "@/hooks/use-toast";
+import { collectLocalBrainExport } from "@/lib/brain-local-export";
 
 const generateId = () => crypto.randomUUID();
 
@@ -109,9 +110,7 @@ export function useDatabase() {
   });
 
   const exportData = async () => {
-    const allBrains = await idb.getAll<Brain>("brains");
-    const allNodes = await idb.getAll<Node>("nodes");
-    const exportObj = { brains: allBrains, nodes: allNodes };
+    const exportObj = await collectLocalBrainExport();
     const blob = new Blob([JSON.stringify(exportObj, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");

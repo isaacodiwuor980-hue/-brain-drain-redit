@@ -204,7 +204,7 @@ export function Dashboard() {
           />
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="sm" onClick={() => void exportData().catch((error) => toast({ title: "Export failed", description: error instanceof Error ? error.message : "Could not export data.", variant: "destructive" }))} title="Export" aria-label="Export brains">
+          <Button variant="ghost" size="sm" onClick={() => { if (!window.confirm("Export browser brains and nodes? This may include data from more than one account on this device. Cloud data and other local stores are not included; this is not a complete backup.")) return; void exportData().catch(() => toast({ title: "Export failed", description: "Export could not be completed. Check your downloads before retrying.", variant: "destructive" })); }} title="Export local brains" aria-label="Export local brains">
             <Share className="w-4 h-4" />
           </Button>
           <Button variant="ghost" size="sm" onClick={() => setIsImportOpen(true)} title="Import" aria-label="Import brains">
