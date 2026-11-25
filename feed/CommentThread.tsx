@@ -342,10 +342,7 @@ export function CommentThread({
 
             <div className="flex items-center justify-between pt-1.5 pb-0.5 -ml-2 gap-2">
               <div className="flex items-center gap-1.5 flex-wrap">
-                {/* Reddit/Quora-style upvote / net-score / downvote cluster.
-                    The net score (upvotes - downvotes) is the primary quality
-                    signal for the gravity ranking formula. Tapping the active
-                    direction again removes the vote (toggle off). */}
+                {/* Vote controls omit visible totals; this is not an API privacy boundary. */}
                 <div className="flex items-center gap-0.5 rounded-full bg-muted/30 py-0.5 px-0.5">
                   <Button
                     variant="ghost"
@@ -357,9 +354,6 @@ export function CommentThread({
                   >
                     <ArrowBigUp className={`w-3.5 h-3.5 ${node.myVote === "up" ? "fill-current" : ""}`} />
                   </Button>
-                  <span className={`text-[12px] font-bold tabular-nums min-w-[1.5em] text-center ${(node.upvotes ?? 0) - (node.downvotes ?? 0) > 0 ? "text-emerald-500" : (node.upvotes ?? 0) - (node.downvotes ?? 0) < 0 ? "text-red-500" : "text-muted-foreground"}`}>
-                    {(node.upvotes ?? 0) - (node.downvotes ?? 0)}
-                  </span>
                   <Button
                     variant="ghost"
                     size="sm"
@@ -381,7 +375,6 @@ export function CommentThread({
                   aria-pressed={node.myHouseVote}
                 >
                   <Landmark className="w-3.5 h-3.5" />
-                  {(node.houseVotes ?? 0) > 0 && <span className="text-[12px] font-medium tabular-nums">{node.houseVotes}</span>}
                 </Button>
                 <Button variant="ghost" size="sm" className={`h-7 px-2 gap-1.5 rounded-full transition-all active:scale-90 ${node.myMouthVote ? "text-orange-500 bg-orange-500/10 hover:bg-orange-500/20" : "text-muted-foreground hover:text-orange-500 hover:bg-muted/50"}`}
                   title="Word of mouth — crowd sentiment / lived experience"
@@ -390,7 +383,6 @@ export function CommentThread({
                   aria-pressed={node.myMouthVote}
                 >
                   <Users className="w-3.5 h-3.5" />
-                  {(node.mouthVotes ?? 0) > 0 && <span className="text-[12px] font-medium tabular-nums">{node.mouthVotes}</span>}
                 </Button>
                 <Button variant="ghost" size="sm" className="h-7 px-2.5 text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-full active:scale-90"
                   onClick={() => { triggerHaptic("selection"); setReplyToId(isReplying ? null : node.id); setIsConfidentialReply(false); if (isEditing) cancelEdit(); }}>

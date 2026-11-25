@@ -19,7 +19,7 @@ import {
   MessageSquare,
   StickyNote,
 } from "lucide-react";
-import { Brain, getPostDownvoteCount, getPostUpvoteCount, Post } from "@/lib/types";
+import { Brain, Post } from "@/lib/types";
 import { sanitizeHtml } from "@/lib/sanitize-html";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -649,7 +649,6 @@ export function PostCard({
                 }}
               >
                 <ArrowBigUp className={`w-4 h-4 ${isUpvoted ? "fill-current" : ""}`} />
-                <span className="text-[13px] font-normal tabular-nums">{getPostUpvoteCount(post)}</span>
               </Button>
 
               <Button
@@ -664,7 +663,6 @@ export function PostCard({
                 }}
               >
                 <ArrowBigDown className={`w-4 h-4 ${isDownvoted ? "fill-current" : ""}`} />
-                <span className="text-[13px] font-normal tabular-nums">{getPostDownvoteCount(post)}</span>
               </Button>
 
               {/* If it is a Question post, provide direct "Answer" action button */}
