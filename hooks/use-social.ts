@@ -21,10 +21,9 @@ import { ApiError } from "../lib/api-client";
 import { getAuthSession, getAuthToken } from "../lib/auth-token";
 import { env } from "../lib/env";
 import { queueOfflineAction } from "../lib/offline-sync";
-import { orderFeed } from "../lib/tsrg/feed";
+import { orderLiveFeed } from "../lib/tsrg/live-feed-gate";
 import { reconcileCachedCloudPost } from "../lib/feed-cache-reconcile";
 import { hideUnverifiedCachedBrainLinks } from "../lib/feed-cached-visibility";
-import { useTsrgStatus } from "./use-tsrg-status";
 import { useOnlineStatus } from "./use-online-status";
 import { useToast } from "./use-toast";
 import { mayStartVote } from "../lib/online-vote-policy";
@@ -100,7 +99,6 @@ export function useSocial(mode: "foryou" | "following" = "foryou", topicId: stri
   const queryClient = useQueryClient();
   const onlineStatus = useOnlineStatus();
   const { toast } = useToast();
-  const tsrgAvailable = useTsrgStatus(mode === "foryou" && env.features.experimentalTsrgFeed);
 
   // Tracks whether the LAST cloud fetch failed with a non-auth error.
   // React Query's isError stays false because queryFn returns cached/seed
@@ -207,8 +205,8 @@ export function useSocial(mode: "foryou" | "following" = "foryou", topicId: stri
     }
     // Shared local cache may contain another account's old selection and vote
     // totals. Hide those fields while the server-confirmed read is gated.
-    return hideCachedVoteDetailsV1(orderFeed(out, mode, tsrgAvailable, query.dataUpdatedAt));
-  }, [query.data, query.dataUpdatedAt, mode, tsrgAvailable]);
+    return hideCachedVoteDetailsV1(orderLiveFeed(out, mode, false, query.dataUpdatedAt));
+  }, [query.data, query.dataUpdatedAt, mode]);
 
   const addPostMutation = useMutation({
     // Optimistic UI: pre-write the new post into the React Query cache so it

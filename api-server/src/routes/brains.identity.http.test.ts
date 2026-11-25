@@ -7,7 +7,8 @@ vi.mock("../middleware/auth", () => ({
   requireAuth(req: express.Request, res: express.Response, next: express.NextFunction) {
     const subject = req.headers.authorization?.replace("Bearer ", "");
     if (!subject) { res.status(401).json({ error: "Authentication required" }); return; }
-    req.auth = { uid: subject } as express.Request["auth"]; next();
+    const authTime = req.headers["x-test-auth-time"] === "missing" ? undefined : req.headers["x-test-auth-time"] ? Number(req.headers["x-test-auth-time"]) : Math.floor(Date.now() / 1000);
+    req.auth = { uid: subject, authTime } as express.Request["auth"]; next();
   },
   optionalAuth(req: express.Request, _res: express.Response, next: express.NextFunction) {
     const subject = req.headers.authorization?.replace("Bearer ", "");
@@ -67,6 +68,14 @@ describe("brain routes with mocked identity and database", () => {
     db.getOne.mockResolvedValueOnce({ ...brain, is_public: true });
     expect((await fetch(`${base}/api/brains/brain1`)).status).toBe(200);
     expect(db.getOne).toHaveBeenCalledTimes(1);
+  });
+  it("requires recent sign-in before brain deletion or any database lookup", async () => {
+    const remove = (headers: Record<string, string>) => fetch(`${base}/api/brains/brain1`, {method: "DELETE", headers});
+    expect((await remove({})).status).toBe(401);
+    expect((await remove({...auth("alice"), "x-test-auth-time": "missing"})).status).toBe(403);
+    expect((await remove({...auth("alice"), "x-test-auth-time": String(Math.floor(Date.now() / 1000) - 301)})).status).toBe(403);
+    expect((await remove({...auth("alice"), "x-test-auth-time": String(Math.floor(Date.now() / 1000) + 60)})).status).toBe(403);
+    expect(db.getOne).not.toHaveBeenCalled(); expect(db.delete).not.toHaveBeenCalled();
   });
   it("only deletes for mapped owner and scopes the write", async () => {
     expect((await fetch(`${base}/api/brains/brain1`, { method: "DELETE", headers: auth("bob") })).status).toBe(403);

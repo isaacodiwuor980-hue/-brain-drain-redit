@@ -2,6 +2,7 @@ import { Router, type IRouter } from "express";
 import { z } from "zod";
 import { supabase, SupabaseError } from "../lib/supabase";
 import { optionalAuth, requireAuth } from "../middleware/auth";
+import { requireRecentAuthentication } from "../middleware/recent-auth";
 import { lookupMappedIdentity, requireMappedIdentity } from "../middleware/identity-map";
 
 const router: IRouter = Router();
@@ -255,7 +256,7 @@ router.post("/brains", requireAuth, requireMappedIdentity, async (req, res) => {
 });
 
 /** Delete a brain (author only). Cascades to nodes via the schema. */
-router.delete("/brains/:id", requireAuth, requireMappedIdentity, async (req, res) => {
+router.delete("/brains/:id", requireAuth, requireRecentAuthentication, requireMappedIdentity, async (req, res) => {
   const id = String(req.params.id ?? "");
   if (!/^[A-Za-z0-9_-]+$/.test(id)) {
     res.status(400).json({ error: "Invalid brain id" });
