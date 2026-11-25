@@ -345,8 +345,7 @@ export function HomeFeed() {
         />
       </div>
 
-      {/* Feed fetch failure banner — shows when /api/feed failed (non-auth)
-          and we are showing cached/seed fallback. Dismissible; Retry refetches. */}
+      {/* A failed feed fetch does not make unverified cached posts safe. */}
       {feedFailed && (
         <div className="mx-3 mt-3 rounded-xl border border-destructive/30 bg-destructive/5 p-3" role="alert">
           <div className="flex items-start gap-3">
@@ -355,7 +354,7 @@ export function HomeFeed() {
                 Couldn’t load the latest posts from the server.
               </p>
               <p className="text-xs text-muted-foreground mt-0.5">
-                Showing saved posts for now. Check your connection and retry.
+                Saved posts are hidden until their visibility can be verified. Check your connection and retry.
               </p>
             </div>
             <button

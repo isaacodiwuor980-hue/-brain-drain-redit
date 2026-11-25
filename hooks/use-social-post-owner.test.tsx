@@ -24,6 +24,13 @@ beforeEach(async()=>{
 });
 afterEach(async()=>{await act(async()=>root.unmount());client.clear();el.remove();});
 describe("post sending on account change",()=>{
+  it("does not show previously loaded feed results when connectivity changes to offline",async()=>{
+    client.setQueryData(["posts","foryou",null],{pages:[{posts:[post],hasMore:false}],pageParams:[0]});
+    await act(async()=>{await client.invalidateQueries({queryKey:["posts","foryou",null],refetchType:"none"});});
+    m.online=false;
+    await act(async()=>root.render(<QueryClientProvider client={client}><Probe/></QueryClientProvider>));
+    expect(api.posts).toEqual([]);
+  });
   it("holds an offline post for review without a network send",async()=>{
     m.online=false;
     await act(async()=>root.render(<QueryClientProvider client={client}><Probe/></QueryClientProvider>));
@@ -54,6 +61,7 @@ describe("post sending on account change",()=>{
     m.session.mockResolvedValue({uid:"b",token:"token-b"});
     await act(async()=>{await api.addPost(post);});
     expect(m.putStrict).toHaveBeenCalled();expect(m.create).not.toHaveBeenCalled();expect(m.queue).not.toHaveBeenCalled();
+    expect(JSON.stringify(client.getQueryData(["posts","foryou",null]))).not.toContain("synthetic");
   });
   it("does not send if the account switches between session checks",async()=>{
     m.session.mockResolvedValueOnce({uid:"a",token:"token-a"}).mockResolvedValueOnce({uid:"b",token:"token-b"});

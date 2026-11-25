@@ -20,6 +20,20 @@ beforeEach(async()=>{
 });
 afterEach(async()=>{await act(async()=>root.unmount());client.clear();el.remove();});
 describe("feed query cache privacy",()=>{
+  it("does not include an unverified local-only post in an online feed",async()=>{
+    m.getAll.mockResolvedValue([{...cached,id:"local-private",content:"sensitive cached draft"}]);
+    await act(async()=>{await client.refetchQueries({queryKey:["posts","foryou",null]});});
+    const data=JSON.stringify(client.getQueryData(["posts","foryou",null]));
+    expect(data).not.toContain("sensitive cached draft"); expect(data).toContain("server");
+  });
+  it("hides unverified cached posts when the server cannot be reached",async()=>{
+    m.getAll.mockResolvedValue([{...cached,id:"local-private",content:"sensitive cached draft"}]);
+    m.fetchFeed.mockRejectedValueOnce(new Error("offline"));
+    await act(async()=>{await client.refetchQueries({queryKey:["posts","foryou",null]});});
+    const data=JSON.stringify(client.getQueryData(["posts","foryou",null]));
+    expect(data).not.toContain("sensitive cached draft");
+  });
+
   it("redacts the fallback query result when cloud fetch fails",async()=>{
     await vi.waitFor(()=>expect(client.getQueryData(["posts","foryou",null])).toBeDefined());
     m.fetchFeed.mockRejectedValueOnce(new Error("offline"));

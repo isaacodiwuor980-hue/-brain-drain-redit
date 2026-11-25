@@ -15,7 +15,6 @@ import {
   toCreatePostInput,
   reactToPost as reactToPostApi,
   isApiError,
-  type CloudPost,
 } from "../lib/api/feed";
 import { ApiError } from "../lib/api-client";
 import { getAuthSession, getAuthToken } from "../lib/auth-token";
@@ -23,7 +22,6 @@ import { env } from "../lib/env";
 import { queueOfflineAction } from "../lib/offline-sync";
 import { orderLiveFeed } from "../lib/tsrg/live-feed-gate";
 import { reconcileCachedCloudPost } from "../lib/feed-cache-reconcile";
-import { hideUnverifiedCachedBrainLinks } from "../lib/feed-cached-visibility";
 import { useOnlineStatus } from "./use-online-status";
 import { useToast } from "./use-toast";
 import { mayStartVote } from "../lib/online-vote-policy";
@@ -43,36 +41,6 @@ const PAGE_SIZE = 30;
 interface FeedPage {
   posts: Post[];
   hasMore: boolean;
-}
-
-function mergeCloudWithLocal(
-  cloudPosts: CloudPost[],
-  localPosts: Post[],
-): Post[] {
-  // Cloud posts are the source of truth. Keep local-only posts (e.g. created
-  // offline, or seeded demo posts) so the UI never goes empty.
-  // For posts that exist in both cloud and local, preserve local-only fields
-  // that the server doesn't know about (isSolved, solvedAt, solvedBranchId,
-  // userReactions) so client-side features like "Mark as Solved" survive
-  // the next cloud refetch (F.1 fix).
-  const localById = new Map(localPosts.map((p) => [p.id, p]));
-  const cloudIds = new Set(cloudPosts.map((p) => p.id));
-  // Local-only posts have no current server visibility proof.
-  const localOnly = hideUnverifiedCachedBrainLinks(localPosts.filter((p) => !cloudIds.has(p.id)));
-  const merged = cloudPosts.map((cloud) => {
-    const local = localById.get(cloud.id);
-    if (!local) return cloud;
-    // Preserve local-only fields that have no server equivalent.
-    return {
-      ...cloud,
-      isSolved: local.isSolved,
-      solvedAt: local.solvedAt,
-      solvedBranchId: local.solvedBranchId,
-      userReactions: local.userReactions,
-    } as Post;
-  });
-  merged.push(...localOnly);
-  return merged.sort((a, b) => b.createdAt - a.createdAt);
 }
 
 /**
@@ -102,8 +70,8 @@ export function useSocial(mode: "foryou" | "following" = "foryou", topicId: stri
   const { toast } = useToast();
 
   // Tracks whether the LAST cloud fetch failed with a non-auth error.
-  // React Query's isError stays false because queryFn returns cached/seed
-  // data on failure (correct offline UX), so we surface the failure via
+  // React Query's isError stays false because the query returns an empty page
+  // on failure, so we surface the failure via
   // this ref + state pair instead. Reset to false on every new fetch.
   const feedFailedRef = useRef(false);
   const [feedFailed, setFeedFailed] = useState(false);
@@ -115,7 +83,7 @@ export function useSocial(mode: "foryou" | "following" = "foryou", topicId: stri
     queryFn: async ({ pageParam, signal }) => {
       const offset = pageParam as number;
 
-      // Always read the local cache first for an instant render.
+      // Read local data only for non-destructive cache reconciliation, not display.
       const cached = (await idb.getAll<Post>("posts")).sort(
         (a, b) => b.createdAt - a.createdAt,
       );
@@ -123,7 +91,7 @@ export function useSocial(mode: "foryou" | "following" = "foryou", topicId: stri
       // apiEnabled: empty base URL means SAME-ORIGIN (production serves /api
       // from this host) — see lib/env.ts. Local-only builds set VITE_LOCAL_ONLY=1.
       if (!env.apiEnabled) {
-        return { posts: hideCachedVoteDetailsV1(hideUnverifiedCachedBrainLinks(cached)), hasMore: false };
+        return { posts: [], hasMore: false };
       }
 
       // Reset failure flag at the start of each attempt.
@@ -166,35 +134,30 @@ export function useSocial(mode: "foryou" | "following" = "foryou", topicId: stri
           // people the user does not follow.
           return { posts: hideCachedVoteDetailsV1(response.posts), hasMore: response.hasMore };
         }
-        return { posts: hideCachedVoteDetailsV1(mergeCloudWithLocal(response.posts, cached)), hasMore: response.hasMore };
+        return { posts: hideCachedVoteDetailsV1(response.posts), hasMore: response.hasMore };
       } catch (error) {
-        // On network error, fall back to the local cache rather than failing.
-        // BUT: surface the failure to the UI so the user can distinguish a
-        // genuine empty feed from a backend-down state showing fallback data.
+        // Cached posts cannot establish current visibility or ownership.
+        // Preserve them on device but do not render them as feed results.
         if (shouldSurfaceFeedError(error)) {
           feedFailedRef.current = true;
           setFeedFailed(true);
-          console.warn("[feed] Cloud fetch failed — showing cached fallback.");
+          console.warn("[feed] Cloud fetch failed; unverified cached posts are hidden.");
         }
         // B3: Following failures (including the signed-out empty page) stay
         // empty — never fall back to the For-You universe under this tab.
         if (mode === "following") return { posts: [], hasMore: false };
-        return { posts: hideCachedVoteDetailsV1(hideUnverifiedCachedBrainLinks(cached)), hasMore: false };
+        return { posts: [], hasMore: false };
       }
     },
     // B4: cursor = next offset while the server says there is more.
     getNextPageParam: (lastPage, allPages) =>
       lastPage.hasMore ? allPages.length * PAGE_SIZE : undefined,
-    // Show cached data immediately while refetching in the background.
-    placeholderData: (previous) => previous,
   });
 
-  // Flatten pages → single deduped, newest-first list. Per-page local merges
-  // can repeat local-only posts across pages; the seen-set removes dupes so
-  // data never duplicates in the UI (Phase 4 requirement).
+  // Flatten fetched pages into a deduped list; offline visibility is unknown.
   const posts = useMemo(() => {
     const data = query.data;
-    if (!data) return [];
+    if (!data || onlineStatus === "offline") return [];
     const seen = new Set<string>();
     const out: Post[] = [];
     for (const page of data.pages) {
@@ -207,42 +170,12 @@ export function useSocial(mode: "foryou" | "following" = "foryou", topicId: stri
     // Shared local cache may contain another account's old selection and vote
     // totals. Hide those fields while the server-confirmed read is gated.
     return hideCachedVoteDetailsV1(orderLiveFeed(out, mode, false, query.dataUpdatedAt));
-  }, [query.data, query.dataUpdatedAt, mode]);
+  }, [query.data, query.dataUpdatedAt, mode, onlineStatus]);
 
   const addPostMutation = useMutation({
-    // Optimistic UI: pre-write the new post into the React Query cache so it
-    // appears in the feed BEFORE the IDB write / network call resolves. If
-    // the mutation fails, onMutate's snapshot is restored so the user
-    // doesn't see a phantom post. The IDB write still happens in
-    // mutationFn for persistence — this just removes the user-visible
-    // flicker between mutation call and cache invalidation.
-    onMutate: async (post: Post) => {
-      // The feed query key is ["posts", mode, topicId] — use the EXACT key
-      // (not a partial ["posts"] which would be a no-op on TanStack Query's
-      // exact-match setQueryData).
-      const queryKey = ["posts", mode, topicId] as const;
-      // Cancel any in-flight queries so they don't clobber our optimistic
-      // update when they resolve.
-      await queryClient.cancelQueries({ queryKey });
-      // Snapshot the previous value for rollback.
-      const previous = queryClient.getQueryData<InfiniteData<FeedPage>>(queryKey);
-      // Optimistically insert the new post at the top of page 0 (deduped).
-      queryClient.setQueryData<InfiniteData<FeedPage>>(queryKey, (old) => {
-        if (!old) return old;
-        return {
-          ...old,
-          pages: old.pages.map((page, index) =>
-            index === 0
-              ? { ...page, posts: [hideCachedVoteDetailsV1([post])[0], ...page.posts.filter((p) => p.id !== post.id)] }
-              : page,
-          ),
-        };
-      });
-      return { previous, queryKey };
-    },
+    // Do not insert unverified local drafts into a shared feed cache.
     mutationFn: async (post: Post) => {
-      // Persist to IDB so the post survives reloads. The optimistic cache
-      // update already happened in onMutate; this just confirms it.
+      // Persist the draft without exposing it as a verified feed item.
       await idb.putStrict("posts", post);
       await trackEvent("post_created", {
         postId: post.id,
@@ -297,14 +230,6 @@ export function useSocial(mode: "foryou" | "following" = "foryou", topicId: stri
         // Keep the local copy for review; save status may be unknown.
         holdPostForReview(session.uid);
         console.warn("Post cloud status needs review.");
-      }
-    },
-    onError: (_err, _post, context) => {
-      // Rollback the optimistic update on error so the user doesn't see a
-      // phantom post that failed to persist. Use the exact query key from
-      // onMutate's context (not a partial ["posts"] which would be a no-op).
-      if (context?.previous !== undefined && context.queryKey) {
-        queryClient.setQueryData(context.queryKey, context.previous);
       }
     },
     onSuccess: () => {
