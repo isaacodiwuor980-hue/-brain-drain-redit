@@ -11,6 +11,14 @@ describe("held offline actions", () => {
       expect(new Set(queue.map(action=>action.id)).size).toBe(2);
     } finally { clock.mockRestore(); random.mockRestore(); }
   });
+  it("does not coalesce unverified comment or profile actions", () => {
+    let queue=enqueueAction([], {type:"add_comment",ownerId:"a",payload:{postId:"p"}});
+    queue=enqueueAction(queue, {type:"add_comment",ownerId:"a",payload:{postId:"p"}});
+    queue=enqueueAction(queue, {type:"save_profile",ownerId:"a",payload:{}});
+    queue=enqueueAction(queue, {type:"save_profile",ownerId:"a",payload:{}});
+    expect(queue).toHaveLength(4);
+    expect(queue.every(requiresManualSyncReview)).toBe(true);
+  });
   it("preserves each uncertain reaction and each conflicting brain version", () => {
     let queue = enqueueAction([], {type:"post_reaction", ownerId:"alice", payload:{postId:"p",reactionType:"upvote"}});
     queue = enqueueAction(queue, {type:"post_reaction", ownerId:"alice", payload:{postId:"p",reactionType:"downvote"}});

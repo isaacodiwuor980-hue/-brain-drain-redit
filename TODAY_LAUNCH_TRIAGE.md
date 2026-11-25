@@ -22,3 +22,5 @@ Any alternative scope needs owner approval; do not silently reverse their web-an
 ## Evidence needed for each proposed live stage
 
 Present the exact live project and change, affected systems, recovery evidence, privacy/data-loss risk, maintenance window, monitoring, verification, rollback limitations and costs. Obtain separate explicit approval before execution. Stop on unexpected schema, permissions, ownership, data or behavior. A failed check calls for fixing or disabling the affected feature, not declaring it ready.
+
+**Later local containment supersedes the older post-reaction description above:** the mounted reaction route is now unconditionally unavailable on this branch; its earlier non-atomic implementation is retained as an unmounted fixture. This is not evidence about deployed routes or direct database writers. See `VOTE_PATH_AUDIT.md` for the current inventory and unresolved gaps.

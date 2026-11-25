@@ -12,8 +12,8 @@ describe("non-idempotent offline actions",()=>{
   it("holds unrecognized legacy or future action types instead of silently discarding them",()=>{
     expect(requiresManualSyncReview(action("future_write" as QueuedAction["type"]))).toBe(true);
   });
-  it("does not change unrelated action handling",()=>{
-    expect(requiresManualSyncReview(action("add_comment"))).toBe(false);
-    expect(requiresManualSyncReview(action("save_profile"))).toBe(false);
+  it("holds comment and profile actions with unverified save state",()=>{
+    expect(requiresManualSyncReview(action("add_comment"))).toBe(true);
+    expect(requiresManualSyncReview(action("save_profile"))).toBe(true);
   });
 });

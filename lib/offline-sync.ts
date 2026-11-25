@@ -114,8 +114,7 @@ export function actionKey(action: Pick<QueuedAction, "type" | "payload" | "owner
 
 /**
  * Append an action. Never coalesce held actions: an earlier toggle may have
- * committed and a brain update may be a conflicting version. Other legacy
- * action types retain their existing coalescing behavior.
+ * committed and a brain update may be a conflicting version. All action types are currently held pending verified recovery.
  */
 export function enqueueAction(
   queue: QueuedAction[],
@@ -162,13 +161,9 @@ export function queueOfflineAction(
   return saveOfflineQueue(queue);
 }
 
-/** Posts lack a trusted retry permit/review flow, brain edits lack versioned
- * conflict handling, and toggles can reverse an already-applied reaction.
- * Keep these actions for review; this is not a complete recovery interface. */
-export function requiresManualSyncReview(action: Pick<QueuedAction, "type">): boolean {
-  // Persisted queues may contain newer or malformed action types despite the
-  // TypeScript union. Only explicitly known local-only cases may be skipped.
-  return action.type !== "add_comment" && action.type !== "save_profile";
+/** No queued action has a verified authoritative receipt or safe review flow. */
+export function requiresManualSyncReview(_action: Pick<QueuedAction, "type">): boolean {
+  return true;
 }
 
 /** Unowned legacy entries and other accounts' work must never be replayed. */

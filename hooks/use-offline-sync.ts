@@ -64,8 +64,8 @@ export function useOfflineSync() {
    * reactions were lost when the user came back online.
    *
    * Unsafe posts, brain edits and reaction toggles are held for manual review.
-   * Other actions with no server replay (add_comment, save_profile) are
-   * marked skipped; their separate local/Firestore behavior is not verified.
+   * Comment and profile actions are also held: their local/Firestore save
+   * status has not been verified, so a skip is not proof of persistence.
    * Failed actions are retained for retry or moved to attention storage.
    * Queue and quarantine storage are not atomic, and recovery UI is incomplete.
    */
