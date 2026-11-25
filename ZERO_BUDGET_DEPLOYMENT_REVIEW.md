@@ -27,3 +27,7 @@ No hosting account, app-store account, project, paid service or deployment has b
 2. Prepare the exact hosting architecture, allowed-use check, costs/limits and a test/deployment/rollback plan. Do not enter, log or request credentials in chat.
 3. Keep the current Supabase project as target. Recovery remains unverified; each exact migration and deployment requires separate approval. Do not apply `DEPLOYMENT.md`'s old instruction to blindly run the initial migration or deploy Firebase rules.
 4. Review native distribution, fees, store ownership, required platform tools and real-device testing before asking permission for purchases or deployment. No readiness guarantee.
+
+## Owner's Netlify answers (not independently verified)
+
+Owner reports a Free plan, GitHub already connected, no Brain Drain Netlify project yet, and a support email exists. Avoid a payment method or upgrade without separate approval. Free-limit exhaustion should pause and notify the owner; do not automatically buy capacity. Disable automatic production deployment and secure any separately approved preview to authorized testers, subject to verifying actual plan capabilities. Wait for the owner to review the final working build before sending invitations. These answers authorize no project creation, connector actions, preview, deployment or external data access. Owner prioritized TSRG validation while live changes remain unapproved.
