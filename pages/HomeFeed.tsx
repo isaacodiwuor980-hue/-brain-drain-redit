@@ -7,7 +7,7 @@ import { FloatingCreateButton } from "@/components/ui/CreateExperienceModal";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { CircleHelp, MessageSquare, PenSquare, BrainCircuit, X } from "lucide-react";
-import { Post, PostType, Topic } from "@/lib/types";
+import { Post, PostType } from "@/lib/types";
 import { useCommunities } from "@/hooks/use-communities";
 import { MomentumWidget } from "@/components/momentum/MomentumWidget";
 import { useLocation } from "wouter";
@@ -34,7 +34,6 @@ import { PeopleYouMayKnow } from "@/feed/PeopleYouMayKnow";
 import { FindFriendsFromContacts } from "@/feed/FindFriendsFromContacts";
 import { FindFriendsFromGmail } from "@/feed/FindFriendsFromGmail";
 import {
-  COLD_START_POSTS,
   shouldShowColdStartBanner,
   dismissColdStartBanner,
 } from "@/lib/cold-start-content";
@@ -46,13 +45,6 @@ const StoriesBar = lazy(() => import("@/feed/StoriesBar").then(m => ({ default: 
 
 const PostCreator = lazy(() => import("@/components/feed/PostCreator").then((module) => ({ default: module.PostCreator })));
 
-// Helper to seed data if empty
-const SEED_TOPICS: Topic[] = [
-  { id: "t1", name: "Engineering", description: "Software and Hardware", followerCount: 1200 },
-  { id: "t2", name: "Philosophy", description: "Deep thoughts", followerCount: 800 },
-  { id: "t3", name: "React", description: "UI Framework", followerCount: 2000 }
-];
-
 // A complete, bundled sample brain used to demonstrate structured reasoning
 // on the feed itself (no network, no auth, no IndexedDB).
 const FEATURED_BRAIN =
@@ -62,8 +54,8 @@ export function HomeFeed() {
   // B3: activeFeed must live ABOVE useSocial — the Following tab now drives
   // a real server query (mode=following) instead of only re-ranking locally.
   const [activeFeed, setActiveFeed] = useState<FeedMode>("foryou");
-  const { posts, isLoading, addPost, reactToPost, refreshPosts, feedFailed, refetchFeed, fetchNextPage, hasNextPage, isFetchingNextPage } = useSocial(activeFeed, null);
-  const { topics, addTopic, refreshTopics } = useTopics();
+  const { posts, isLoading, addPost, reactToPost, feedFailed, refetchFeed, fetchNextPage, hasNextPage, isFetchingNextPage } = useSocial(activeFeed, null);
+  const { topics } = useTopics();
   const { communities } = useCommunities();
   const [location, setLocation] = useLocation();
   const { toast } = useToast();
@@ -172,8 +164,6 @@ export function HomeFeed() {
     return () => window.removeEventListener("bd:open-composer", openComposerFromMenu);
   }, [openComposerFromMenu]);
 
-  const [isSeeding, setIsSeeding] = useState(false);
-
   // Extract all question posts to feed into the Answer picker
   const existingQuestionsList = useMemo(() => {
     return posts
@@ -194,44 +184,6 @@ export function HomeFeed() {
         };
       });
   }, [posts, topics, currentDisplayName, currentUserId]);
-
-  useEffect(() => {
-    const seedData = async () => {
-      // B3: seeding is a For-You cold-start concern. On the Following view
-      // posts are cloud-only (legitimately empty for new users) — seeding
-      // here would loop forever: seeds land in the For-You universe,
-      // Following never sees them, posts.length stays 0 → re-seed → ∞.
-      // That loop was the fuel of the 401/429 rate-limit cascade before the
-      // guest local-only fix.
-      if (activeFeed === "following") return;
-      if (isLoading || isSeeding || (posts.length > 0 && topics.length > 0)) return;
-
-      setIsSeeding(true);
-      try {
-        if (topics.length === 0) {
-          for (const topic of SEED_TOPICS) await addTopic(topic);
-        }
-        if (posts.length === 0) {
-          // Phase 5 — seed with the full 12-post cold-start pool so the
-          // feed is never blank for new users. Mixes across all 6 topics.
-          for (const post of COLD_START_POSTS) await addPost(post);
-        }
-        await refreshTopics();
-        await refreshPosts();
-      } catch (error) {
-        console.error("Failed to seed the home feed", error);
-        toast({
-          title: "Feed setup failed",
-          description: "We could not load starter content. Please refresh and try again.",
-          variant: "destructive",
-        });
-      } finally {
-        setIsSeeding(false);
-      }
-    };
-    void seedData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- seeding must only re-trigger on feed/topic/loading state, not on the stable mutation identities (addPost/addTopic/refreshPosts/refreshTopics); listing them would re-seed on every mutation refetch.
-  }, [activeFeed, posts.length, topics.length, isLoading, isSeeding, toast]);
 
   // Phase 5 — Cold-start banner state. Shown when user follows <3 topics
   // and hasn't dismissed it explicitly.
@@ -332,7 +284,7 @@ export function HomeFeed() {
     return selectChronologicalHomePosts(visiblePosts, selectedTopicId, postId, displayLimit);
   }, [posts, selectedTopicId, displayLimit, location]);
 
-  if (isLoading || isSeeding) {
+  if (isLoading) {
     // PHASE 1/3 — the old loading state was a wall of skeletons: on Slow 3G
     // (or a cold IDB open) a first-time visitor stared at grey boxes with no
     // way to do anything. The instant-value card renders FIRST — it needs no
