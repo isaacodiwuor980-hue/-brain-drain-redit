@@ -264,13 +264,21 @@ export function useSocial(mode: "foryou" | "following" = "foryou", topicId: stri
         toast({ title: "Post not published", description: "This item remains on this device and needs review.", variant: "destructive" });
         return;
       }
-      if (!session.token) {
+      // Offline posts are drafts for explicit review, not automatic sends.
+      // Recheck navigator before sending too, since connectivity can change
+      // while token acquisition is pending.
+      if (!session.token || onlineStatus === "offline" || (typeof navigator !== "undefined" && navigator.onLine === false)) {
         queueOfflineAction("create_post", { postId: post.id }, session.uid);
         toast({ title: "Post not published", description: "This item remains on this device and needs review.", variant: "destructive" });
         return;
       }
       const active = await getAuthSession();
       if (!maySendPostAs(post.userId, active)) {
+        toast({ title: "Post not published", description: "This item remains on this device and needs review.", variant: "destructive" });
+        return;
+      }
+      if (typeof navigator !== "undefined" && navigator.onLine === false) {
+        queueOfflineAction("create_post", { postId: post.id }, session.uid);
         toast({ title: "Post not published", description: "This item remains on this device and needs review.", variant: "destructive" });
         return;
       }
