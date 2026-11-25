@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import express from "express";
 import type { Server } from "node:http";
-const mock = vi.hoisted(() => ({ insert: vi.fn(), get: vi.fn(), updateMatchingIds: vi.fn(), deleteMatchingIds: vi.fn(), isConfigured: vi.fn(() => true) }));
+const mock = vi.hoisted(() => ({ insert: vi.fn(), get: vi.fn(), getOne: vi.fn(), updateMatchingIds: vi.fn(), deleteMatchingIds: vi.fn(), isConfigured: vi.fn(() => true) }));
 vi.mock("../lib/supabase", () => ({ supabase: mock, SupabaseError: class extends Error { constructor(message: string, public status: number, public body?: unknown) { super(message); } } }));
 vi.mock("../lib/logger", () => ({ logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() } }));
 vi.mock("../middleware/auth", () => ({
@@ -10,45 +10,46 @@ vi.mock("../middleware/auth", () => ({
     if (!subject) { res.status(401).json({ error: "Authentication required" }); return; }
     req.auth = { uid: subject } as express.Request["auth"]; next();
   },
-  optionalAuth(_req: express.Request, _res: express.Response, next: express.NextFunction) { next(); },
+  optionalAuth(req: express.Request, _res: express.Response, next: express.NextFunction) { const uid = req.headers.authorization?.replace("Bearer ", ""); if (uid) req.auth = {uid}; next(); },
 }));
 import router from "./skills";
 import { SupabaseError } from "../lib/supabase";
 let server: Server, base: string;
 beforeAll(async () => { const app = express(); app.use(express.json()); app.use("/api", router); await new Promise<void>(resolve => { server = app.listen(0, "127.0.0.1", resolve); }); const addr = server.address(); if (!addr || typeof addr === "string") throw new Error("No port"); base = `http://127.0.0.1:${addr.port}`; });
 afterAll(async () => { await new Promise<void>((resolve, reject) => server.close(err => err ? reject(err) : resolve())); });
-beforeEach(() => { vi.clearAllMocks(); mock.isConfigured.mockReturnValue(true); mock.insert.mockResolvedValue(undefined); mock.get.mockResolvedValue([]); mock.updateMatchingIds.mockResolvedValue([]); mock.deleteMatchingIds.mockResolvedValue(["skill-1"]); });
+const aliceId = "00000000-0000-4000-8000-000000000001", bobId = "00000000-0000-4000-8000-000000000002";
+beforeEach(() => { vi.clearAllMocks(); mock.getOne.mockImplementation(async (_table: string, opts: { filters: Record<string,string> }) => opts.filters.firebase_subject === "eq.alice" ? {supabase_uid: aliceId} : opts.filters.firebase_subject === "eq.bob" ? {supabase_uid: bobId} : null); mock.isConfigured.mockReturnValue(true); mock.insert.mockResolvedValue(undefined); mock.get.mockResolvedValue([]); mock.updateMatchingIds.mockResolvedValue([]); mock.deleteMatchingIds.mockResolvedValue(["skill-1"]); });
 const payload = { id: "skill-1", domain: "TEST", title: "Example", status: "private" };
 async function put(user: string, body: unknown = payload) { return fetch(`${base}/api/v1/skills`, { method: "PUT", headers: { authorization: `Bearer ${user}`, "content-type": "application/json" }, body: JSON.stringify(body) }); }
 describe("skill ownership with mocked service-role database", () => {
   it("inserts a new skill without merge-duplicates", async () => {
     expect((await put("alice")).status).toBe(200);
-    expect(mock.insert).toHaveBeenCalledWith("skills", expect.objectContaining({ id: "skill-1", author_id: "alice" }));
+    expect(mock.insert).toHaveBeenCalledWith("skills", expect.objectContaining({ id: "skill-1", author_id: aliceId }));
     expect(mock.updateMatchingIds).not.toHaveBeenCalled();
   });
   it("allows an existing owner to update using an atomic owner predicate", async () => {
     mock.insert.mockRejectedValueOnce(new SupabaseError("conflict", 409)); mock.updateMatchingIds.mockResolvedValueOnce(["skill-1"]);
     expect((await put("alice")).status).toBe(200);
-    expect(mock.updateMatchingIds).toHaveBeenCalledWith("skills", { id: "skill-1", author_id: "alice" }, expect.objectContaining({ author_id: "alice" }));
+    expect(mock.updateMatchingIds).toHaveBeenCalledWith("skills", { id: "skill-1", author_id: aliceId }, expect.objectContaining({ author_id: aliceId }));
   });
   it("does not overwrite another user's existing skill", async () => {
     mock.insert.mockRejectedValueOnce(new SupabaseError("conflict", 409)); mock.updateMatchingIds.mockResolvedValueOnce([]);
     const res = await put("bob"); expect(res.status).toBe(403); expect(await res.json()).toEqual({ error: "Skill ownership conflict" });
-    expect(mock.updateMatchingIds).toHaveBeenCalledWith("skills", { id: "skill-1", author_id: "bob" }, expect.anything());
+    expect(mock.updateMatchingIds).toHaveBeenCalledWith("skills", { id: "skill-1", author_id: bobId }, expect.anything());
   });
   it("does not leak upstream error bodies", async () => {
     mock.insert.mockRejectedValueOnce(new SupabaseError("failed", 500, "sensitive upstream body"));
     const res = await put("alice"); expect(res.status).toBe(502); expect(JSON.stringify(await res.json())).not.toContain("sensitive");
   });
   it("rechecks ownership in delete and never deletes for a nonowner", async () => {
-    mock.get.mockResolvedValue([{ id: "skill-1", author_id: "alice" }]);
+    mock.get.mockResolvedValue([{ id: "skill-1", author_id: aliceId }]);
     expect((await fetch(`${base}/api/v1/skills/skill-1`, { method: "DELETE", headers: { authorization: "Bearer bob" } })).status).toBe(403);
     expect(mock.deleteMatchingIds).not.toHaveBeenCalled();
     expect((await fetch(`${base}/api/v1/skills/skill-1`, { method: "DELETE", headers: { authorization: "Bearer alice" } })).status).toBe(200);
-    expect(mock.deleteMatchingIds).toHaveBeenCalledWith("skills", { id: "skill-1", author_id: "alice" });
+    expect(mock.deleteMatchingIds).toHaveBeenCalledWith("skills", { id: "skill-1", author_id: aliceId });
   });
   it("reports a concurrent delete or ownership change instead of false success", async () => {
-    mock.get.mockResolvedValue([{ id: "skill-1", author_id: "alice" }]); mock.deleteMatchingIds.mockResolvedValueOnce([]);
+    mock.get.mockResolvedValue([{ id: "skill-1", author_id: aliceId }]); mock.deleteMatchingIds.mockResolvedValueOnce([]);
     const res = await fetch(`${base}/api/v1/skills/skill-1`, { method: "DELETE", headers: { authorization: "Bearer alice" } });
     expect(res.status).toBe(409);
   });
@@ -98,4 +99,22 @@ it("rejects unreviewed publication before any service-role write", async () => {
   const res = await put("alice", { ...payload, status: "published", reviewer_id: "self" });
   expect(res.status).toBe(503); expect(res.headers.get("cache-control")).toContain("no-store");
   expect(mock.insert).not.toHaveBeenCalled(); expect(mock.updateMatchingIds).not.toHaveBeenCalled();
+});
+
+it("requires verified mapping before private reads and writes", async () => {
+  mock.get.mockResolvedValue([{id:"skill-1", status:"private", author_id:aliceId, steps:["secret"]}]);
+  const get = (user: string) => fetch(`${base}/api/v1/skills/skill-1`, {headers:{authorization:`Bearer ${user}`}});
+  expect((await get("alice")).status).toBe(200);
+  expect((await get("bob")).status).toBe(403);
+  expect((await get(aliceId)).status).toBe(403);
+  expect((await put("unknown")).status).toBe(403);
+  expect(mock.insert).not.toHaveBeenCalled();
+});
+
+it("fails closed on mapping lookup failure without exposing upstream details", async () => {
+  mock.getOne.mockRejectedValueOnce(new Error("private identity data"));
+  const res = await put("alice");
+  expect(res.status).toBe(503);
+  expect(JSON.stringify(await res.json())).not.toContain("private identity data");
+  expect(mock.insert).not.toHaveBeenCalled();
 });

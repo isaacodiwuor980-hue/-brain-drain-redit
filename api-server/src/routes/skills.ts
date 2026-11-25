@@ -10,14 +10,28 @@
  * All writes require Firebase auth. Reads of published skills are public.
  * Reads of private/in_review skills require the requester to be the author.
  */
-import { Router, type IRouter } from "express";
+import { Router, type IRouter, type Response } from "express";
 import { z } from "zod";
 import { supabase, SupabaseError } from "../lib/supabase";
 import { logger } from "../lib/logger";
 import { optionalAuth, requireAuth } from "../middleware/auth";
+import { lookupMappedIdentity } from "../middleware/identity-map";
 import type { VerifiedAuth } from "../lib/firebase-auth";
 
 const router: IRouter = Router();
+
+// Firebase subjects and Supabase UUIDs are different identity domains.
+async function verifiedOwner(subject: string, res: Response): Promise<string | null> {
+  try {
+    const uid = await lookupMappedIdentity(subject);
+    if (!uid) { res.set("Cache-Control", "no-store").status(403).json({ error: "Identity mapping required" }); return null; }
+    return uid.toLowerCase();
+  } catch {
+    res.set("Cache-Control", "no-store").status(503).json({ error: "Identity service unavailable" });
+    return null;
+  }
+}
+
 
 const SkillRowSchema = z.object({
   id: z.string().min(1).max(120).regex(/^[A-Za-z0-9_-]+$/),
@@ -106,11 +120,13 @@ router.get("/v1/skills/:id", optionalAuth, async (req, res) => {
     }
     // Private/in_review skills require the requester to be the author.
     const auth: VerifiedAuth | undefined = req.auth;
-    if (!auth || auth.uid !== skill.author_id) {
-      res.status(403).json({ error: "Not authorized to view this skill" });
-      return;
+    if (!auth) { res.status(403).json({ error: "Not authorized to view this skill" }); return; }
+    const owner = await verifiedOwner(auth.uid, res);
+    if (!owner) return;
+    if (owner !== skill.author_id?.toLowerCase()) {
+      res.status(403).json({ error: "Not authorized to view this skill" }); return;
     }
-    res.json(skill);
+    res.set("Cache-Control", "no-store").json(skill);
   } catch (err) {
     // B-9 fix: previously every error (including Supabase outages / 500s)
     // was converted to 404, masking real failures and making debugging
@@ -183,13 +199,9 @@ router.put("/v1/skills", requireAuth, async (req, res) => {
     res.set("Cache-Control", "no-store").status(503).json({ error: "Skill publishing is temporarily unavailable" });
     return;
   }
-  // Subject is used in an ownership filter. Reject filter syntax rather than
-  // letting an authenticated caller broaden a service-role operation.
-  if (!/^[A-Za-z0-9_-]{1,128}$/.test(auth.uid)) {
-    res.status(403).json({ error: "Identity not supported" });
-    return;
-  }
-  const row = { ...parsed.data, author_id: auth.uid, updated_at: new Date().toISOString() };
+  const owner = await verifiedOwner(auth.uid, res);
+  if (!owner) return;
+  const row = { ...parsed.data, author_id: owner, updated_at: new Date().toISOString() };
   try {
     // Never use merge-duplicates with service-role authority: it could replace
     // another author's row. Insert first, then update only an owned conflict.
@@ -197,7 +209,7 @@ router.put("/v1/skills", requireAuth, async (req, res) => {
       await supabase.insert("skills", row);
     } catch (err) {
       if (!(err instanceof SupabaseError) || err.status !== 409) throw err;
-      const updated = await supabase.updateMatchingIds("skills", { id: row.id, author_id: auth.uid }, row);
+      const updated = await supabase.updateMatchingIds("skills", { id: row.id, author_id: owner }, row);
       if (updated.length !== 1 || updated[0] !== row.id) {
         res.status(403).json({ error: "Skill ownership conflict" });
         return;
@@ -230,9 +242,8 @@ router.delete("/v1/skills/:id", requireAuth, async (req, res) => {
     res.status(400).json({ error: "Invalid skill id" });
     return;
   }
-  if (!/^[A-Za-z0-9_-]{1,128}$/.test(auth.uid)) {
-    res.status(403).json({ error: "Identity not supported" }); return;
-  }
+  const owner = await verifiedOwner(auth.uid, res);
+  if (!owner) return;
   try {
     // Verify ownership before delete.
     const rows = await supabase.get<SkillRow>("skills", {
@@ -244,12 +255,12 @@ router.delete("/v1/skills/:id", requireAuth, async (req, res) => {
       res.status(404).json({ error: "Skill not found" });
       return;
     }
-    if (rows[0].author_id !== auth.uid) {
+    if (rows[0].author_id?.toLowerCase() !== owner) {
       res.status(403).json({ error: "Not authorized to delete this skill" });
       return;
     }
     // Recheck ownership on the delete itself to close the probe/write race.
-    const deleted = await supabase.deleteMatchingIds("skills", { id, author_id: auth.uid });
+    const deleted = await supabase.deleteMatchingIds("skills", { id, author_id: owner });
     if (deleted.length !== 1 || deleted[0] !== id) {
       res.status(409).json({ error: "Skill changed or is no longer available" }); return;
     }
