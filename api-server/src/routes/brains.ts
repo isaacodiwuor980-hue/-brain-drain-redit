@@ -117,6 +117,7 @@ router.get("/brains", optionalAuth, async (req, res) => {
 
   const { limit, offset, mine } = parsed.data;
   const filters: Record<string, string> = {};
+  let mappedOwner: string | null = null;
   if (mine) {
     if (!req.auth) {
       res.status(401).json({ error: "Authentication required" });
@@ -125,6 +126,7 @@ router.get("/brains", optionalAuth, async (req, res) => {
     try {
       const mapped = await lookupMappedIdentity(req.auth.uid);
       if (!mapped) { res.status(403).json({ error: "Identity mapping required" }); return; }
+      mappedOwner = mapped;
       filters.author_id = `eq.${mapped}`;
     } catch {
       res.status(503).json({ error: "Identity service unavailable" }); return;
@@ -140,7 +142,12 @@ router.get("/brains", optionalAuth, async (req, res) => {
       limit: limit + 1,
       offset,
     });
-    res.json({
+    // This query uses a privileged client; never trust a malformed upstream
+    // result to have obeyed the requested visibility/owner filter.
+    if (rows.some(row => mine ? row.author_id?.toLowerCase() !== mappedOwner?.toLowerCase() : row.is_public !== true)) {
+      res.set("Cache-Control", "no-store").status(502).json({ error: "Brains unavailable" }); return;
+    }
+    res.set("Cache-Control", "no-store").json({
       brains: rows.slice(0, limit).map(toClientBrain),
       hasMore: rows.length > limit,
       source: "supabase",
@@ -167,32 +174,18 @@ router.get("/brains/:id", (_req, res, next) => { res.setHeader("Cache-Control", 
     return;
   }
   try {
-    const brain = await supabase.getOne<BrainRow>("brains", {
-      filters: { id: `eq.${req.params.id}` },
-    });
-    if (!brain) {
-      res.status(404).json({ error: "Brain not found" });
-      return;
-    }
-    // Match the database visibility rule: legacy repo status never overrides
-    // an explicit private is_public value. Service-role reads bypass RLS.
-    if (brain.is_public !== true) {
-      if (!req.auth) { res.status(404).json({ error: "Brain not found" }); return; }
+    // One SQL statement returns an authorized brain and its nodes from the
+    // same snapshot; separate service-role reads could cross a privacy change.
+    type Detail = { brain: BrainRow; nodes: BrainNodeRow[] };
+    let detail = await supabase.rpc<Detail | null>("read_brain_detail_v2", { p_id: id, p_uid: null });
+    if (!detail && req.auth) {
       let mapped: string | null;
       try { mapped = await lookupMappedIdentity(req.auth.uid); }
       catch { res.status(503).json({ error: "Identity service unavailable" }); return; }
-      if (!mapped || brain.author_id !== mapped) { res.status(404).json({ error: "Brain not found" }); return; }
+      if (mapped) detail = await supabase.rpc<Detail | null>("read_brain_detail_v2", { p_id: id, p_uid: mapped });
     }
-
-    const nodes = await supabase.get<BrainNodeRow>("brain_nodes", {
-      filters: { brain_id: `eq.${brain.id}` },
-    });
-
-    res.json({
-      brain: toClientBrain(brain),
-      nodes: nodes.map(toClientNode),
-      source: "supabase",
-    });
+    if (!detail) { res.status(404).json({ error: "Brain not found" }); return; }
+    res.json({ brain: toClientBrain(detail.brain), nodes: detail.nodes.map(toClientNode), source: "supabase" });
   } catch (error) {
     if (error instanceof SupabaseError) {
       res.status(502).json({ error: "Brain unavailable" });

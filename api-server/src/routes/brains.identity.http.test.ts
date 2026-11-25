@@ -39,7 +39,10 @@ beforeEach(() => {
     return null;
   });
   db.get.mockResolvedValue([]); db.delete.mockResolvedValue(undefined);
-  db.rpc.mockResolvedValue({ created: true, nodeCount: 0, brain });
+  db.rpc.mockImplementation(async (name: string, args: {p_uid?: string; p_id?: string}) => {
+    if (name === "read_brain_detail_v2") return args.p_uid === a ? { brain, nodes: [] } : null;
+    return { created: true, nodeCount: 0, brain };
+  });
 });
 const auth = (user: string) => ({ authorization: `Bearer ${user}` });
 async function save(user: string) { return fetch(`${base}/api/brains`, { method: "POST", headers: { ...auth(user), "content-type": "application/json" }, body: JSON.stringify({ brain: { id: "brain1", title: "Private" }, nodes: [] }) }); }
@@ -59,24 +62,33 @@ describe("brain routes with mocked identity and database", () => {
     expect(db.get).toHaveBeenCalledWith("brains", expect.objectContaining({ filters: { author_id: `eq.${a}` } }));
     expect((await fetch(`${base}/api/brains?mine=true`, { headers: auth("unknown") })).status).toBe(403);
   });
+  it("does not return mismatched rows from a privileged list query", async () => {
+    db.get.mockResolvedValueOnce([brain, {...brain, id:"public", is_public:true}]);
+    const guest = await fetch(`${base}/api/brains`);
+    expect(guest.status).toBe(502);
+    expect(JSON.stringify(await guest.json())).not.toContain("Private");
+    db.get.mockResolvedValueOnce([brain, {...brain, id:"other", author_id:b}]);
+    const owner = await fetch(`${base}/api/brains?mine=true`, {headers:auth("alice")});
+    expect(owner.status).toBe(502);
+    expect(JSON.stringify(await owner.json())).not.toContain("Private");
+  });
   it("allows owner private read and blocks another user and guest", async () => {
     expect((await fetch(`${base}/api/brains/brain1`, { headers: auth("alice") })).status).toBe(200);
     expect((await fetch(`${base}/api/brains/brain1`, { headers: auth("bob") })).status).toBe(404);
     expect((await fetch(`${base}/api/brains/brain1`)).status).toBe(404);
   });
-  it("never exposes a private brain or its nodes merely because a legacy repo status is public", async () => {
-    for (const status of ["public_repo", "archived"]) {
-      db.getOne.mockResolvedValueOnce({ ...brain, is_public: false, repo_status: status });
-      const response = await fetch(`${base}/api/brains/brain1`);
-      expect(response.status).toBe(404);
-      expect(response.headers.get("cache-control")).toContain("no-store");
-      expect(db.get).not.toHaveBeenCalled();
-    }
+  it("uses the public-only atomic detail lookup for a guest", async () => {
+    const response = await fetch(`${base}/api/brains/brain1`);
+    expect(response.status).toBe(404);
+    expect(response.headers.get("cache-control")).toContain("no-store");
+    expect(db.rpc).toHaveBeenCalledWith("read_brain_detail_v2", {p_id:"brain1",p_uid:null});
+    expect(db.get).not.toHaveBeenCalled();
   });
   it("keeps public reads available without a mapping", async () => {
-    db.getOne.mockResolvedValueOnce({ ...brain, is_public: true });
+    db.rpc.mockResolvedValueOnce({brain:{ ...brain, is_public: true },nodes:[]});
     expect((await fetch(`${base}/api/brains/brain1`)).status).toBe(200);
-    expect(db.getOne).toHaveBeenCalledTimes(1);
+    expect(db.getOne).not.toHaveBeenCalled();
+    expect(db.rpc).toHaveBeenCalledWith("read_brain_detail_v2", {p_id:"brain1",p_uid:null});
   });
   it("requires recent sign-in before brain deletion or any database lookup", async () => {
     const remove = (headers: Record<string, string>) => fetch(`${base}/api/brains/brain1`, {method: "DELETE", headers});
