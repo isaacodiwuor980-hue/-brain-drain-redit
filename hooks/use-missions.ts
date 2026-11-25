@@ -1,11 +1,9 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Mission, Milestone } from "../lib/types";
 import { idb } from "../lib/db";
-import { useReputation } from "./use-reputation";
 
 export function useMissions() {
   const queryClient = useQueryClient();
-  const { addXPEvent } = useReputation();
 
   const { data: { missions = [], milestones = [] } = {}, isLoading } = useQuery({
     queryKey: ["missionsData"],
@@ -84,7 +82,6 @@ export function useMissions() {
         ...newMilestones.map(m => idb.put("milestones", m))
       ]);
 
-      await addXPEvent("mission_created", 50, `Started mission: ${newMission.title}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["missionsData"] });
@@ -132,9 +129,6 @@ export function useMissions() {
         const newProgress = calculateProgress(missionId, allUpdatedMilestones);
         await idb.put("missions", { ...mission, progress: newProgress });
         
-        if (updatedMilestone.completed) {
-          await addXPEvent("milestone_completed", 20, `Completed milestone: ${updatedMilestone.title}`);
-        }
       }
     },
     onSuccess: () => {
@@ -162,7 +156,7 @@ export function useMissions() {
 
       if (mission.repeatsDaily) {
         // Daily-repeat missions: mark today as the last-completed day,
-        // grant XP, and set progress to 100 for today. The daily reset
+        // and set progress to 100 for today. The daily reset
         // check (below) will reset progress to 0 on the next day so the
         // user can complete it again.
         const updatedMission: Mission = {
@@ -172,7 +166,6 @@ export function useMissions() {
           lastDailyReset: today,
         };
         await idb.put("missions", updatedMission);
-        await addXPEvent("mission_completed", mission.xpReward, `Daily mission: ${mission.title}`);
       } else {
         // Normal mission: mark completed permanently.
         const updatedMission: Mission = {
@@ -181,7 +174,6 @@ export function useMissions() {
           progress: 100
         };
         await idb.put("missions", updatedMission);
-        await addXPEvent("mission_completed", mission.xpReward, `Completed mission: ${mission.title}`);
       }
     },
     onSuccess: () => {

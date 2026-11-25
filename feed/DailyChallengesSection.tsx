@@ -167,7 +167,7 @@ export function DailyChallengesSection() {
                         {challenge.difficulty}
                       </Badge>
                       <span className="text-xs font-bold text-amber-600 dark:text-amber-400 flex items-center gap-1">
-                        <Sparkles className="w-3 h-3" /> +{challenge.rewardXp} XP
+                        <Sparkles className="w-3 h-3" /> Points paused
                       </span>
                     </div>
                   </div>
@@ -291,8 +291,7 @@ export function DailyChallengesSection() {
               </h4>
 
               <p className="text-xs text-muted-foreground max-w-sm mx-auto">
-                You achieved a score of <strong>{attemptOutcome?.score}%</strong> and earned{" "}
-                <strong className="text-amber-500">+{attemptOutcome?.xpEarned} Reasoning XP</strong>.
+                You achieved a score of <strong>{attemptOutcome?.score}%</strong>. Points are temporarily paused.
               </p>
 
               <div className="pt-2">

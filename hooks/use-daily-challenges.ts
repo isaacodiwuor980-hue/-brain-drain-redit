@@ -1,7 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { DailyChallenge, UserChallengeAttempt } from "../lib/extension-types";
 import { idb } from "../lib/db";
-import { useReputation } from "./use-reputation";
 import { useAuth } from "@/components/auth/AuthContext";
 import { userIdOr } from "@/lib/user-data";
 
@@ -98,7 +97,6 @@ const SEED_DAILY_CHALLENGES: DailyChallenge[] = [
 
 export function useDailyChallenges() {
   const queryClient = useQueryClient();
-  const { addXPEvent } = useReputation();
   // Phase 2: real user ID for challenge attempts.
   const { user } = useAuth();
   const currentUserId = userIdOr(user);
@@ -155,7 +153,7 @@ export function useDailyChallenges() {
       const totalScenarios = challenge.scenarios.length;
       const score = Math.round((correctCount / (totalScenarios || 1)) * 100);
       const isSuccessful = score >= 70;
-      const xpEarned = isSuccessful ? challenge.rewardXp : Math.round(challenge.rewardXp * 0.25);
+      const xpEarned = 0; // Points are paused; do not record an unawarded reward.
 
       const attempt: UserChallengeAttempt = {
         id: `${currentUserId}_${challengeId}`,
@@ -173,13 +171,6 @@ export function useDailyChallenges() {
 
       await idb.putStrict("user_challenge_attempts", attempt);
 
-      if (xpEarned > 0) {
-        await addXPEvent(
-          "mission_completed",
-          xpEarned,
-          `Daily Challenge: ${challenge.title} (${score}%)`
-        );
-      }
 
       return attempt;
     },

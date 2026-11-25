@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { idb } from "@/lib/db";
 import { trackEvent } from "@/lib/analytics";
 import { Comment, Post } from "@/lib/types";
-import { countSourceLinks, computeSourceLinkReputation } from "@/lib/hive-mind";
+import { countSourceLinks } from "@/lib/hive-mind";
 import { votingAvailable } from "@/lib/vote-availability";
 
 const STORE = "comments";
@@ -138,22 +138,6 @@ export function useComments(postId?: string) {
       } catch {
         // Best-effort — the comment is already saved; the counter
         // will be reconciled on the next refetch.
-      }
-
-      // Award +1 reputation per source link.
-      const repDelta = computeSourceLinkReputation(content);
-      if (repDelta > 0) {
-        try {
-          const rep = await idb.get<{ id: string; xp: number; level: number; streak: number; lastActiveDate: string; totalMissionsCompleted: number; totalBrainsCreated: number; totalCheckIns: number; badges: string[] }>("reputation", "me");
-          if (rep) {
-            await idb.put("reputation", {
-              ...rep,
-              xp: rep.xp + repDelta,
-            });
-          }
-        } catch {
-          // Best-effort — reputation update is non-critical.
-        }
       }
 
       await trackEvent("comment_created", {

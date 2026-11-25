@@ -373,7 +373,7 @@ export function MissionsPage() {
                   </div>
                 </div>
                 <div className="grid gap-2">
-                  <Label>XP Reward</Label>
+                  <Label>Potential XP reward (paused)</Label>
                   <Select value={xpReward} onValueChange={setXpReward}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
@@ -412,7 +412,7 @@ export function MissionsPage() {
                       <RefreshCw className="w-4 h-4 text-muted-foreground" />
                       <div>
                         <Label className="cursor-pointer">Repeats every day</Label>
-                        <p className="text-xs text-muted-foreground">Auto-resets daily. XP is re-granted each day you complete it.</p>
+                        <p className="text-xs text-muted-foreground">Auto-resets daily. Points are temporarily paused.</p>
                       </div>
                     </div>
                     <Switch checked={repeatsDaily} onCheckedChange={setRepeatsDaily} aria-label="Repeats every day" />
@@ -558,7 +558,7 @@ export function MissionsPage() {
                         <div className="flex items-center justify-between text-xs text-muted-foreground mb-3">
                           <span>{mStones.length} milestones</span>
                           <span className="flex items-center gap-1 text-yellow-500 font-medium">
-                            +{mission.xpReward} XP
+                            Points paused
                           </span>
                         </div>
                         <div className="flex items-center gap-3">
@@ -637,7 +637,7 @@ export function MissionsPage() {
                       )}
                       <div className="flex items-center gap-2 text-sm bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 px-3 py-1.5 rounded-md border border-yellow-500/20 font-semibold">
                         <Target className="w-4 h-4" />
-                        Reward: {selectedMission.xpReward} XP
+                        Points paused
                       </div>
                     </div>
                   </div>
@@ -733,7 +733,7 @@ export function MissionsPage() {
                 <Rocket className="w-10 h-10 opacity-50" />
               </div>
               <h3 className="text-xl font-bold mb-2">Select a Mission</h3>
-              <p className="max-w-xs text-center">Choose a mission from the list to view details, track milestones, and earn XP.</p>
+              <p className="max-w-xs text-center">Choose a mission to view details and track milestones. Points are paused.</p>
             </div>
           )}
         </div>
@@ -1035,7 +1035,7 @@ export function MissionsPage() {
                     <span className="font-semibold">Builder Level</span>
                     <span className="text-muted-foreground">Level {reputation?.level ?? 1} • {reputation?.xp ?? 0} XP</span>
                   </div>
-                  <p className="text-xs text-muted-foreground">Earn XP by completing missions and milestones to level up.</p>
+                  <p className="text-xs text-muted-foreground">Points and automatic streak changes are temporarily paused.</p>
                 </div>
                 {categoryStats.length === 0 ? (
                   <p className="text-sm text-muted-foreground">No missions yet — create a pathway to start tracking domain progress.</p>
@@ -1089,7 +1089,7 @@ export function MissionsPage() {
               </div>
             </div>
             <div className="grid gap-2">
-              <Label>XP Reward</Label>
+              <Label>Potential XP reward (paused)</Label>
               <Select value={xpReward} onValueChange={setXpReward}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
@@ -1108,7 +1108,7 @@ export function MissionsPage() {
                   <RefreshCw className="w-4 h-4 text-muted-foreground" />
                   <div>
                     <Label className="cursor-pointer">Repeats every day</Label>
-                    <p className="text-xs text-muted-foreground">Auto-resets daily. XP is re-granted each day you complete it.</p>
+                    <p className="text-xs text-muted-foreground">Auto-resets daily. Points are temporarily paused.</p>
                   </div>
                 </div>
                 <Switch checked={repeatsDaily} onCheckedChange={setRepeatsDaily} aria-label="Repeats every day" />

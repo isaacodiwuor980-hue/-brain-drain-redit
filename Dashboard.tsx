@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { Brain, BrainData } from "@/lib/types";
 import { useDatabase } from "@/hooks/use-database";
-import { useReputation } from "@/hooks/use-reputation";
 import { useToast } from "@/hooks/use-toast";
 import { BrainCard } from "./BrainCard";
 import { BrainDrawer } from "./BrainDrawer";
@@ -17,7 +16,6 @@ import { SampleBrainLibrary } from "@/components/ui/SampleBrainLibrary";
 
 export function Dashboard() {
   const { brains, isLoading, saveBrainData, deleteBrain, exportData, getBrainData, refresh } = useDatabase();
-  const { addXPEvent } = useReputation();
   const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState("");
   
@@ -127,7 +125,6 @@ export function Dashboard() {
 
   const handleSampleAdded = async (data: BrainData) => {
     await saveBrainData(data);
-    await addXPEvent("brain_created", 10, "Tried a sample brain");
     toast({
       title: "Sample added",
       description: `"${data.brain.title}" is in your library. You can edit or run it anytime.`,
@@ -179,7 +176,6 @@ export function Dashboard() {
       }
 
       await saveBrainData({ brain: newBrain, nodes: newNodes });
-      await addXPEvent("brain_created", 30, "Forked a brain");
 
       toast({ title: "Brain forked", description: "Brain forked and saved to your library." });
       setIsForkOpen(false);

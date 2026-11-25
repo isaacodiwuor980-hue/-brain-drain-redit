@@ -22,6 +22,10 @@ describe("unverified local comment voting", () => {
     await expect(api.addComment({postId:"p",parentId:null,content:"synthetic private",authorName:"Alice",isConfidential:true})).rejects.toThrow("Confidential replies are unavailable");
     expect(mock.get).not.toHaveBeenCalled(); expect(mock.put).not.toHaveBeenCalled(); expect(mock.track).not.toHaveBeenCalled();
   });
+  it("does not award points for source links when a comment is created", async () => {
+    await act(async () => { await api.addComment({postId:"p",parentId:null,content:"see https://example.com",authorName:"Alice"}); });
+    expect(mock.put.mock.calls.some(([store]) => store === "reputation" || store === "xp_events")).toBe(false);
+  });
   it("rejects all vote actions before mutation, storage or analytics", async () => {
     await expect(api.voteComment({id:"c", postId:"p", direction:"up"})).rejects.toThrow("Voting temporarily unavailable");
     await expect(api.voteHouse({id:"c", postId:"p"})).rejects.toThrow("Voting temporarily unavailable");

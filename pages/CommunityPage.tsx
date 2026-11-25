@@ -2,7 +2,6 @@ import { useState } from "react";
 import { useLocation } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useCommunities } from "@/hooks/use-communities";
-import { useReputation } from "@/hooks/use-reputation";
 import { useAuth } from "@/components/auth/AuthContext";
 import { userIdOr, displayNameOr } from "@/lib/user-data";
 import { useMessages } from "@/hooks/use-messages";
@@ -162,7 +161,6 @@ function MembershipButton({
 export function CommunityPage() {
   const { communities, joinCommunity, leaveCommunity, cancelJoinRequest, isJoining, isLeaving, isCancelling } = useCommunities();
   const { checkins, addCheckin } = useCheckins();
-  const { addXPEvent } = useReputation();
   const { addConversation, addMessage } = useMessages();
   const { toast } = useToast();
   const [, setLocation] = useLocation();
@@ -310,8 +308,7 @@ export function CommunityPage() {
         createdAt: Date.now()
       });
 
-      await addXPEvent("check_in", 25, "Daily Momentum Check-In");
-      toast({ title: "Checked in!", description: "+25 XP earned for check-in." });
+      toast({ title: "Checked in!", description: "Points are temporarily paused." });
       setCheckinMessage("");
       setMoodScore(0);
     } catch (error) {
@@ -335,8 +332,7 @@ export function CommunityPage() {
         createdAt: Date.now()
       });
 
-      await addXPEvent("check_in", 25, "Circle Check-In");
-      toast({ title: "Checked in to circle!", description: "+25 XP earned." });
+      toast({ title: "Checked in to circle!", description: "Points are temporarily paused." });
       setCheckinMessage("");
       setMoodScore(0);
     } catch (error) {
