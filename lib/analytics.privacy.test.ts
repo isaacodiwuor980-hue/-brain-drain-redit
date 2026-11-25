@@ -8,6 +8,14 @@ import { flushAnalyticsEvents, getAnalyticsEvents, setQueryClientRef, trackEvent
 beforeEach(() => { vi.stubGlobal("indexedDB", new IDBFactory()); vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("{}", {status:200, headers:{"content-type":"application/json"}}))); });
 afterEach(async () => { setQueryClientRef(null); await clearLocalAnalytics().catch(() => undefined); resetDBConnection(); vi.unstubAllGlobals(); });
 describe("local activity privacy integration", () => {
+  it("does not collect vote or classification events locally or send them", async () => {
+    for (const type of ["post_reaction", "comment_reaction", "comment_classified", "vote_reward"] as const) {
+      await trackEvent(type, {postId:"synthetic-post", userId:"synthetic-voter", direction:"upvote"});
+    }
+    await flushAnalyticsEvents();
+    expect(await idb.getAllStrict("analytics_events")).toEqual([]);
+    expect(fetch).not.toHaveBeenCalled();
+  });
   it("does not persist, use, or send newly recorded events when disabled", async () => {
     await setLocalAnalyticsEnabled(false); await trackEvent("topic_selected", {topicId:"example"}); await flushAnalyticsEvents();
     expect(await idb.getAllStrict("analytics_events")).toEqual([]); expect(await getAnalyticsEvents()).toEqual([]); expect(fetch).not.toHaveBeenCalled();

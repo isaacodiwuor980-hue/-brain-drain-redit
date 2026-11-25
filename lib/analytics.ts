@@ -256,6 +256,9 @@ export async function flushAnalyticsEvents() {
 export function flushAnalyticsEventsWithBeacon() { return false; }
 
 export async function trackEvent(type: AnalyticsEventType, payload?: Record<string, unknown>) {
+  // Vote analytics are paused, including classification and reward signals.
+  // Existing historical data is not deleted by this guard.
+  if (type === "post_reaction" || type === "comment_reaction" || type === "comment_classified" || type === "vote_reward") return;
   const event: AnalyticsEvent = {
     id: createId(),
     type,

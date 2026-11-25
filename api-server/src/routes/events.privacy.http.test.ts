@@ -23,5 +23,14 @@ describe("server-side event privacy (mocked storage)", () => {
     mock.store.mockRejectedValueOnce(new Error("private-upstream-body")); const response=await send([event]); expect(response.status).toBe(500);
     expect(mock.error).toHaveBeenCalledWith({}, "Failed to store analytics events");
   });
+  it("rejects a whole batch containing legacy reaction events without storage or logging payloads", async () => {
+    for (const type of ["post_reaction", "comment_reaction"]) {
+      const reaction = {...event, type, payload:{postId:"synthetic-post", direction:"upvote", userId:"synthetic-voter"}};
+      const response = await send([event, reaction]);
+      expect(response.status).toBe(422); expect(await response.json()).toEqual({accepted:0,error:"Reaction analytics unavailable"});
+      expect(mock.store).not.toHaveBeenCalled();
+      expect(JSON.stringify(mock.info.mock.calls)).not.toContain("synthetic-voter");
+    }
+  });
   it("rejects invalid event batches before storing them",async () => { expect((await send([{type:"invalid"}])).status).toBe(400); expect(mock.store).not.toHaveBeenCalled(); });
 });

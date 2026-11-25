@@ -84,6 +84,14 @@ router.post("/events", async (req, res) => {
     return;
   }
 
+  // Reject the entire batch, rather than silently acknowledging dropped events.
+  // This avoids storing legacy vote activity even from older clients. Other
+  // event types still accept untrusted fields and need a separate privacy review.
+  if (parsed.data.events.some(event => event.type === "post_reaction" || event.type === "comment_reaction")) {
+    res.status(422).json({ accepted: 0, error: "Reaction analytics unavailable" });
+    return;
+  }
+
   const events = parsed.data.events.map((event) => ({
     ...event,
     route: event.route.split(/[?#]/, 1)[0],
