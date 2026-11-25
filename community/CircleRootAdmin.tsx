@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useState, useEffect, type ReactNode } from "react";
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -6,20 +6,35 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Shield, Settings, Users, Activity, Radio, BookOpen, AlertTriangle } from "lucide-react";
+import { Shield, Settings, Users, Activity, Radio, BookOpen, AlertTriangle, FileText } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useCommunities } from "@/hooks/use-communities";
 
 interface Props {
   communityId: string;
   communityName: string;
 }
 
-export function CircleRootAdmin({ communityName }: Props) {
+export function CircleRootAdmin({ communityId, communityName }: Props) {
   const [open, setOpen] = useState(false);
   const { toast } = useToast();
+  const { communities, updateCharter, transferStewardship, promoteToCurator, demoteToContributor, makeObserver } = useCommunities();
+  const community = communities.find((c) => c.id === communityId);
+  const currentRole = community?.role ?? (community?.joinStatus === "member" ? "contributor" : null);
 
   const [semanticMatching, setSemanticMatching] = useState(true);
   const [persistentOrbit, setPersistentOrbit] = useState(true);
+  // Phase 4/5: charter editor draft state, seeded from the live record.
+  const [missionDraft, setMissionDraft] = useState(community?.charter?.mission ?? "");
+  const [scopeDraft, setScopeDraft] = useState(community?.charter?.scope ?? "");
+
+  // Keep drafts in sync when the Community record loads or the selected
+  // Room changes. Guarded by the saved charter value, so typing in the
+  // draft does not trigger a reset (community.charter is unchanged until save).
+  useEffect(() => {
+    setMissionDraft(community?.charter?.mission ?? "");
+    setScopeDraft(community?.charter?.scope ?? "");
+  }, [communityId, community?.charter?.mission, community?.charter?.scope]);
   
   const contentTypes = ['Posts', 'Questions', 'Polls', 'Quizzes', 'Quiz Answers', 'Assignments', 'Articles', 'Tutorials', 'Files', 'Images', 'Videos', 'Audio', 'Voice Notes', 'Events', 'Announcements', 'Challenges', 'Projects', 'Live Sessions', 'Job Posts', 'Marketplace', 'Resource Links', 'Wikis', 'AI Generated Notes'];
   const [contentToggles, setContentToggles] = useState<Record<string, boolean>>(
@@ -29,7 +44,7 @@ export function CircleRootAdmin({ communityName }: Props) {
   const [reviewPeriod, setReviewPeriod] = useState('Trusted Members Skip Review');
   const [customRules, setCustomRules] = useState(`1. No spam\n2. Respect members\n3. Academic references required\n4. No duplicate questions`);
 
-  const recTypes = ['Suggested Quizzes', 'Related Topics', 'Similar Discussions', 'Popular Posts', 'Popular Files', 'Related Resources', 'Recommended Members', 'Suggested Study Groups', 'Suggested Accountability Circles', 'Recent Activity'];
+  const recTypes = ['Suggested Quizzes', 'Related Topics', 'Similar Discussions', 'Popular Posts', 'Popular Files', 'Related Resources', 'Recommended Members', 'Suggested Study Groups', 'Suggested Rooms', 'Recent Activity'];
   const [recToggles, setRecToggles] = useState<Record<string, boolean>>(
     recTypes.reduce((acc, type) => ({ ...acc, [type]: true }), {})
   );
@@ -39,7 +54,7 @@ export function CircleRootAdmin({ communityName }: Props) {
       <SheetTrigger asChild>
         <Button variant="outline" size="sm" className="w-full mt-4 flex items-center gap-2 border-primary/20 hover:bg-primary/5 text-primary">
           <Shield className="w-4 h-4" />
-          /root Administration
+          /root RoomSteward
         </Button>
       </SheetTrigger>
       <SheetContent side="bottom" className="h-[85vh] sm:h-[85vh] p-0 flex flex-col rounded-t-xl">
@@ -50,7 +65,7 @@ export function CircleRootAdmin({ communityName }: Props) {
               /root Workspace
             </SheetTitle>
             <p className="text-sm text-muted-foreground mt-1">
-              Advanced circle configuration for: <span className="font-semibold text-foreground">{communityName}</span>
+              Advanced Room configuration for: <span className="font-semibold text-foreground">{communityName}</span>
             </p>
           </div>
           <Badge variant="outline" className="bg-primary/10 text-primary uppercase tracking-widest text-xs font-mono">
@@ -69,6 +84,9 @@ export function CircleRootAdmin({ communityName }: Props) {
             <TabsTrigger value="moderation" className="justify-start gap-2">
               <AlertTriangle className="w-4 h-4" /> Moderation & Rules
             </TabsTrigger>
+            <TabsTrigger value="charter" className="justify-start gap-2">
+              <FileText className="w-4 h-4" /> Charter
+            </TabsTrigger>
             <TabsTrigger value="roles" className="justify-start gap-2">
               <Users className="w-4 h-4" /> Member Roles
             </TabsTrigger>
@@ -84,7 +102,7 @@ export function CircleRootAdmin({ communityName }: Props) {
             <TabsContent value="active-relay" className="m-0 space-y-6">
               <div>
                 <h3 className="text-lg font-bold">Active Relay Engine</h3>
-                <p className="text-sm text-muted-foreground">Configure the intelligent routing layer for this circle.</p>
+                <p className="text-sm text-muted-foreground">Configure the intelligent routing layer for this Room.</p>
               </div>
               
               <div className="grid gap-6">
@@ -201,7 +219,7 @@ export function CircleRootAdmin({ communityName }: Props) {
             <TabsContent value="recommendations" className="m-0 space-y-6">
               <div>
                 <h3 className="text-lg font-bold">Recommendation Engine</h3>
-                <p className="text-sm text-muted-foreground">Configure what recommendations appear in the circle.</p>
+                <p className="text-sm text-muted-foreground">Configure what recommendations appear in the Room.</p>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {recTypes.map(type => (
@@ -214,10 +232,43 @@ export function CircleRootAdmin({ communityName }: Props) {
             </TabsContent>
 
             <TabsContent value="roles" className="m-0 space-y-6">
-               <div>
+              <div>
                 <h3 className="text-lg font-bold">Member Roles</h3>
                 <p className="text-sm text-muted-foreground">Manage permissions across hierarchy levels.</p>
               </div>
+
+              {/* Phase 5: functional role management for the current viewer.
+                  Local-first: the `role` lives on this user's Community
+                  record. Cross-user promotion needs a member directory. */}
+              <div className="p-4 border rounded-[16px] bg-card space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="font-medium">Your role in this Room</span>
+                  <Badge variant="outline" className="bg-primary/10 text-primary uppercase tracking-widest text-xs font-mono">
+                    {currentRole ?? "none"}
+                  </Badge>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Steward and Curator can manage the charter and promote Deposits into the Library. Observer is read-only.
+                </p>
+                <p className="text-[11px] text-muted-foreground/70">
+                  Role and charter changes are paused until membership and permissions are verified. Displayed local roles are not proof of authorization.
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  <Button variant="outline" size="sm" disabled onClick={() => { void transferStewardship(communityId); toast({ title: "Stewardship claimed", description: "You are now the Room steward." }); }}>
+                    Claim Stewardship
+                  </Button>
+                  <Button variant="outline" size="sm" disabled onClick={() => { void promoteToCurator(communityId); toast({ title: "Role updated", description: "You are now a Curator." }); }}>
+                    Make Curator
+                  </Button>
+                  <Button variant="outline" size="sm" disabled onClick={() => { void demoteToContributor(communityId); toast({ title: "Role updated", description: "You are now a Contributor." }); }}>
+                    Make Contributor
+                  </Button>
+                  <Button variant="outline" size="sm" disabled onClick={() => { void makeObserver(communityId); toast({ title: "Role updated", description: "You are now an Observer (read-only)." }); }}>
+                    Make Observer
+                  </Button>
+                </div>
+              </div>
+
               <div className="space-y-2">
                 {['Owner', 'Co-owner', 'Administrator', 'Moderator', 'Trusted Member', 'Contributor', 'Member', 'Visitor'].map(role => (
                    <div key={role} className="flex items-center justify-between p-3 border rounded-[16px] bg-card">
@@ -225,6 +276,46 @@ export function CircleRootAdmin({ communityName }: Props) {
                      <Button variant="ghost" size="sm" onClick={() => toast({title: "Edit Permissions", description: `Editing permissions for ${role}`})}>Edit Permissions</Button>
                    </div>
                 ))}
+              </div>
+            </TabsContent>
+
+            <TabsContent value="charter" className="m-0 space-y-6">
+              <div>
+                <h3 className="text-lg font-bold">Room Charter</h3>
+                <p className="text-sm text-muted-foreground">The mission and scope of this Room. Visible on the Room card and detail panel.</p>
+              </div>
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Mission</Label>
+                  <Textarea
+                    value={missionDraft}
+                    onChange={(e) => setMissionDraft(e.target.value)}
+                    placeholder="One sentence: what does this Room exist to do?"
+                    className="min-h-[80px]"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Scope</Label>
+                  <Textarea
+                    value={scopeDraft}
+                    onChange={(e) => setScopeDraft(e.target.value)}
+                    placeholder="What's in-bounds vs out-of-bounds for this Room?"
+                    className="min-h-[80px]"
+                  />
+                </div>
+                <Button
+                  disabled
+                  onClick={async () => {
+                    try {
+                      await updateCharter({ communityId, mission: missionDraft.trim(), scope: scopeDraft.trim() });
+                      toast({ title: "Charter Saved", description: "This Room's mission and scope were updated." });
+                    } catch (error) {
+                      toast({ title: "Couldn't save charter", description: error instanceof Error ? error.message : "Please try again.", variant: "destructive" });
+                    }
+                  }}
+                >
+                  Save Charter
+                </Button>
               </div>
             </TabsContent>
 

@@ -278,6 +278,12 @@ export interface Post {
   answeredQuestionAuthor?: string;
   communityId?: string;
   communityName?: string;
+  /**
+   * Room migration (Phase 1, additive): Room alias for `communityId`.
+   * When set, readers prefer it; `communityId` remains the source of
+   * truth for old records.
+   */
+  roomId?: string;
   event?: PostEvent;
   mediaUrls?: string[];
   brainId?: string; // Optional link to a brain
@@ -345,6 +351,65 @@ export interface Post {
    * simply stay author-locked, which is the safest default).
    */
   editPolicy?: "public" | "verified-experts" | "me-only";
+
+  // ── Room migration (Phase 6): Typed Deposits ───────────────────
+  // All additive. Old posts simply have no deposit fields and render as
+  // regular feed posts. A Deposit is a typed, versioned artifact that a
+  // Room's Curators can promote into the Library (Phase 7).
+
+  /**
+   * The Deposit type, when this post is a typed artifact rather than a
+   * freeform post/question/answer/note. Drives the structured fields
+   * shown and how it can be promoted into the Library.
+   */
+  depositType?: "procedure" | "decision" | "evidence" | "case" | "question" | "synthesis";
+  /**
+   * Per-type optional structured fields (free-form key/value). e.g. a
+   * "procedure" might carry { steps, prerequisites }, an "evidence" post
+   * might carry { source, confidence }. Renderers read these when present.
+   */
+  depositFields?: Record<string, string>;
+  /**
+   * Provenance trail for a Deposit. All fields optional so old posts and
+   * minimal deposits remain valid. `decayFlag` marks a Deposit whose
+   * evidence has since been superseded (preserved for the Library record).
+   */
+  provenance?: {
+    author?: string;
+    roleAtTime?: string;
+    source?: string;
+    validationStatus?: "unverified" | "community-validated" | "superseded";
+    version?: number;
+    decayFlag?: boolean;
+  };
+}
+
+/**
+ * Room migration (Phase 7): a Library entry is a versioned synthesis of one or
+ * more Deposits, curated by a Room's Curators and signed off by the Steward.
+ * Dissent is preserved as data (never dropped) so the record stays honest.
+ * Additive — the `library_entries` store is created fresh in DB v21; old
+ * installs simply have an empty Library.
+ */
+export interface LibraryEntry {
+  id: string;
+  roomId: string;
+  /** Deposit Post ids that were synthesized into this entry. */
+  depositIds: string[];
+  title: string;
+  summary: string;
+  /** Version of this synthesis (increments on re-synthesis). */
+  version: number;
+  /** userId of the Curator who promoted the Deposits. */
+  curatedBy?: string;
+  /** userId of the Steward who signed off (optional until signed). */
+  signedBy?: string;
+  /** Preserved dissent — counter-arguments that were NOT merged. */
+  dissent?: string;
+  /** Whether the synthesis is still considered current. */
+  superseded?: boolean;
+  createdAt: number;
+  updatedAt: number;
 }
 
 /**
@@ -489,6 +554,13 @@ export interface CircleCheckIn {
   myDownvote?: boolean;
   replies?: { id: string; userId: string; content: string; createdAt: number }[];
   linkedBrainId?: string;
+  /**
+   * Room migration (Phase 1, additive): Room alias for `circleId`. When
+   * set, readers prefer it; `circleId` remains the source of truth for
+   * old records. New check-ins keep writing `circleId` (the community
+   * id) so the checkin → PostCard path is unchanged.
+   */
+  roomId?: string;
 }
 export interface Pathway {
   id: string;
@@ -571,6 +643,29 @@ export interface Community {
   privacy?: "public" | "restricted" | "private";
   allowMature?: boolean;
   coverImage?: string;
+  /**
+   * Room migration (Phase 1, additive): the Room's charter. `mission` is
+   * the one-sentence mission ("Find a functional cure for HIV"); `scope`
+   * is the boundary of what the Room covers. Old circles have no charter
+   * and render `description` as before.
+   */
+  charter?: { mission: string; scope: string };
+  /**
+   * Room migration (Phase 1, additive): Room visibility vocabulary.
+   * Derived from `privacy` at read time when unset:
+   * public → open, restricted → gated, private → sealed (label only).
+   */
+  visibility?: "open" | "gated" | "sealed";
+  /**
+   * Room migration (Phase 1, additive): the current user's role in this
+   * Room. Derived as "contributor" when `joinStatus === "member"` and no
+   * role is stored. One steward per Room; curators and observers are
+   * assigned by the steward (Phase 5).
+   */
+  role?: "steward" | "curator" | "contributor" | "observer";
+  /** Room migration (Phase 1, additive): userId of the creator. Set by
+   *  CreateCircleDialog so stewardship can be assigned on creation. */
+  createdBy?: string;
 }
 
 export interface UserProfile {

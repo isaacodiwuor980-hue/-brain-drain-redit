@@ -203,12 +203,12 @@ export function useSocial(mode: "foryou" | "following" = "foryou", topicId: stri
         toast({ title: "Post not published", description: "This item remains on this device and needs review.", variant: "destructive" });
         return;
       }
-      // Media has no verified upload pipeline. Notes are not represented by
-      // the mounted create API; never silently drop their attachments. Keep
+      // Media has no verified upload pipeline. Notes and Room deposits are not
+      // represented by the mounted create API; never silently drop fields. Keep
       // the complete local draft and hold it for review instead of sending.
-      if ((post.mediaUrls?.length ?? 0) > 0 || post.postType === "note" || (post.noteAttachments?.length ?? 0) > 0) {
+      if ((post.mediaUrls?.length ?? 0) > 0 || post.postType === "note" || (post.noteAttachments?.length ?? 0) > 0 || post.depositType || post.depositFields || post.provenance) {
         holdPostForReview(session.uid);
-        toast({ title: "Post not published", description: "Image and note publishing is paused. This draft remains on this device and needs review.", variant: "destructive" });
+        toast({ title: "Post not published", description: "Image, note and Room deposit publishing is paused. This draft remains on this device and needs review.", variant: "destructive" });
         return;
       }
       // Offline posts are drafts for explicit review, not automatic sends.

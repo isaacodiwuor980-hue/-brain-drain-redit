@@ -44,6 +44,39 @@ const WizardModal = lazy(() =>
   import("@/components/WizardModal").then((module) => ({ default: module.WizardModal })),
 );
 
+// Room migration (Phase 6): which structured fields each Deposit type shows.
+// Additive — the composer only renders these when a depositType is chosen.
+const DEPOSIT_TYPE_FIELDS: Record<string, { key: string; label: string; placeholder: string }[]> = {
+  procedure: [
+    { key: "steps", label: "Steps", placeholder: "Ordered steps to reproduce / execute" },
+    { key: "prerequisites", label: "Prerequisites", placeholder: "What must be true first" },
+    { key: "owner", label: "Owner", placeholder: "Who runs this procedure" },
+  ],
+  decision: [
+    { key: "rationale", label: "Rationale", placeholder: "Why this decision was made" },
+    { key: "alternatives", label: "Alternatives", placeholder: "Options considered" },
+    { key: "decidedOn", label: "Decided On", placeholder: "Date or version" },
+  ],
+  evidence: [
+    { key: "source", label: "Source", placeholder: "Where this evidence comes from" },
+    { key: "confidence", label: "Confidence", placeholder: "e.g. high / medium / low" },
+    { key: "method", label: "Method", placeholder: "How it was gathered" },
+  ],
+  case: [
+    { key: "context", label: "Context", placeholder: "Situation background" },
+    { key: "outcome", label: "Outcome", placeholder: "What happened" },
+    { key: "lessonsLearned", label: "Lessons Learned", placeholder: "Takeaways" },
+  ],
+  question: [
+    { key: "openQuestion", label: "Open Question", placeholder: "The unresolved question" },
+    { key: "hypotheses", label: "Hypotheses", placeholder: "Candidate explanations" },
+  ],
+  synthesis: [
+    { key: "synthesizedFrom", label: "Synthesized From", placeholder: "Deposit IDs or sources combined" },
+    { key: "contradictions", label: "Contradictions", placeholder: "Points of disagreement to resolve" },
+  ],
+};
+
 export interface CommunityOption {
   id: string;
   name: string;
@@ -168,6 +201,12 @@ export function PostCreator({
   // Default "me-only" is the safest choice; the author can always edit
   // their own post regardless. See Post.editPolicy in lib/types.ts.
   const [editPolicy, setEditPolicy] = useState<"public" | "verified-experts" | "me-only">("me-only");
+
+  // Room migration (Phase 6): Typed Deposits. depositType is optional — when
+  // "none" the post is a standard post/question/answer/note. depositFields is
+  // a free-form key/value map rendered per deposit type.
+  const [depositType, setDepositType] = useState<"none" | "procedure" | "decision" | "evidence" | "case" | "question" | "synthesis">("none");
+  const [depositFields, setDepositFields] = useState<Record<string, string>>({});
 
   // B: Suggest existing tags from recent posts (loaded from IDB on mount).
   const [recentTags, setRecentTags] = useState<string[]>([]);
@@ -320,6 +359,8 @@ export function PostCreator({
     setEventDate("");
     setEventTime("");
     setEventLocation("");
+    setDepositType("none");
+    setDepositFields({});
     try { localStorage.removeItem("postCreatorDraft"); } catch { /* best-effort */ }
   };
 
@@ -336,6 +377,23 @@ export function PostCreator({
     setIsPublishing(false); // reset the submit guard for the next open
     reset();
     onClose();
+  };
+
+  // Room migration (Phase 6): build the Deposit payload from the composer
+  // state. Returns undefined when no depositType is selected, so standard
+  // posts are unaffected. Only non-empty fields are included.
+  const buildDeposit = (): Pick<Post, "depositType" | "depositFields" | "provenance"> | undefined => {
+    if (depositType === "none") return undefined;
+    const fields: Record<string, string> = {};
+    for (const f of DEPOSIT_TYPE_FIELDS[depositType] ?? []) {
+      const v = (depositFields[f.key] ?? "").trim();
+      if (v) fields[f.key] = v;
+    }
+    return {
+      depositType,
+      depositFields: fields,
+      provenance: { author: currentDisplayName, version: 1, validationStatus: "unverified" },
+    };
   };
 
   const buildEvent = (): PostEvent | undefined | null => {
@@ -391,6 +449,8 @@ export function PostCreator({
     // also catches programmatic calls and keyboard Enter spam.
     if (isPublishing) return;
     const trimmedContent = content.trim();
+    // Phase 6: resolve the Deposit payload once for all post branches.
+    const deposit = buildDeposit();
 
     if (postType === "question") {
       if (!trimmedContent) {
@@ -419,6 +479,7 @@ export function PostCreator({
         reactions: { upvote: 0, downvote: 0 },
         commentCount: 0,
         createdAt: Date.now(),
+        ...(deposit ?? {}),
       };
 
       triggerHaptic("success");
@@ -454,6 +515,7 @@ export function PostCreator({
         reactions: { upvote: 0, downvote: 0 },
         commentCount: 0,
         createdAt: Date.now(),
+        ...(deposit ?? {}),
       };
 
       triggerHaptic("success");
@@ -525,6 +587,7 @@ export function PostCreator({
       reactions: { upvote: 0, downvote: 0 },
       commentCount: 0,
       createdAt: Date.now(),
+      ...(deposit ?? {}),
     };
 
     triggerHaptic("success");
@@ -850,6 +913,44 @@ export function PostCreator({
                       </SelectContent>
                     </Select>
                   </div>
+                </div>
+
+                {/* Room migration (Phase 6): Typed Deposit selector. Additive —
+                    when set to "none" the post is a standard post. Per-type
+                    structured fields appear below when a type is chosen. */}
+                <div className="p-3 rounded-xl border border-border/60 bg-muted/20 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-sm font-medium">Deposit type (optional)</Label>
+                    <Select value={depositType} onValueChange={(v) => { setDepositType(v as typeof depositType); setDepositFields({}); }}>
+                      <SelectTrigger className="rounded-full text-xs h-8 border-border/60 gap-1.5 w-auto min-w-[150px]">
+                        <SelectValue placeholder="None — standard post" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">None — standard post</SelectItem>
+                        <SelectItem value="procedure">Procedure</SelectItem>
+                        <SelectItem value="decision">Decision</SelectItem>
+                        <SelectItem value="evidence">Evidence</SelectItem>
+                        <SelectItem value="case">Case</SelectItem>
+                        <SelectItem value="question">Question</SelectItem>
+                        <SelectItem value="synthesis">Synthesis</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {depositType !== "none" && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {(DEPOSIT_TYPE_FIELDS[depositType] ?? []).map((f) => (
+                        <div key={f.key} className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">{f.label}</Label>
+                          <Input
+                            value={depositFields[f.key] ?? ""}
+                            onChange={(e) => setDepositFields((prev) => ({ ...prev, [f.key]: e.target.value }))}
+                            placeholder={f.placeholder}
+                            className="h-8 text-sm"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 {/* Preview attached media or brain */}
@@ -1537,7 +1638,7 @@ export function PostCreator({
           </div>
 
           <p className="px-4 pb-2 text-xs text-muted-foreground" role="status">
-            Image and note publishing is paused. Drafts with images or notes are kept on this device for review, not uploaded to cloud storage.
+            Image, note and structured Room deposit publishing is paused. These drafts remain on this device for review and are not uploaded to cloud storage.
           </p>
 
           {/* Hidden File Input — single shared picker for all post types.

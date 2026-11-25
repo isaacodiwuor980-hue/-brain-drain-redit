@@ -97,6 +97,14 @@ describe("post sending on account change",()=>{
     expect(m.create).not.toHaveBeenCalled();
     expect(m.queue).toHaveBeenCalledWith("create_post",{postId:"p"},"a");
   });
+  it("retains a structured Room deposit without dropping fields on cloud send",async()=>{
+    m.session.mockResolvedValue({uid:"a",token:"token-a"});
+    const deposit={...post,depositType:"procedure" as const,depositFields:{steps:"synthetic steps"}};
+    await act(async()=>{await api.addPost(deposit);});
+    expect(m.putStrict).toHaveBeenCalledWith("posts",deposit);
+    expect(m.create).not.toHaveBeenCalled();
+    expect(m.queue).toHaveBeenCalledWith("create_post",{postId:"p"},"a");
+  });
   it("sends only when both checks match the post owner",async()=>{
     m.session.mockResolvedValue({uid:"a",token:"token-a"});
     await act(async()=>{await api.addPost(post);});

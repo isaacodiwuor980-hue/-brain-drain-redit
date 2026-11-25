@@ -116,6 +116,39 @@ export function useCommunities() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: [STORE] }),
   });
 
+  // ── Phase 5: Role management (Room migration) ───────────────────
+  // Local-first: the `role` field lives on the current user's Community
+  // record (their membership + role in this Room). There is no separate
+  // member store, so role operations write the single record. Cross-user
+  // role assignment (a steward promoting *another* member) requires a
+  // member directory / cloud sync and is out of scope for Phases 1–7.
+  const { mutateAsync: setRole, isPending: isSettingRole } = useMutation({
+    mutationFn: async ({ communityId, role }: { communityId: string; role: NonNullable<Community["role"]> }) => {
+      // Unscoped local membership is not proof of permission to assign roles.
+      void communityId; void role;
+      throw new Error("Room role changes are paused pending authorization review.");
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: [STORE] }),
+  });
+
+  // Convenience wrappers — all delegate to setRole so the single record
+  // stays the source of truth.
+  const promoteToCurator = (communityId: string) => setRole({ communityId, role: "curator" });
+  const demoteToContributor = (communityId: string) => setRole({ communityId, role: "contributor" });
+  const makeObserver = (communityId: string) => setRole({ communityId, role: "observer" });
+  const transferStewardship = (communityId: string) => setRole({ communityId, role: "steward" });
+
+  // ── Phase 4/5: Charter editing ──────────────────────────────────
+  // Writes the `charter` field on the Community record (mission + scope).
+  const { mutateAsync: updateCharter } = useMutation({
+    mutationFn: async ({ communityId, mission, scope }: { communityId: string; mission: string; scope: string }) => {
+      // Unverified local roles cannot authorize Room administration.
+      void communityId; void mission; void scope;
+      throw new Error("Room charter changes are paused pending authorization review.");
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: [STORE] }),
+  });
+
   useEffect(() => {
     const seed = async () => {
       const existing = await idb.getAll(STORE);
@@ -145,5 +178,13 @@ export function useCommunities() {
     isJoining,
     isLeaving,
     isCancelling,
+    // Phase 5: Room role management.
+    setRole,
+    promoteToCurator,
+    demoteToContributor,
+    makeObserver,
+    transferStewardship,
+    updateCharter,
+    isSettingRole,
   };
 }
