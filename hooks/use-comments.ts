@@ -3,6 +3,7 @@ import { idb } from "@/lib/db";
 import { trackEvent } from "@/lib/analytics";
 import { Comment, Post } from "@/lib/types";
 import { countSourceLinks, computeSourceLinkReputation } from "@/lib/hive-mind";
+import { votingAvailable } from "@/lib/vote-availability";
 
 const STORE = "comments";
 
@@ -192,7 +193,7 @@ export function useComments(postId?: string) {
    * would be a per-user map; in this local-first build it's a single
    * field (the "me" user).
    */
-  const { mutateAsync: voteComment } = useMutation({
+  const { mutateAsync: voteCommentMutation } = useMutation({
     onMutate: async ({ id, direction, postId: targetPostId }) => {
       // Optimistic UI — update the cache instantly so the user sees
       // their vote register with zero latency. If the mutation fails,
@@ -360,13 +361,14 @@ export function useComments(postId?: string) {
     },
   });
 
-  /** House vote — classify a comment as institutional / verifiable evidence. */
+  // The old local vote fields are neither account-scoped nor synchronized;
+  // do not run optimistic mutations or analytics while voting is disabled.
+  const voteComment = (args: { id: string; postId: string; direction: "up" | "down" }) =>
+    votingAvailable() ? voteCommentMutation(args) : Promise.reject(new Error("Voting temporarily unavailable"));
   const voteHouse = (args: { id: string; postId: string }) =>
-    voteClassification({ ...args, classification: "house" as const });
-
-  /** Mouth vote — classify a comment as crowd sentiment / lived experience. */
+    votingAvailable() ? voteClassification({ ...args, classification: "house" as const }) : Promise.reject(new Error("Voting temporarily unavailable"));
   const voteMouth = (args: { id: string; postId: string }) =>
-    voteClassification({ ...args, classification: "mouth" as const });
+    votingAvailable() ? voteClassification({ ...args, classification: "mouth" as const }) : Promise.reject(new Error("Voting temporarily unavailable"));
 
   /**
    * Pin a single reply per thread — the post author anchors the "definitive"

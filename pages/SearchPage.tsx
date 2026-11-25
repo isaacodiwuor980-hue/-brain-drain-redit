@@ -6,7 +6,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { trackEvent } from "@/lib/analytics";
 import { idb } from "@/lib/db";
-import { Brain, Topic, Post, getPostUpvoteCount } from "@/lib/types";
+import { Brain, Topic, Post } from "@/lib/types";
 import { useLocation, useSearch } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -462,7 +462,6 @@ export function SearchPage() {
                             {post.content}
                           </p>
                           <div className="flex items-center gap-3 text-xs text-muted-foreground pt-1">
-                            <span>▲ {getPostUpvoteCount(post)}</span>
                             <span>💬 {post.commentCount || 0}</span>
                             {post.type && <span className="uppercase text-[10px] bg-muted px-1.5 py-0.5 rounded font-mono">{post.type}</span>}
                           </div>
@@ -604,7 +603,6 @@ export function SearchPage() {
                       {post.content}
                     </p>
                     <div className="flex items-center gap-4 text-xs text-muted-foreground pt-1">
-                      <span>▲ {getPostUpvoteCount(post)} Upvotes</span>
                       <span>💬 {post.commentCount || 0} Comments</span>
                       {post.type && <span className="uppercase text-[10px] bg-muted px-2 py-0.5 rounded font-mono">{post.type}</span>}
                     </div>

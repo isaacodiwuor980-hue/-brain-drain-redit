@@ -1,4 +1,4 @@
-import { Router, type IRouter } from "express";
+import { Router, type IRouter, type RequestHandler } from "express";
 import { z } from "zod";
 import { supabase, SupabaseError } from "../lib/supabase";
 import { requireAuth } from "../middleware/auth";
@@ -117,11 +117,19 @@ router.post("/posts", requireAuth, async (req, res) => {
 });
 
 /**
- * Toggle a reaction on a post. Upvotes/downvotes are mutually exclusive;
- * clicking the same reaction removes it. Mirrors the local togglePostReaction
- * rules so client and server stay consistent.
+ * Legacy writer is intentionally unavailable: it cannot establish mapped
+ * identity, enforce recent sign-in, handle idempotent retries or hide counts.
+ * No client header or feature flag can enable it. This API gate does not
+ * prevent direct database or privileged-function writes.
  */
-router.post("/posts/:id/react", requireAuth, async (req, res) => {
+router.post("/posts/:id/react", requireAuth, (_req, res) => {
+  res.setHeader("Cache-Control", "no-store");
+  res.status(503).json({ error: "Voting temporarily unavailable" });
+});
+
+/** Unmounted legacy implementation retained solely for synthetic regression
+ * tests and migration analysis. Never mount in a live router. */
+export const legacyReactionHandlerForTests: RequestHandler = async (req, res) => {
   const parsed = ReactSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "Invalid reaction" });
@@ -212,6 +220,6 @@ router.post("/posts/:id/react", requireAuth, async (req, res) => {
     }
     throw error;
   }
-});
+};
 
 export default router;

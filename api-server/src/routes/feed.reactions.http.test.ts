@@ -35,13 +35,17 @@ describe("feed personalization with mocked database", () => {
     const alice = await get("/api/feed?topic=test-multiple-reactions", "alice");
     expect(alice.res.headers.get("x-feed-cache")).toBe("MISS");
     expect(alice.body.posts[0].userReactions).toEqual({ repost: ["alice"], upvote: ["alice"] });
-    expect(alice.body.posts[0].reactions).toEqual({ upvote: 1, downvote: 1, repost: 1 });
+    expect(alice.body.posts[0].reactions).toEqual({ repost: 1 });
+    expect(alice.body.posts[0].reactions).not.toHaveProperty("upvote");
+    expect(alice.body.posts[0].reactions).not.toHaveProperty("downvote");
     const bob = await get("/api/feed?topic=test-multiple-reactions", "bob");
     expect(bob.res.headers.get("x-feed-cache")).toBe("HIT");
     expect(bob.body.posts[0].userReactions).toEqual({ downvote: ["bob"] });
     expect(JSON.stringify(bob.body)).not.toContain("alice");
     const guest = await get("/api/feed?topic=test-multiple-reactions");
     expect(guest.body.posts[0].userReactions).toBeUndefined();
+    expect(guest.body.posts[0].reactions).toEqual({ repost: 1 });
+    expect(bob.body.posts[0].reactions).toEqual({ repost: 1 });
   });
   it("does not place personalized following pages in the shared feed cache", async () => {
     db.get.mockImplementation(async (table: string) => table === "user_follows" ? [{ followee_id: "author" }] : table === "posts" ? [post] : reactions);

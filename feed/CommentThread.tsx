@@ -37,6 +37,7 @@ import { Comment } from "@/lib/types";
 import { computeCommentRank } from "@/lib/hive-mind";
 import { useAuth } from "@/components/auth/AuthContext";
 import { displayNameOr, userIdOr } from "@/lib/user-data";
+import { votingAvailable } from "@/lib/vote-availability";
 
 interface CommentThreadProps {
   postId: string;
@@ -73,6 +74,7 @@ export function CommentThread({
   postAuthorId,
   currentUserId: currentUserIdProp,
 }: CommentThreadProps) {
+  const votesEnabled = votingAvailable();
   // Phase 2: real user identity. Falls back to "me" for guest mode.
   const { user } = useAuth();
   const currentUserId = currentUserIdProp ?? userIdOr(user);
@@ -347,40 +349,46 @@ export function CommentThread({
                   <Button
                     variant="ghost"
                     size="sm"
-                    className={`h-6 w-6 p-0 rounded-full active:scale-90 ${node.myVote === "up" ? "text-emerald-500 bg-emerald-500/10 hover:bg-emerald-500/20" : "text-muted-foreground hover:text-emerald-500 hover:bg-emerald-500/10"}`}
+                    className={`h-6 w-6 p-0 rounded-full active:scale-90 ${votesEnabled && node.myVote === "up" ? "text-emerald-500 bg-emerald-500/10 hover:bg-emerald-500/20" : "text-muted-foreground hover:text-emerald-500 hover:bg-emerald-500/10"}`}
                     onClick={() => { triggerHaptic("light"); void voteComment({ id: node.id, direction: "up", postId }).catch((e) => toast({ title: "Couldn't vote", description: e instanceof Error ? e.message : "", variant: "destructive" })); }}
-                    aria-label="Upvote"
-                    aria-pressed={node.myVote === "up"}
+                    aria-label={votesEnabled ? "Upvote" : "Voting temporarily unavailable"}
+                    disabled={!votesEnabled}
+                    title={!votesEnabled ? "Voting temporarily unavailable" : undefined}
+                    aria-pressed={votesEnabled && node.myVote === "up"}
                   >
-                    <ArrowBigUp className={`w-3.5 h-3.5 ${node.myVote === "up" ? "fill-current" : ""}`} />
+                    <ArrowBigUp className={`w-3.5 h-3.5 ${votesEnabled && node.myVote === "up" ? "fill-current" : ""}`} />
                   </Button>
                   <Button
                     variant="ghost"
                     size="sm"
-                    className={`h-6 w-6 p-0 rounded-full active:scale-90 ${node.myVote === "down" ? "text-red-500 bg-red-500/10 hover:bg-red-500/20" : "text-muted-foreground hover:text-red-500 hover:bg-red-500/10"}`}
+                    className={`h-6 w-6 p-0 rounded-full active:scale-90 ${votesEnabled && node.myVote === "down" ? "text-red-500 bg-red-500/10 hover:bg-red-500/20" : "text-muted-foreground hover:text-red-500 hover:bg-red-500/10"}`}
                     onClick={() => { triggerHaptic("light"); void voteComment({ id: node.id, direction: "down", postId }).catch((e) => toast({ title: "Couldn't vote", description: e instanceof Error ? e.message : "", variant: "destructive" })); }}
-                    aria-label="Downvote"
-                    aria-pressed={node.myVote === "down"}
+                    aria-label={votesEnabled ? "Downvote" : "Voting temporarily unavailable"}
+                    disabled={!votesEnabled}
+                    title={!votesEnabled ? "Voting temporarily unavailable" : undefined}
+                    aria-pressed={votesEnabled && node.myVote === "down"}
                   >
-                    <ArrowBigDown className={`w-3.5 h-3.5 ${node.myVote === "down" ? "fill-current" : ""}`} />
+                    <ArrowBigDown className={`w-3.5 h-3.5 ${votesEnabled && node.myVote === "down" ? "fill-current" : ""}`} />
                   </Button>
                 </div>
                 {/* House / Mouth classification votes — rivers made emergent:
                     readers classify each comment instead of the author
                     declaring a stream at entry. Mutually exclusive. */}
-                <Button variant="ghost" size="sm" className={`h-7 px-2 gap-1.5 rounded-full transition-all active:scale-90 ${node.myHouseVote ? "text-indigo-500 bg-indigo-500/10 hover:bg-indigo-500/20" : "text-muted-foreground hover:text-indigo-500 hover:bg-muted/50"}`}
-                  title="House view — institutional / verifiable evidence"
+                <Button variant="ghost" size="sm" className={`h-7 px-2 gap-1.5 rounded-full transition-all active:scale-90 ${votesEnabled && node.myHouseVote ? "text-indigo-500 bg-indigo-500/10 hover:bg-indigo-500/20" : "text-muted-foreground hover:text-indigo-500 hover:bg-muted/50"}`}
+                  disabled={!votesEnabled}
+                  title={votesEnabled ? "House view — institutional / verifiable evidence" : "Voting temporarily unavailable"}
                   onClick={() => { triggerHaptic("light"); void voteHouse({ id: node.id, postId }).catch((e) => toast({ title: "Couldn't vote", description: e instanceof Error ? e.message : "", variant: "destructive" })); }}
                   aria-label="House view vote"
-                  aria-pressed={node.myHouseVote}
+                  aria-pressed={votesEnabled && !!node.myHouseVote}
                 >
                   <Landmark className="w-3.5 h-3.5" />
                 </Button>
-                <Button variant="ghost" size="sm" className={`h-7 px-2 gap-1.5 rounded-full transition-all active:scale-90 ${node.myMouthVote ? "text-orange-500 bg-orange-500/10 hover:bg-orange-500/20" : "text-muted-foreground hover:text-orange-500 hover:bg-muted/50"}`}
-                  title="Word of mouth — crowd sentiment / lived experience"
+                <Button variant="ghost" size="sm" className={`h-7 px-2 gap-1.5 rounded-full transition-all active:scale-90 ${votesEnabled && node.myMouthVote ? "text-orange-500 bg-orange-500/10 hover:bg-orange-500/20" : "text-muted-foreground hover:text-orange-500 hover:bg-muted/50"}`}
+                  disabled={!votesEnabled}
+                  title={votesEnabled ? "Word of mouth — crowd sentiment / lived experience" : "Voting temporarily unavailable"}
                   onClick={() => { triggerHaptic("light"); void voteMouth({ id: node.id, postId }).catch((e) => toast({ title: "Couldn't vote", description: e instanceof Error ? e.message : "", variant: "destructive" })); }}
                   aria-label="Word of mouth vote"
-                  aria-pressed={node.myMouthVote}
+                  aria-pressed={votesEnabled && !!node.myMouthVote}
                 >
                   <Users className="w-3.5 h-3.5" />
                 </Button>

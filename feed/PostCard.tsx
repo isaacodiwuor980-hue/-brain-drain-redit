@@ -41,6 +41,7 @@ import { useSocial } from "@/hooks/use-social";
 import { useCommunities } from "@/hooks/use-communities";
 import { useMessages } from "@/hooks/use-messages";
 import { useOnlineStatus } from "@/hooks/use-online-status";
+import { votingAvailable } from "@/lib/vote-availability";
 
 // PERF-002: confetti is dynamically imported only when a CELEBRATION (4%) or
 // JACKPOT (1%) vote fires. Previously it was a static import, which put 227
@@ -83,6 +84,7 @@ export function PostCard({
 
   const { toast } = useToast();
   const offline = useOnlineStatus() === "offline";
+  const votesEnabled = votingAvailable();
   const [, setLocation] = useLocation();
   const currentUserId = "me";
   const { profile, updateProfile } = useProfile();
@@ -637,8 +639,8 @@ export function PostCard({
               <Button
                 variant="ghost"
                 size="sm"
-                aria-label={offline ? "Upvote requires internet" : "Upvote"} aria-pressed={isUpvoted}
-                disabled={offline} title={offline ? "Connect to vote" : undefined}
+                aria-label={!votesEnabled ? "Voting temporarily unavailable" : offline ? "Upvote requires internet" : "Upvote"} aria-pressed={isUpvoted}
+                disabled={!votesEnabled || offline} title={!votesEnabled ? "Voting temporarily unavailable" : offline ? "Connect to vote" : undefined}
                 className={`gap-1.5 h-8 px-2.5 rounded-full transition-all duration-150 cursor-pointer active:scale-[0.92] touch-manipulation ${isUpvoted ? "text-rose-500 bg-rose-500/10" : "text-muted-foreground hover:text-rose-500 hover:bg-rose-500/10"}`}
                 onClick={(e) => {
                   // APEX-OMEGA LEVER 1: variable reward on ACTIVATING upvote only.
@@ -654,8 +656,8 @@ export function PostCard({
               <Button
                 variant="ghost"
                 size="sm"
-                aria-label={offline ? "Downvote requires internet" : "Downvote"} aria-pressed={isDownvoted}
-                disabled={offline} title={offline ? "Connect to vote" : undefined}
+                aria-label={!votesEnabled ? "Voting temporarily unavailable" : offline ? "Downvote requires internet" : "Downvote"} aria-pressed={isDownvoted}
+                disabled={!votesEnabled || offline} title={!votesEnabled ? "Voting temporarily unavailable" : offline ? "Connect to vote" : undefined}
                 className={`gap-1.5 h-8 px-2.5 rounded-full transition-all duration-150 cursor-pointer active:scale-[0.92] touch-manipulation ${isDownvoted ? "text-red-400 bg-red-400/10" : "text-muted-foreground hover:text-red-400 hover:bg-red-400/10"}`}
                 onClick={() => {
                   triggerHaptic("light");
@@ -704,8 +706,8 @@ export function PostCard({
               <Button
                 variant="ghost"
                 size="sm"
-                aria-label={offline ? "Repost requires internet" : `Repost · ${post.repostCount || post.reactions?.repost || 0}`}
-                disabled={offline} title={offline ? "Connect to repost" : undefined}
+                aria-label={!votesEnabled ? "Reposting temporarily unavailable" : offline ? "Repost requires internet" : `Repost · ${post.repostCount || post.reactions?.repost || 0}`}
+                disabled={!votesEnabled || offline} title={!votesEnabled ? "Reposting temporarily unavailable" : offline ? "Connect to repost" : undefined}
                 className="gap-1.5 h-8 px-2.5 rounded-full transition-all duration-150 cursor-pointer active:scale-[0.92] touch-manipulation text-muted-foreground hover:text-emerald-500 hover:bg-emerald-500/10"
                 onClick={() => {
                   triggerHaptic("medium");

@@ -73,8 +73,9 @@ function normalizePostType(raw: string | null | undefined): "post" | "question" 
   return "post";
 }
 
-/** Attach aggregate counts and only the requesting user's reaction types.
- * The cache is shared; verify linked brains on every response, not when cached.
+/** Attach repost totals and only the requesting user's reaction types.
+ * Vote totals are deliberately not exposed; this does not restrict direct DB
+ * access or other routes. The cache is shared; verify linked brains per response.
  * Until ownership mapping is proven, even an author's private brain is omitted.
  */
 async function renderFeedPosts(entry: CachedFeed, currentUserId: string | undefined) {
@@ -105,8 +106,6 @@ async function renderFeedPosts(entry: CachedFeed, currentUserId: string | undefi
       ...row,
       brainId: typeof row.brainId === "string" && publicIds.has(row.brainId) ? row.brainId : null,
       reactions: {
-        upvote: reactions.filter((r) => r.reaction_type === "upvote").length,
-        downvote: reactions.filter((r) => r.reaction_type === "downvote").length,
         repost: ((row as { repostCount?: number }).repostCount ?? 0) + reactions.filter((r) => r.reaction_type === "repost").length,
       },
       userReactions: Object.keys(own).length ? own : undefined,

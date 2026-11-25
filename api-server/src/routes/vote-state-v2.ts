@@ -1,5 +1,6 @@
-import { Router, type IRouter } from "express";
+import { Router, type IRouter, type RequestHandler } from "express";
 import { requireAuth } from "../middleware/auth";
+import { requireRecentAuthentication } from "../middleware/recent-auth";
 import { requireMappedIdentity } from "../middleware/identity-map";
 import { requireServerFeature } from "../middleware/server-feature-flag";
 import { supabase } from "../lib/supabase";
@@ -11,13 +12,18 @@ const router: IRouter = Router();
  * the repository or live database. Do not enable this route until the RPC can
  * atomically authorize post visibility, return a consistent own vote/revision,
  * fail on ambiguous legacy state, and all writers cooperate with the revision.
- * Service-role access bypasses RLS: this adapter is NOT an authorization or
- * privacy boundary on its own. No recovery write or automatic replay occurs.
+ * The route returns 503 even when the flag is on: changing a flag cannot enable
+ * an unreviewed RPC. Service-role access bypasses RLS: the unmounted adapter is
+ * NOT an authorization or privacy boundary. No automatic replay occurs.
  */
 router.get("/posts/:id/vote-state-v2",
   (_req, res, next) => { res.setHeader("Cache-Control", "no-store"); next(); },
-  requireServerFeature("vote_state_v2"), requireAuth, requireMappedIdentity,
-  async (req, res) => {
+  requireServerFeature("vote_state_v2"), requireAuth, requireRecentAuthentication, requireMappedIdentity,
+  (_req, res) => { res.status(503).json({error: "Vote status unavailable"}); },
+);
+
+/** Unmounted experimental adapter, retained for synthetic tests only. */
+export const voteStateReadAdapterForTests: RequestHandler = async (req, res) => {
     const postId = String(req.params.id ?? "");
     if (!/^[A-Za-z0-9_-]{1,120}$/.test(postId)) { res.status(400).json({error: "Invalid post id"}); return; }
     try {
@@ -31,6 +37,5 @@ router.get("/posts/:id/vote-state-v2",
       // No caller IDs, tokens, post IDs, SQL or upstream error details in logs.
       res.status(503).json({error: "Vote status unavailable"});
     }
-  },
-);
+};
 export default router;

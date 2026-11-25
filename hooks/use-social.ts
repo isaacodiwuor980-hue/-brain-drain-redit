@@ -28,6 +28,8 @@ import { useTsrgStatus } from "./use-tsrg-status";
 import { useOnlineStatus } from "./use-online-status";
 import { useToast } from "./use-toast";
 import { mayStartVote } from "../lib/online-vote-policy";
+import { votingAvailable } from "../lib/vote-availability";
+import { hideCachedVoteDetailsV1 } from "../lib/vote-display-privacy";
 
 /** Posts fetched per page. Matches the server max (feed.ts limit.max = 50). */
 const PAGE_SIZE = 30;
@@ -203,7 +205,9 @@ export function useSocial(mode: "foryou" | "following" = "foryou", topicId: stri
         out.push(post);
       }
     }
-    return orderFeed(out, mode, tsrgAvailable, query.dataUpdatedAt);
+    // Shared local cache may contain another account's old selection and vote
+    // totals. Hide those fields while the server-confirmed read is gated.
+    return hideCachedVoteDetailsV1(orderFeed(out, mode, tsrgAvailable, query.dataUpdatedAt));
   }, [query.data, query.dataUpdatedAt, mode, tsrgAvailable]);
 
   const addPostMutation = useMutation({
@@ -432,6 +436,10 @@ export function useSocial(mode: "foryou" | "following" = "foryou", topicId: stri
   // stable across renders, so the wrapper only needs to be memoized once.
   const reactToPost = useCallback(
     (postId: string, reactionType: string) => {
+      if (!votingAvailable()) {
+        toast({title:"Voting temporarily unavailable",description:"No vote or repost was sent.",variant:"destructive"});
+        return Promise.resolve();
+      }
       if (!mayStartVote(onlineStatus, typeof navigator === "undefined" || navigator.onLine !== false)) {
         toast({title:"Internet required",description:"Connect before voting or reposting.",variant:"destructive"});
         return Promise.resolve();
