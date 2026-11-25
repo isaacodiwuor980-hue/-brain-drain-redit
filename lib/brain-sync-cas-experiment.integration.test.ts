@@ -40,6 +40,14 @@ describe('synthetic account-scoped brain sync experiment',()=>{
     try { await expect(save(bob,'brain',op2,1,{id:'brain'})).rejects.toThrow(); }
     finally { await db.exec('RESET ROLE'); }
   });
+  it('denies direct service-role writes while allowing its constrained RPC',async()=>{
+    await db.exec('SET ROLE service_role');
+    try {
+      await expect(db.query('INSERT INTO brain_sync_documents_experiment VALUES ($1,$2,1,$3::jsonb)',[alice,'brain',JSON.stringify({id:'brain'})])).rejects.toThrow();
+      await expect(db.query('SELECT * FROM brain_sync_operations_experiment')).rejects.toThrow();
+      expect(await save(alice,'brain',op1,0,{id:'brain'})).toEqual({revision:1,replayed:false});
+    } finally { await db.exec('RESET ROLE'); }
+  });
   it('documents that a privileged caller may spoof an owner',async()=>{
     await db.exec('SET ROLE service_role');
     try { expect(await save(bob,'brain',op1,0,{id:'brain',title:'spoofed'})).toEqual({revision:1,replayed:false}); }

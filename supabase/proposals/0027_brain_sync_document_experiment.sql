@@ -1,7 +1,7 @@
 -- SYNTHETIC EXPERIMENT ONLY. Do not apply to a shared/live database.
 -- Separate storage prototype: does NOT migrate public.brains, provision users,
 -- serve public libraries, implement deletion, or protect against privileged
--- callers passing another UUID. Direct table writers can bypass this protocol.
+-- callers passing another UUID. Owners and other privileged writers can bypass this protocol.
 CREATE TABLE public.brain_sync_documents_experiment (
   owner_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   brain_id text NOT NULL CHECK (length(brain_id) BETWEEN 1 AND 120),
@@ -20,11 +20,10 @@ CREATE TABLE public.brain_sync_operations_experiment (
 );
 ALTER TABLE public.brain_sync_documents_experiment ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.brain_sync_operations_experiment ENABLE ROW LEVEL SECURITY;
-REVOKE ALL ON public.brain_sync_documents_experiment, public.brain_sync_operations_experiment FROM PUBLIC, anon, authenticated;
-GRANT SELECT, INSERT, UPDATE ON public.brain_sync_documents_experiment, public.brain_sync_operations_experiment TO service_role;
+REVOKE ALL ON public.brain_sync_documents_experiment, public.brain_sync_operations_experiment FROM PUBLIC, anon, authenticated, service_role;
 
 CREATE FUNCTION public.brain_sync_save_experiment(p_owner uuid, p_brain_id text, p_operation uuid, p_expected bigint, p_snapshot jsonb)
-RETURNS jsonb LANGUAGE plpgsql SECURITY INVOKER SET search_path=pg_catalog,public AS $$
+RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,public AS $$
 DECLARE previous public.brain_sync_operations_experiment%rowtype; current_rev bigint; next_rev bigint;
 BEGIN
   IF p_owner IS NULL OR p_operation IS NULL OR p_expected IS NULL OR p_expected < 0
