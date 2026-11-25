@@ -37,3 +37,9 @@ The owner's 20 decisions are recorded here as requirements, **not an approved mi
 - Vote operation identity proof, all-writer enforcement, two-step switching, bootstrap, version retrieval, pending-state UI, receipts, retention, account deletion and live permissions are not complete. Local SQL experiments cannot be treated as live migrations.
 - Counts are hidden in selected local UI controls only. API, database, caches, comment and other paths can still expose them.
 - The safe chronological fallback, moderation/block enforcement, TSRG ranking/authority, privacy and reliable cross-device sync are not ready or verified end-to-end.
+
+## Additional scope choices
+- Two-step remove-then-select applies to post votes, comment votes and switching House/Mouth classifications. Requires separate safe server-side enforcement for each writer and operation, not simply a UI rule.
+- Pilot target includes web and native mobile. A shallow repository search found no Capacitor config or native iOS/Android directory at depth two; this is not a complete native-app audit. Native builds, distribution, session/storage isolation and mobile cross-device behavior remain unverified. Do not claim native apps exist or are production-ready.
+- Prepare low-cost hosting options for application and API; user did not authorize hosting purchases, resource creation or deployment. Accurate cost and operational claims require provider verification.
+- On review, a person may explicitly discard only an ambiguous local pending reaction with a warning and confirmation; this must not alter their server vote. The account-scoped recovery interface and safe storage are not implemented.
