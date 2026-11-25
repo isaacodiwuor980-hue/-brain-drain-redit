@@ -495,22 +495,40 @@ export function resetDBConnection() {
 export const idb = {
   /** Persist a local-first brain and its nodes atomically. Unlike cache writes,
    * this must reject when storage is unavailable: no cloud write backs it up. */
-  async saveBrainWithNodes(brain: { id: string }, nodes: Array<{ id: string }>): Promise<void> {
+  async saveBrainWithNodes(brain: { id: string }, nodes: Array<{ id: string; brain_id: string }>): Promise<void> {
+    if (!brain.id || nodes.some(n => !n.id || n.brain_id !== brain.id) || new Set(nodes.map(n => n.id)).size !== nodes.length) {
+      throw new Error("Invalid brain or node identifiers");
+    }
     const db = await openDB();
     return new Promise<void>((resolve, reject) => {
       const tx = db.transaction(["brains", "nodes"], "readwrite");
+      let failure: unknown;
       tx.oncomplete = () => resolve();
-      tx.onerror = () => reject(tx.error ?? new Error("Could not save brain"));
-      tx.onabort = () => reject(tx.error ?? new Error("Brain save was aborted"));
-      try {
-        // A user save is authoritative local data, never a cloud-only stub.
-        const localBrain = { ...brain } as typeof brain & { __cloudMetadataOnly?: boolean };
-        delete localBrain.__cloudMetadataOnly;
-        tx.objectStore("brains").put(localBrain);
-        for (const node of nodes) tx.objectStore("nodes").put(node);
-      } catch (error) {
-        tx.abort();
-        reject(error);
+      tx.onerror = () => reject(failure ?? tx.error ?? new Error("Could not save brain"));
+      tx.onabort = () => reject(failure ?? tx.error ?? new Error("Brain save was aborted"));
+      const nodeStore = tx.objectStore("nodes");
+      const write = () => {
+        try {
+          // A user save is authoritative local data, never a cloud-only stub.
+          const localBrain = { ...brain } as typeof brain & { __cloudMetadataOnly?: boolean };
+          delete localBrain.__cloudMetadataOnly;
+          tx.objectStore("brains").put(localBrain);
+          for (const node of nodes) nodeStore.put(node);
+        } catch (error) { failure = error; tx.abort(); }
+      };
+      if (nodes.length === 0) { write(); return; }
+      let remaining = nodes.length;
+      for (const node of nodes) {
+        const request = nodeStore.get(node.id);
+        request.onsuccess = () => {
+          const previous = request.result as { brain_id?: string } | undefined;
+          if (previous && previous.brain_id !== brain.id) {
+            failure = new Error("Local node ownership conflict");
+            tx.abort(); return;
+          }
+          remaining -= 1;
+          if (remaining === 0) write();
+        };
       }
     });
   },

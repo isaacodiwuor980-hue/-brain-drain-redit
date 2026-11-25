@@ -10,18 +10,32 @@ afterEach(() => {
 describe("local brain import transaction", () => {
   it("commits the brain and every node together", async () => {
     vi.stubGlobal("indexedDB", new IDBFactory());
-    await idb.saveBrainWithNodes({ id: "b1" }, [{ id: "n1" }, { id: "n2" }]);
+    await idb.saveBrainWithNodes({ id: "b1" }, [{ id: "n1", brain_id: "b1" }, { id: "n2", brain_id: "b1" }]);
     expect(await idb.get("brains", "b1")).toEqual({ id: "b1" });
-    expect(await idb.get("nodes", "n1")).toEqual({ id: "n1" });
-    expect(await idb.get("nodes", "n2")).toEqual({ id: "n2" });
+    expect(await idb.get("nodes", "n1")).toEqual({ id: "n1", brain_id: "b1" });
+    expect(await idb.get("nodes", "n2")).toEqual({ id: "n2", brain_id: "b1" });
   });
 
   it("rolls back the brain and earlier nodes if a node cannot be stored", async () => {
     vi.stubGlobal("indexedDB", new IDBFactory());
-    const invalid = { id: "bad", cannotClone: () => {} };
-    await expect(idb.saveBrainWithNodes({ id: "b1" }, [{ id: "n1" }, invalid])).rejects.toThrow();
+    const invalid = { id: "bad", brain_id: "b1", cannotClone: () => {} };
+    await expect(idb.saveBrainWithNodes({ id: "b1" }, [{ id: "n1", brain_id: "b1" }, invalid])).rejects.toThrow();
     expect(await idb.get("brains", "b1")).toBeUndefined();
     expect(await idb.get("nodes", "n1")).toBeUndefined();
+  });
+
+  it("rejects a node ID owned by another brain without overwriting either brain", async () => {
+    vi.stubGlobal("indexedDB", new IDBFactory());
+    await idb.saveBrainWithNodes({id:"b1"},[{id:"shared",brain_id:"b1"}]);
+    await expect(idb.saveBrainWithNodes({id:"b2"},[{id:"shared",brain_id:"b2"}])).rejects.toThrow(/node.*conflict/i);
+    expect(await idb.get("brains","b2")).toBeUndefined();
+    expect(await idb.get("nodes","shared")).toEqual({id:"shared",brain_id:"b1"});
+  });
+  it("rejects mismatched and duplicate node identifiers without changing records", async () => {
+    vi.stubGlobal("indexedDB", new IDBFactory());
+    await expect(idb.saveBrainWithNodes({id:"b1"},[{id:"x",brain_id:"b2"}])).rejects.toThrow();
+    await expect(idb.saveBrainWithNodes({id:"b1"},[{id:"x",brain_id:"b1"},{id:"x",brain_id:"b1"}])).rejects.toThrow();
+    expect(await idb.get("brains","b1")).toBeUndefined();
   });
 
   it("does not overwrite local edits when cloud metadata is cached", async () => {
