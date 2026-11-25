@@ -38,3 +38,11 @@ Owner responses to 20 risk questions. These are policy decisions, not proof of i
 - Hide vote totals from authors as well as the public, for posts and comments. Internal ranking access must be independently protected. Do not expose equivalent counts or individual voter identities through API/database/caches; this is not yet implemented.
 - Keep confidence results hidden for everyone until trustworthy criteria and appropriate review can detect credible minority disagreement. No existing synthetic test establishes such criteria.
 - If no free, safe recovery verification is available, owner will consider a read-only demonstration only after access and privacy are independently verified. A read-only demonstration is not necessarily a restore drill and does not by itself establish restorability, waive the prior backup/recovery gate, or authorize live migrations, deployment, paid services or creation of another project. Present any specific demonstration and its scope for approval where required.
+
+## Final algorithm clarifications
+- The owner confirmed symmetric bridging should take precedence over the reference's conflicting one-sided cluster description in a future reviewed additive version. This resolves the policy conflict, but does not itself implement or validate a change; preserve existing scoring until a tested additive version exists.
+- Confidence results stay hidden while credible minority evidence cannot be assessed reliably. This reiterates the existing launch constraint.
+- Posts without a verified topic stay excluded from the selected chronological fallback until authorized human reviewers resolve them. Review tooling and verified topic provenance remain unimplemented.
+- If a shadow test reveals a serious quality, privacy or exposure problem, present the evidence for the owner's decision; do not enable TSRG automatically. Serious privacy or data-loss issues remain stop conditions under the existing rollout policy.
+
+Answers to clarification questions are not evidence of secure implementation or production readiness. No migration, shadow logging or deployment is authorized by these answers.
