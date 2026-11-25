@@ -1,5 +1,8 @@
 import { afterAll,beforeAll,describe,expect,it,vi } from "vitest";
 import { PGlite } from "@electric-sql/pglite";
+import { IDBFactory } from "fake-indexeddb";
+import { openBrainSyncExperiment, readLocalSyncDocument, saveLocalSyncEdit, stageLocalSyncWrite } from "../../../lib/brain-sync-local-experiment";
+import { sendPendingBrainExperiment, type BrainSyncTransport } from "../../../lib/brain-sync-orchestrator-experiment";
 import { readFile } from "node:fs/promises";
 import express from "express";
 import type { Server } from "node:http";
@@ -38,4 +41,27 @@ describe('simulated two-device synchronization over experimental API',()=>{
     const rows=await db.query('SELECT owner_id,revision,snapshot FROM brain_sync_documents_experiment ORDER BY owner_id');
     expect(rows.rows).toEqual([{owner_id:a,revision:2,snapshot:{id:'brain',title:'device A'}},{owner_id:b,revision:1,snapshot:{id:'brain',title:'bob own document'}}]);
   });
+  it('retains a lost response and replays the same saved operation from local storage',async()=>{
+    vi.stubGlobal('indexedDB',new IDBFactory());const local=await openBrainSyncExperiment();
+    try {
+      const operation='20000000-0000-4000-8000-000000000001';
+      await saveLocalSyncEdit(local,'alice','second-brain',{id:'second-brain',title:'saved'});
+      await stageLocalSyncWrite(local,'alice','second-brain',operation);
+      const session=async()=>({uid:'alice',token:'alice'});
+      let loseResponse=true;
+      const send:BrainSyncTransport=async(payload,token)=>{
+        const res=await fetch(`${base}/api/experimental/brain-sync`,{method:'POST',headers:{authorization:`Bearer ${token}`,'content-type':'application/json'},body:JSON.stringify(payload)});
+        if (loseResponse) {loseResponse=false;throw new Error('response lost after server committed');}
+        const body=await res.json();
+        return res.status===200?{kind:'ok',revision:body.revision}:res.status===409?{kind:'conflict'}:{kind:'uncertain'};
+      };
+      expect(await sendPendingBrainExperiment(local,'alice','second-brain',session,send)).toBe('unconfirmed');
+      expect((await readLocalSyncDocument(local,'alice','second-brain'))?.sync.status).toBe('pending');
+      expect(await sendPendingBrainExperiment(local,'alice','second-brain',session,send)).toBe('acknowledged');
+      expect((await readLocalSyncDocument(local,'alice','second-brain'))?.sync).toMatchObject({status:'synced',confirmedRevision:1,pending:null});
+      const saved=await db.query('SELECT revision,snapshot FROM brain_sync_documents_experiment WHERE owner_id=$1 AND brain_id=$2',[a,'second-brain']);
+      expect(saved.rows).toEqual([{revision:1,snapshot:{id:'second-brain',title:'saved'}}]);
+    } finally {local.close();vi.unstubAllGlobals();}
+  });
+
 });
