@@ -11,10 +11,8 @@
  *  - Backoff is exponential WITH JITTER (see lib/api-client.ts
  *    computeBackoffMs). A fleet of clients coming back online after an
  *    outage no longer stampedes the API in lockstep.
- *  - Actions are coalesced: ten offline edits to the same post, or five
- *    toggles of the same reaction, collapse into ONE replay. Previously the
- *    queue replayed all of them in order, wasting the rate-limit budget and
- *    producing redundant writes.
+ *  - Held posts, brain versions and reaction toggles are retained individually
+ *    for review; they are not automatically replayed or coalesced.
  *  - A poison action can no longer block the queue forever: after
  *    MAX_RETRIES it is quarantined (kept in `deadLetter` for inspection)
  *    rather than silently dropped.
@@ -111,19 +109,24 @@ export function actionKey(action: Pick<QueuedAction, "type" | "payload" | "owner
 }
 
 /**
- * Append an action, collapsing any earlier action with the same identity.
- * "Update" semantics: the newest payload wins, so a reaction toggled
- * up→down→up offline results in exactly one network write.
+ * Append an action. Never coalesce held actions: an earlier toggle may have
+ * committed and a brain update may be a conflicting version. Other legacy
+ * action types retain their existing coalescing behavior.
  */
 export function enqueueAction(
   queue: QueuedAction[],
   action: Omit<QueuedAction, "id" | "createdAt" | "retryCount">,
 ): QueuedAction[] {
   const key = actionKey(action);
-  const filtered = queue.filter((existing) => actionKey(existing) !== key);
+  const held = action.type === "post_reaction" || action.type === "create_post" || action.type === "update_brain";
+  const filtered = held ? queue : queue.filter((existing) => actionKey(existing) !== key);
+  const baseId = `queue_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+  const existingIds = new Set(queue.map(item => item.id));
+  let id = baseId;
+  for (let suffix = 1; existingIds.has(id); suffix++) id = `${baseId}_${suffix}`;
   const next: QueuedAction = {
     ...action,
-    id: `queue_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+    id,
     createdAt: Date.now(),
     retryCount: 0,
   };

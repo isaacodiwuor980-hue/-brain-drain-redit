@@ -21,7 +21,7 @@ describe("offline replay reconciliation", () => {
 });
 
 describe("account-scoped offline queues", () => {
-  it("keeps coalescing separate across users and legacy work", async () => {
+  it("keeps held reactions separate across users and legacy work", async () => {
     const { enqueueAction, actionsForOwner } = await import("./offline-sync");
     const base = { type: "post_reaction" as const, payload: { postId: "same", reactionType: "upvote" } };
     let queue = enqueueAction([], base);
@@ -34,7 +34,8 @@ describe("account-scoped offline queues", () => {
     expect(actionsForOwner(queue, "bob")).toHaveLength(1);
     expect(actionsForOwner(queue, "alice")[0].ownerId).toBe("alice");
     const latest = enqueueAction(queue, { ...base, ownerId: "alice" });
-    expect(reconcileSyncBatch(latest, [queue[1].id], [], [])).toEqual(latest);
-    expect(latest).toHaveLength(4);
+    expect(latest).toHaveLength(5);
+    expect(actionsForOwner(latest, "alice")).toHaveLength(2);
+    expect(reconcileSyncBatch(latest, [queue[1].id], [], [])).toEqual(latest.filter(item => item.id !== queue[1].id));
   });
 });

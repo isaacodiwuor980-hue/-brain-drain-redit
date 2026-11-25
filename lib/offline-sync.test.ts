@@ -45,12 +45,12 @@ describe("enqueueAction", () => {
     expect(queue[0].id).toMatch(/^queue_/);
   });
 
-  it("coalesces duplicate actions instead of stacking them", () => {
+  it("retains every uncertain reaction instead of coalescing toggles", () => {
     let queue = enqueueAction([], { type: "post_reaction", payload: { postId: "p1", reactionType: "upvote" } });
     queue = enqueueAction(queue, { type: "post_reaction", payload: { postId: "p1", reactionType: "downvote" } });
     queue = enqueueAction(queue, { type: "post_reaction", payload: { postId: "p1", reactionType: "upvote" } });
-    expect(queue).toHaveLength(1);
-    expect(queue[0].payload.reactionType).toBe("upvote");
+    expect(queue).toHaveLength(3);
+    expect(queue.map(item => item.payload.reactionType)).toEqual(["upvote", "downvote", "upvote"]);
   });
 
   it("keeps independent posts separate", () => {
