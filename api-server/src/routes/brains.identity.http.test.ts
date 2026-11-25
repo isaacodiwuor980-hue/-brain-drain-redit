@@ -64,6 +64,15 @@ describe("brain routes with mocked identity and database", () => {
     expect((await fetch(`${base}/api/brains/brain1`, { headers: auth("bob") })).status).toBe(404);
     expect((await fetch(`${base}/api/brains/brain1`)).status).toBe(404);
   });
+  it("never exposes a private brain or its nodes merely because a legacy repo status is public", async () => {
+    for (const status of ["public_repo", "archived"]) {
+      db.getOne.mockResolvedValueOnce({ ...brain, is_public: false, repo_status: status });
+      const response = await fetch(`${base}/api/brains/brain1`);
+      expect(response.status).toBe(404);
+      expect(response.headers.get("cache-control")).toContain("no-store");
+      expect(db.get).not.toHaveBeenCalled();
+    }
+  });
   it("keeps public reads available without a mapping", async () => {
     db.getOne.mockResolvedValueOnce({ ...brain, is_public: true });
     expect((await fetch(`${base}/api/brains/brain1`)).status).toBe(200);

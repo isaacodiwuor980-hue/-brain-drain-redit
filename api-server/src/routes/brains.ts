@@ -156,7 +156,7 @@ router.get("/brains", optionalAuth, async (req, res) => {
 
 /** Fetch a single brain with all of its nodes. Public brains are readable by
  *  anyone; private brains only by their author. */
-router.get("/brains/:id", optionalAuth, async (req, res) => {
+router.get("/brains/:id", (_req, res, next) => { res.setHeader("Cache-Control", "no-store"); next(); }, optionalAuth, async (req, res) => {
   const id = String(req.params.id ?? "");
   if (!/^[A-Za-z0-9_-]+$/.test(id)) {
     res.status(400).json({ error: "Invalid brain id" });
@@ -174,10 +174,9 @@ router.get("/brains/:id", optionalAuth, async (req, res) => {
       res.status(404).json({ error: "Brain not found" });
       return;
     }
-    // Security: enforce visibility. Private brains are only accessible to their owner.
-    // repo_status "private" or null = private; "public_repo" = public; "archived" = read-only public.
-    const isPrivate = !brain.is_public && brain.repo_status !== "public_repo" && brain.repo_status !== "archived";
-    if (isPrivate) {
+    // Match the database visibility rule: legacy repo status never overrides
+    // an explicit private is_public value. Service-role reads bypass RLS.
+    if (brain.is_public !== true) {
       if (!req.auth) { res.status(404).json({ error: "Brain not found" }); return; }
       let mapped: string | null;
       try { mapped = await lookupMappedIdentity(req.auth.uid); }
