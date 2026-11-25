@@ -4,11 +4,12 @@ import { getAnalyticsEvents } from "@/lib/analytics";
 import { rankBrainsByLocalSignals } from "@/lib/recommendations";
 import { Brain, Node, BrainData } from "@/lib/types";
 import { env } from "@/lib/env";
-import { listBrains, saveBrain as saveBrainApi, isBrainsError } from "@/lib/api/brains";
+import { listBrains, isBrainsError } from "@/lib/api/brains";
 import { getAuthToken } from "@/lib/auth-token";
 import { mergeCloudWithLocal } from "@/lib/brain-merge";
 import { loadBrainData } from "@/lib/load-brain-data";
 import { deleteBrainData } from "@/lib/delete-brain";
+import { useToast } from "@/hooks/use-toast";
 
 const generateId = () => crypto.randomUUID();
 
@@ -18,6 +19,7 @@ let seedInProgress = false;
 
 export function useDatabase() {
   const queryClient = useQueryClient();
+  const { toast } = useToast();
 
   const { data: brains = [], isLoading } = useQuery<Brain[]>({
     queryKey: ["brains"],
@@ -90,31 +92,9 @@ export function useDatabase() {
       // would otherwise report success even when IndexedDB is unavailable.
       await idb.saveBrainWithNodes(data.brain, data.nodes);
 
-      // Same-origin API when VITE_API_BASE_URL is empty — see lib/env.ts.
-      if (!env.apiEnabled) return;
-
-      try {
-        const token = await getAuthToken();
-        // Only sync brains authored by the signed-in user. Guests keep brains local.
-        if (token) {
-          await saveBrainApi(
-            {
-              brain: {
-                ...data.brain,
-                is_public: (data.brain as Brain & { isPublic?: boolean }).isPublic ?? false,
-              },
-              nodes: data.nodes,
-            },
-            token,
-          );
-        }
-      } catch (error) {
-        // Message only — no stack dump for an expected offline/auth deferral.
-        console.warn(
-          "Brain saved locally, cloud sync deferred:",
-          error instanceof Error ? error.message : error,
-        );
-      }
+      // This store is not account-scoped and has no server-confirmed version.
+      // Never publish an edit under the account that happens to be signed in.
+      toast({ title: "Saved on this device", description: "Cloud saving is paused. Keep this device's data; this edit is not backed up to the cloud." });
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["brains"] });

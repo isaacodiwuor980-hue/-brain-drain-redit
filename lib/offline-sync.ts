@@ -66,9 +66,14 @@ export function getOfflineQueue(): QueuedAction[] {
   return getOfflineQueueStrict() ?? [];
 }
 
-/** Quarantined actions — kept for diagnostics, never replayed. */
+/** Null means recovery data could not be read safely. */
+export function getDeadLetterQueueStrict(): QueuedAction[] | null {
+  return readQueueStrict(DEAD_LETTER_KEY);
+}
+
+/** Quarantined actions — display only, never replayed. */
 export function getDeadLetterQueue(): QueuedAction[] {
-  return readQueueStrict(DEAD_LETTER_KEY) ?? [];
+  return getDeadLetterQueueStrict() ?? [];
 }
 
 function writeQueue(key: string, queue: QueuedAction[]): boolean {
@@ -217,12 +222,8 @@ export function recordFailure(
 export function quarantineActions(actions: QueuedAction[]): boolean {
   if (actions.length === 0) return true;
   try {
-    const raw = localStorage.getItem(DEAD_LETTER_KEY);
-    const parsed: unknown = raw === null ? [] : JSON.parse(raw);
-    if (!Array.isArray(parsed)) return false;
-    const existing = getDeadLetterQueue();
-    // Do not overwrite malformed/partially unrecognized recovery records.
-    if (existing.length !== parsed.length) return false;
+    const existing = getDeadLetterQueueStrict();
+    if (existing === null) return false;
     const byId = new Map(existing.map(item => [item.id, item]));
     for (const action of actions) {
       const prior = byId.get(action.id);

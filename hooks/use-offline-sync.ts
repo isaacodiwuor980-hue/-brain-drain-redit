@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import {
   getOfflineQueue,
   getOfflineQueueStrict,
+  getDeadLetterQueueStrict,
   actionsForOwner,
   summarizeOwnedQueue,
   getDeadLetterQueue,
@@ -31,7 +32,7 @@ export function useOfflineSync() {
   const status = useOnlineStatus();
   const isOnline = status === "online";
   const [queue, setQueue] = useState<QueuedAction[]>(getOfflineQueue);
-  const [storageUnavailable, setStorageUnavailable] = useState(() => getOfflineQueueStrict() === null);
+  const [storageUnavailable, setStorageUnavailable] = useState(() => getOfflineQueueStrict() === null || getDeadLetterQueueStrict() === null);
   const [isSyncing, setIsSyncing] = useState(false);
   const [authRetryAt, setAuthRetryAt] = useState(0);
   const syncingRef = useRef(false);
@@ -44,7 +45,7 @@ export function useOfflineSync() {
   useEffect(() => {
     const handleQueueChange = () => {
       const current = getOfflineQueueStrict();
-      setStorageUnavailable(current === null);
+      setStorageUnavailable(current === null || getDeadLetterQueueStrict() === null);
       if (current !== null) setQueue(current);
     };
     window.addEventListener("brainbuilder_queue_change", handleQueueChange);
@@ -70,7 +71,7 @@ export function useOfflineSync() {
    */
   const syncNow = useCallback(async () => {
     const currentQueue = getOfflineQueueStrict();
-    if (currentQueue === null) {
+    if (currentQueue === null || getDeadLetterQueueStrict() === null) {
       setStorageUnavailable(true);
       toast({ title: "Sync needs attention", description: "Recovery storage cannot be read. Do not clear browser data.", variant: "destructive" });
       return;
@@ -133,7 +134,7 @@ export function useOfflineSync() {
       // An enqueue may have happened during the network requests. Re-read the
       // queue and only update entries that are still present by their unique id.
       const latest = getOfflineQueueStrict();
-      if (latest === null) {
+      if (latest === null || getDeadLetterQueueStrict() === null) {
         setStorageUnavailable(true);
         toast({ title: "Sync needs attention", description: "Recovery storage cannot be read. Do not clear browser data.", variant: "destructive" });
         return;
