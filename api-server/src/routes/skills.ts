@@ -64,6 +64,16 @@ export interface SkillRow {
   updated_at?: string;
 }
 
+/** Public projection: do not expose unverified brain links or internal IDs. */
+function publicSkill(skill: SkillRow, includeSteps = false) {
+  return {
+    id: skill.id, title: skill.title, domain: skill.domain, make: skill.make,
+    model: skill.model, year: skill.year, part: skill.part, version: skill.version,
+    author_name: skill.author_name, author_years_experience: skill.author_years_experience,
+    status: skill.status, ...(includeSteps ? { steps: skill.steps } : {}),
+  };
+}
+
 /**
  * GET /api/v1/skills/:id — fetch a single skill.
  * Public if status='published'; otherwise requires auth + author match.
@@ -91,7 +101,7 @@ router.get("/v1/skills/:id", optionalAuth, async (req, res) => {
     const skill = rows[0];
     // Public skills are readable by anyone.
     if (skill.status === "published") {
-      res.json(skill);
+      res.json(publicSkill(skill, true));
       return;
     }
     // Private/in_review skills require the requester to be the author.
@@ -134,13 +144,13 @@ router.get("/v1/skills", optionalAuth, async (req, res) => {
       filters.domain = `eq.${req.query.domain}`;
     }
     const rows = await supabase.get<SkillRow>("skills", {
-      select: "id,title,domain,make,model,year,part,version,author_name,author_years_experience,status,source_brain_id",
+      select: "id,title,domain,make,model,year,part,version,author_name,author_years_experience,status",
       filters,
       order: { column: "published_at", ascending: false },
       limit,
     });
     // Defense in depth: the service-role client bypasses RLS.
-    res.json({ skills: rows.filter((row) => row.status === "published"), source: "supabase" });
+    res.json({ skills: rows.filter((row) => row.status === "published").map((row) => publicSkill(row)), source: "supabase" });
   } catch {
     // An unavailable store is not evidence that the list is empty.
     logger.warn("Skill list unavailable");
@@ -165,6 +175,12 @@ router.put("/v1/skills", requireAuth, async (req, res) => {
   const parsed = SkillRowSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "Invalid skill payload", details: parsed.error.flatten() });
+    return;
+  }
+  // A client-supplied reviewer/status is not verified moderation or identity.
+  // Existing published skills remain readable; new publication stays paused.
+  if (parsed.data.status === "published") {
+    res.set("Cache-Control", "no-store").status(503).json({ error: "Skill publishing is temporarily unavailable" });
     return;
   }
   // Subject is used in an ownership filter. Reject filter syntax rather than

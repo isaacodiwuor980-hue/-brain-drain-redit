@@ -84,3 +84,18 @@ it("reports unconfigured skill storage rather than an empty successful list", as
   expect(res.status).toBe(503); expect(res.headers.get("cache-control")).toContain("no-store");
   expect(await res.json()).toEqual({ error: "Skill storage unavailable" }); expect(mock.get).not.toHaveBeenCalled();
 });
+
+it("does not disclose source brain or internal reviewer fields on public skill reads", async () => {
+  mock.get.mockResolvedValue([{ id:"skill-1", status:"published", title:"example", domain:"test", steps:[], source_brain_id:"private-brain", author_id:"internal-author", reviewer_id:"internal-reviewer", extra_secret:"hidden" }]);
+  for (const path of ["/api/v1/skills", "/api/v1/skills/skill-1"]) {
+    const res=await fetch(`${base}${path}`); expect(res.status).toBe(200);
+    const text=JSON.stringify(await res.json());
+    for (const secret of ["private-brain","internal-author","internal-reviewer","hidden"]) expect(text).not.toContain(secret);
+  }
+});
+
+it("rejects unreviewed publication before any service-role write", async () => {
+  const res = await put("alice", { ...payload, status: "published", reviewer_id: "self" });
+  expect(res.status).toBe(503); expect(res.headers.get("cache-control")).toContain("no-store");
+  expect(mock.insert).not.toHaveBeenCalled(); expect(mock.updateMatchingIds).not.toHaveBeenCalled();
+});

@@ -39,3 +39,9 @@ it("reports unconfigured search storage instead of a successful empty result", a
   expect((await res.json()).error).toBe("Skill search is temporarily unavailable.");
   expect(db.get).not.toHaveBeenCalled();
 });
+
+it("does not expose an unverified source brain identifier from published results", async () => {
+  db.get.mockResolvedValueOnce([{...row("public", "published"), source_brain_id:"private-brain"}]);
+  const res=await fetch(`${base}/api/v1/search/skills?q=example`);
+  expect(res.status).toBe(200); expect(JSON.stringify(await res.json())).not.toContain("private-brain");
+});
