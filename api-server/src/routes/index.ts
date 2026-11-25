@@ -6,6 +6,7 @@ import clientErrorsRouter from "./client-errors";
 import feedRouter from "./feed";
 import feedPrivacyRouter from "./feed-privacy";
 import postsRouter from "./posts";
+import voteStateV2Router from "./vote-state-v2";
 import topicsRouter from "./topics";
 import brainsRouter from "./brains";
 import dataApiRouter from "./data-api";
@@ -34,6 +35,7 @@ router.use(clientErrorsRouter);
 router.use(feedRouter);
 router.use(feedPrivacyRouter);
 router.use(postsRouter);
+router.use(voteStateV2Router);
 router.use(topicsRouter);
 router.use(brainsRouter);
 // Phase 3: verify + provenance routers removed (501 stubs that advertised
