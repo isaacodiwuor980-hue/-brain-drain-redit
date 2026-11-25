@@ -43,6 +43,9 @@ import { useMessages } from "@/hooks/use-messages";
 import { useOnlineStatus } from "@/hooks/use-online-status";
 import { votingAvailable } from "@/lib/vote-availability";
 
+// Duplicate-post/Room and direct-message delivery are not verified.
+const UNSAFE_POST_SHARING_ENABLED = false;
+
 // PERF-002: confetti is dynamically imported only when a CELEBRATION (4%) or
 // JACKPOT (1%) vote fires. Previously it was a static import, which put 227
 // lines of canvas code into every PostCard on the feed even though 95% of
@@ -237,7 +240,7 @@ export function PostCard({
         if (!reports.includes(post.id)) {
           reports.push(post.id);
           localStorage.setItem("brainDrain_reportedPosts", JSON.stringify(reports));
-          toast({ title: "Post reported", description: "Thank you. Our team will review this content." });
+          toast({ title: "Saved on this device", description: "This report was not sent to a moderation team." });
         } else {
           toast({ title: "Already reported", description: "You've already reported this post." });
         }
@@ -249,6 +252,7 @@ export function PostCard({
 
   // Task 4a: "Share as post" = real repost on the user's own feed (visible to followers).
   const handleShareAsPost = async () => {
+    if (!UNSAFE_POST_SHARING_ENABLED) return;
     triggerHaptic("medium");
     try {
       const repost: Post = {
@@ -278,6 +282,7 @@ export function PostCard({
 
   // Task 4b: "Share to" = send to a circle/community OR directly to a follower (DM).
   const handleShareToCircle = async (communityId: string, communityName: string) => {
+    if (!UNSAFE_POST_SHARING_ENABLED) return;
     triggerHaptic("medium");
     try {
       const shared: Post = {
@@ -310,6 +315,7 @@ export function PostCard({
   };
 
   const handleShareToFollower = async () => {
+    if (!UNSAFE_POST_SHARING_ENABLED) return;
     const recipient = shareToRecipient.trim();
     if (!recipient) {
       toast({ title: "Enter a username", description: "Type the follower you want to send this post to.", variant: "destructive" });
@@ -745,10 +751,10 @@ export function PostCard({
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="rounded-xl border-border/50">
-                  <DropdownMenuItem onClick={() => void handleShareAsPost()}>
+                  <DropdownMenuItem disabled={!UNSAFE_POST_SHARING_ENABLED} onClick={() => void handleShareAsPost()}>
                     <Share className="w-4 h-4 mr-2" /> Share as post
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => { triggerHaptic("selection"); setIsShareToOpen(true); }}>
+                  <DropdownMenuItem disabled={!UNSAFE_POST_SHARING_ENABLED} onClick={() => { triggerHaptic("selection"); setIsShareToOpen(true); }}>
                     <Send className="w-4 h-4 mr-2" /> Share to…
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => setIsSaveModalOpen(true)}>

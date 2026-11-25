@@ -1,3 +1,4 @@
+import { hasComposerUnsavedWork } from "./composer-unsaved-work";
 import { lazy, Suspense, useEffect, useRef, useState, useMemo } from "react";
 import { Dialog, DialogContent, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -208,9 +209,6 @@ export function PostCreator({
   const [depositType, setDepositType] = useState<"none" | "procedure" | "decision" | "evidence" | "case" | "question" | "synthesis">("none");
   const [depositFields, setDepositFields] = useState<Record<string, string>>({});
 
-  // B: Suggest existing tags from recent posts (loaded from IDB on mount).
-  const [recentTags, setRecentTags] = useState<string[]>([]);
-
   // For answering questions
   const [selectedQuestion, setSelectedQuestion] = useState<QuestionTarget | null>(initialSelectedQuestion);
   const [questionSearchQuery, setQuestionSearchQuery] = useState("");
@@ -242,71 +240,9 @@ export function PostCreator({
         setSelectedQuestion(initialSelectedQuestion);
       }
 
-      // Load drafts. localStorage may be unavailable (private mode /
-      // sandboxed iframes) — guard with try/catch so the dialog still opens.
-      try {
-        const savedDraft = localStorage.getItem("postCreatorDraft");
-        if (savedDraft) {
-          const draft = JSON.parse(savedDraft);
-          if (draft.postTitle) setPostTitle(draft.postTitle);
-          if (draft.content) setContent(draft.content);
-          if (draft.postTags) setPostTags(draft.postTags);
-          if (draft.questionDetails) setQuestionDetails(draft.questionDetails);
-          if (draft.postType) setPostType(draft.postType);
-          if (draft.isEventMode) setIsEventMode(draft.isEventMode);
-          if (draft.eventTitle) setEventTitle(draft.eventTitle);
-          if (draft.eventDate) setEventDate(draft.eventDate);
-          if (draft.eventTime) setEventTime(draft.eventTime);
-          if (draft.eventLocation) setEventLocation(draft.eventLocation);
-        }
-      } catch {
-        // Draft restore is best-effort — ignore parse / quota / access errors.
-      }
+
     }
   }, [initialPostType, initialSelectedQuestion, isOpen]);
-
-  // B: Load recent tags from IDB on mount (suggests existing tags instead of
-  // requiring users to invent new ones).
-  useEffect(() => {
-    const loadTags = async () => {
-      try {
-        const allPosts = await idb.getAll<Post>("posts");
-        const tagCount = new Map<string, number>();
-        for (const p of allPosts) {
-          if (p.tags) for (const t of p.tags) {
-            tagCount.set(t, (tagCount.get(t) || 0) + 1);
-          }
-        }
-        // Sort by frequency, take top 10.
-        setRecentTags(Array.from(tagCount.entries()).sort((a, b) => b[1] - a[1]).slice(0, 10).map(([t]) => t));
-      } catch { /* best-effort */ }
-    };
-    if (isOpen) void loadTags();
-  }, [isOpen]);
-
-  // Auto-save draft whenever inputs change. Guarded against blocked storage.
-  useEffect(() => {
-    if (!isOpen) return undefined;
-    const timer = setTimeout(() => {
-      try {
-        localStorage.setItem("postCreatorDraft", JSON.stringify({
-          postTitle,
-          content,
-          postTags,
-          questionDetails,
-          postType,
-          isEventMode,
-          eventTitle,
-          eventDate,
-          eventTime,
-          eventLocation
-        }));
-      } catch {
-        // Best-effort: ignore quota / private-mode write errors.
-      }
-    }, 1000);
-    return () => clearTimeout(timer);
-  }, [postTitle, content, postTags, questionDetails, postType, isEventMode, eventTitle, eventDate, eventTime, eventLocation, isOpen]);
 
   // Combine provided existing questions with curated community questions
   const allAvailableQuestions = useMemo(() => {
@@ -350,6 +286,7 @@ export function PostCreator({
     setSelectedCommunityId("");
     setPostType("post");
     setMediaUrls([]);
+    setNoteAttachments([]);
     setAttachedBrainId(null);
     setSelectedQuestion(null);
     setQuestionSearchQuery("");
@@ -361,18 +298,19 @@ export function PostCreator({
     setEventLocation("");
     setDepositType("none");
     setDepositFields({});
-    try { localStorage.removeItem("postCreatorDraft"); } catch { /* best-effort */ }
   };
 
   const handleClose = () => {
-    // B: Warn before discarding unsaved work.
-    const hasUnsavedContent = content.trim() || postTitle.trim() || postTags.length > 0 || questionDetails.trim();
-    if (hasUnsavedContent && !isPublishing) {
-      // Auto-save draft before closing (existing localStorage draft logic
-      // already persists on every change, so the draft IS saved). Just show
-      // a toast so the user knows their draft is preserved.
-      toast({ title: "Draft saved", description: "Your draft will be here next time you open the composer.", duration: 2000 });
-    }
+    const hasUnsavedContent = hasComposerUnsavedWork({
+      content, title: postTitle, tags: postTags, details: questionDetails,
+      media: mediaUrls, noteAttachments, brainId: attachedBrainId, isEventMode,
+      eventTitle, eventDate, eventTime, eventLocation, depositType, depositFields,
+      pendingTag: tagInput, topicId: selectedTopicId, communityId: selectedCommunityId,
+      questionId: selectedQuestion?.id, editPolicy,
+    });
+    if (hasUnsavedContent && !isPublishing && !window.confirm(
+      "Discard this unsaved post? Automatic draft saving is paused; this editor's changes will be lost.",
+    )) return;
     setIsWizardOpen(false);
     setIsPublishing(false); // reset the submit guard for the next open
     reset();
@@ -596,15 +534,12 @@ export function PostCreator({
 
   const handleBrainSave = async (data: BrainData) => {
     try {
-      await idb.put("brains", data.brain);
-      for (const node of data.nodes) {
-        await idb.put("nodes", node);
-      }
+      await idb.saveBrainWithNodes(data.brain, data.nodes);
       setAttachedBrainId(data.brain.id);
       setIsWizardOpen(false);
       toast({
         title: "Brain Attached",
-        description: `"${data.brain.title}" is now attached to your submission.`,
+        description: `"${data.brain.title}" is saved on this device. The attachment must be confirmed public before publishing.`,
       });
     } catch (error) {
       toast({
@@ -612,6 +547,7 @@ export function PostCreator({
         description: error instanceof Error ? error.message : "Please try again.",
         variant: "destructive",
       });
+      throw error; // Keep the wizard open rather than reporting a failed save as success.
     }
   };
 
@@ -1455,23 +1391,6 @@ export function PostCreator({
                   </div>
                 </div>
 
-                {/* B: Suggest existing tags from recent posts — no inventing required */}
-                {recentTags.length > 0 && postTags.length === 0 && !tagInput && (
-                  <div className="flex flex-wrap gap-1.5 mt-1">
-                    <span className="text-[10px] text-muted-foreground self-center mr-1">Suggested:</span>
-                    {recentTags.slice(0, 6).map(tag => (
-                      <button
-                        key={tag}
-                        type="button"
-                        className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
-                        onClick={() => setPostTags([...postTags, tag])}
-                      >
-                        {tag}
-                      </button>
-                    ))}
-                  </div>
-                )}
-
                 {/* 4. Content Textarea & Markdown Toolbar */}
                 <div className="rounded-xl border border-border/60 bg-card overflow-hidden focus-within:ring-1 focus-within:ring-primary/50 transition-all">
                   <Textarea
@@ -1638,7 +1557,7 @@ export function PostCreator({
           </div>
 
           <p className="px-4 pb-2 text-xs text-muted-foreground" role="status">
-            Image, note and structured Room deposit publishing is paused. These drafts remain on this device for review and are not uploaded to cloud storage.
+            Automatic editor draft saving is paused. Keep this editor open until you save; image, note and Room deposit posts are saved on this device for review, not uploaded.
           </p>
 
           {/* Hidden File Input — single shared picker for all post types.
