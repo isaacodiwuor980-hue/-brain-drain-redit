@@ -16,14 +16,21 @@ beforeAll(async () => {
 });
 afterAll(async () => { await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve())); });
 beforeEach(() => {vi.resetAllMocks(); db.isConfigured.mockReturnValue(true); db.getOne.mockResolvedValue({id: "post-1"}); db.get.mockResolvedValue([]);});
-async function vote(auth: boolean, authTime = Math.floor(Date.now() / 1000)) {
-  return fetch(`${base}/api/posts/post-1/react`, {method: "POST", headers: {"content-type": "application/json", ...(auth ? {authorization: "Bearer synthetic", "x-synthetic-time": String(authTime)} : {}), "x-enable-feature": "true"}, body: JSON.stringify({reactionType: "upvote"})});
+async function vote(auth: boolean, authTime = Math.floor(Date.now() / 1000), reactionType = "upvote") {
+  return fetch(`${base}/api/posts/post-1/react`, {method: "POST", headers: {"content-type": "application/json", ...(auth ? {authorization: "Bearer synthetic", "x-synthetic-time": String(authTime)} : {}), "x-enable-feature": "true"}, body: JSON.stringify({reactionType})});
 }
 describe("legacy reaction endpoint safety gate (mocked DB)", () => {
   it("denies unauthenticated requests", async () => {expect((await vote(false)).status).toBe(401); expect(db.insert).not.toHaveBeenCalled();});
   it("does not perform unversioned writes even for fresh sessions or forged enable headers", async () => {
     const result = await vote(true); expect(result.status).toBe(503); expect(await result.json()).toEqual({error: "Voting temporarily unavailable"});
     expect(db.get).not.toHaveBeenCalled(); expect(db.getOne).not.toHaveBeenCalled(); expect(db.insert).not.toHaveBeenCalled(); expect(db.delete).not.toHaveBeenCalled(); expect(db.rpc).not.toHaveBeenCalled();
+  });
+  it.each(["upvote", "downvote", "repost", "unknown"])("fails closed for %s independently of request body", async (reactionType) => {
+    const response = await vote(true, Math.floor(Date.now() / 1000), reactionType);
+    expect(response.status).toBe(503);
+    expect(response.headers.get("cache-control")).toBe("no-store");
+    expect(db.get).not.toHaveBeenCalled(); expect(db.getOne).not.toHaveBeenCalled();
+    expect(db.insert).not.toHaveBeenCalled(); expect(db.delete).not.toHaveBeenCalled(); expect(db.rpc).not.toHaveBeenCalled();
   });
   it("does not perform unversioned writes for stale sessions or retries", async () => {
     for (let i = 0; i < 2; i++) expect((await vote(true, Math.floor(Date.now() / 1000) - 301)).status).toBe(503);
