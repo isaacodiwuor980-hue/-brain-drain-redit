@@ -246,7 +246,7 @@ export function CommentThread({
   const handleDelete = async (node: CommentWithChildren) => {
     try {
       await deleteComment({ id: node.id, postId, restore: false });
-      toast({ title: "Reply deleted", description: "Hidden from the thread. Restore from the menu." });
+      toast({ title: "Reply hidden", description: "The reply and its thread are hidden here. Recovery is not yet available." });
     } catch (error) {
       toast({ title: "Couldn't delete reply", description: error instanceof Error ? error.message : "Please try again.", variant: "destructive" });
     }
