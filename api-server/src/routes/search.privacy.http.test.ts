@@ -25,8 +25,17 @@ describe("public skill search privacy with database mocks", () => {
 it("does not advise applying an unreviewed migration when search storage fails", async () => {
   db.get.mockRejectedValueOnce(new Error("upstream outage"));
   const res = await fetch(`${base}/api/v1/search/skills?q=example`);
-  expect(res.status).toBe(200);
+  expect(res.status).toBe(503);
+  expect(res.headers.get("cache-control")).toContain("no-store");
   const body = await res.json();
-  expect(body.note).toBe("Skill search is temporarily unavailable.");
+  expect(body.error).toBe("Skill search is temporarily unavailable.");
   expect(JSON.stringify(body)).not.toContain("0002_search.sql");
+});
+
+it("reports unconfigured search storage instead of a successful empty result", async () => {
+  db.isConfigured.mockReturnValue(false);
+  const res = await fetch(`${base}/api/v1/search/skills?q=example`);
+  expect(res.status).toBe(503); expect(res.headers.get("cache-control")).toContain("no-store");
+  expect((await res.json()).error).toBe("Skill search is temporarily unavailable.");
+  expect(db.get).not.toHaveBeenCalled();
 });

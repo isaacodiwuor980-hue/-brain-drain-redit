@@ -46,18 +46,9 @@ router.get("/v1/search/skills", async (req, res) => {
 
   const { q, domain, make, model, year, part, layers, limit } = parsed.data;
 
-  // If Supabase isn't configured, return the contract + empty results so
-  // the client can fall back to local IDB search.
+  // An outage or missing configuration is not a verified empty result.
   if (!supabase.isConfigured()) {
-    res.json({
-      query: q,
-      filters: { domain, make, model, year, part },
-      layers,
-      results: [],
-      resultCount: 0,
-      note: "Supabase not configured. Server-side search unavailable — use the client-side IDB search fallback.",
-      generatedAt: new Date().toISOString(),
-    });
+    res.set("Cache-Control", "no-store").status(503).json({ error: "Skill search is temporarily unavailable." });
     return;
   }
 
@@ -103,18 +94,8 @@ router.get("/v1/search/skills", async (req, res) => {
     try {
       keywordResults = await supabase.get<SkillRow>("skills", queryOptions);
     } catch {
-      // Supabase returned an error (e.g. skills table missing — PGRST205).
-      // Log + return empty results so the client can fall back to IDB.
-      logger.warn("Skill keyword search failed — returning empty results");
-      res.json({
-        query: q,
-        filters: { domain, make, model, year, part },
-        layers,
-        results: [],
-        resultCount: 0,
-        note: "Skill search is temporarily unavailable.",
-        generatedAt: new Date().toISOString(),
-      });
+      logger.warn("Skill keyword search unavailable");
+      res.set("Cache-Control", "no-store").status(503).json({ error: "Skill search is temporarily unavailable." });
       return;
     }
 

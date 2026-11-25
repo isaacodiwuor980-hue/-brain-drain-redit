@@ -123,7 +123,7 @@ router.get("/v1/skills/:id", optionalAuth, async (req, res) => {
  */
 router.get("/v1/skills", optionalAuth, async (req, res) => {
   if (!supabase.isConfigured()) {
-    res.json({ skills: [], source: "local-only" });
+    res.set("Cache-Control", "no-store").status(503).json({ error: "Skill storage unavailable" });
     return;
   }
   try {
@@ -142,10 +142,9 @@ router.get("/v1/skills", optionalAuth, async (req, res) => {
     // Defense in depth: the service-role client bypasses RLS.
     res.json({ skills: rows.filter((row) => row.status === "published"), source: "supabase" });
   } catch {
-    // Skills table may not exist yet (migration 0002 not run).
-    // Return empty list instead of crashing the server.
+    // An unavailable store is not evidence that the list is empty.
     logger.warn("Skill list unavailable");
-    res.json({ skills: [], source: "supabase-unavailable", error: "Skill storage unavailable" });
+    res.set("Cache-Control", "no-store").status(503).json({ error: "Skill storage unavailable" });
   }
 });
 

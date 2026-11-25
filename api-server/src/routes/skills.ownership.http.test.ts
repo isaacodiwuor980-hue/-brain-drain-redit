@@ -72,7 +72,15 @@ describe("public skill list with a mocked service-role database", () => {
   });
   it("does not claim a database outage means a migration is missing", async () => {
     mock.get.mockRejectedValueOnce(new Error("upstream outage"));
-    const body = await (await fetch(`${base}/api/v1/skills`)).json();
-    expect(body).toEqual({ skills: [], source: "supabase-unavailable", error: "Skill storage unavailable" });
+    const res = await fetch(`${base}/api/v1/skills`);
+    expect(res.status).toBe(503); expect(res.headers.get("cache-control")).toContain("no-store");
+    expect(await res.json()).toEqual({ error: "Skill storage unavailable" });
   });
+});
+
+it("reports unconfigured skill storage rather than an empty successful list", async () => {
+  mock.isConfigured.mockReturnValue(false);
+  const res = await fetch(`${base}/api/v1/skills`);
+  expect(res.status).toBe(503); expect(res.headers.get("cache-control")).toContain("no-store");
+  expect(await res.json()).toEqual({ error: "Skill storage unavailable" }); expect(mock.get).not.toHaveBeenCalled();
 });
