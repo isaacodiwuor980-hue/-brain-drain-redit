@@ -40,6 +40,7 @@ export async function listBrains(
   const qs = params.toString();
   return api.get<ListBrainsResponse>(`/api/brains${qs ? `?${qs}` : ""}`, {
     signal: options.signal,
+    cache: "no-store",
     headers: options.authToken ? { Authorization: `Bearer ${options.authToken}` } : undefined,
     retries: 1,
   });
@@ -52,6 +53,7 @@ export async function getBrain(
 ): Promise<BrainDetailResponse> {
   return api.get<BrainDetailResponse>(`/api/brains/${encodeURIComponent(id)}`, {
     signal,
+    cache: "no-store",
     headers: authToken ? { Authorization: `Bearer ${authToken}` } : undefined,
     retries: 1,
   });

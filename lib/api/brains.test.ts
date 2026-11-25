@@ -11,6 +11,7 @@ describe("authenticated brain requests", () => {
     vi.stubGlobal("fetch", fetchMock);
     await listBrains({ mine: true, authToken: "token-a" });
     expect(String(fetchMock.mock.calls[0][0])).toContain("/api/brains?mine=true");
+    expect(fetchMock.mock.calls[0][1].cache).toBe("no-store");
     expect(new Headers(fetchMock.mock.calls[0][1].headers).get("authorization")).toBe("Bearer token-a");
   });
 
@@ -19,6 +20,7 @@ describe("authenticated brain requests", () => {
     vi.stubGlobal("fetch", fetchMock);
     await getBrain("b1", undefined, "token-b");
     expect(String(fetchMock.mock.calls[0][0])).toContain("/api/brains/b1");
+    expect(fetchMock.mock.calls[0][1].cache).toBe("no-store");
     expect(new Headers(fetchMock.mock.calls[0][1].headers).get("authorization")).toBe("Bearer token-b");
   });
 

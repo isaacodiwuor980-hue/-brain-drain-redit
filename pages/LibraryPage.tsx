@@ -11,6 +11,7 @@ import { Brain } from "@/lib/types";
 import { Database, Network, Clock, Files, Library, Map as MapIcon, Hash, Lock, Globe } from "lucide-react";
 import { useDatabase } from "@/hooks/use-database";
 import { BrainCard } from "@/components/BrainCard";
+import { PublicBrainLibrary } from "./PublicBrainLibrary";
 
 /** A5: Local brains — private workspace. repo_status is "private" or undefined. */
 function LocalBrainsTab({ onView }: { onView: (brain: Brain) => void }) {
@@ -346,10 +347,5 @@ function libraryVisibilityVerified(): boolean { return false; }
 
 export function LibraryPage() {
   if (libraryVisibilityVerified()) return <LibraryContent />;
-  return (
-    <div className="container mx-auto p-6" role="status">
-      <h1 className="text-2xl font-bold">Brain library is temporarily unavailable</h1>
-      <p className="mt-2 text-muted-foreground">Brain viewing and editing are paused while privacy is reviewed. Existing device data is retained; do not clear browser data.</p>
-    </div>
-  );
+  return <PublicBrainLibrary />;
 }
