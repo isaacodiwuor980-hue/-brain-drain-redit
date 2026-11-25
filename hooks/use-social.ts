@@ -154,8 +154,8 @@ export function useSocial(mode: "foryou" | "following" = "foryou", topicId: stri
               reconcileCachedCloudPost(server, localById.get(server.id)),
             );
             await idb.putAll("posts", toCache);
-          } catch (idbErr) {
-            console.warn("[feed] Could not cache posts locally (cloud data still shown)", idbErr);
+          } catch {
+            console.warn("[feed] Could not cache posts locally (cloud data still shown)");
           }
         }
         if (mode === "following") {
@@ -173,7 +173,7 @@ export function useSocial(mode: "foryou" | "following" = "foryou", topicId: stri
         if (shouldSurfaceFeedError(error)) {
           feedFailedRef.current = true;
           setFeedFailed(true);
-          console.warn("[feed] Cloud fetch failed — showing cached/seed fallback. Error:", error);
+          console.warn("[feed] Cloud fetch failed — showing cached fallback.");
         }
         // B3: Following failures (including the signed-out empty page) stay
         // empty — never fall back to the For-You universe under this tab.
@@ -271,14 +271,10 @@ export function useSocial(mode: "foryou" | "following" = "foryou", topicId: stri
           toCreatePostInput(post),
           token,
         );
-      } catch (error) {
-        // Keep the local copy and queue for auto-sync when connection returns.
-        queueOfflineAction("create_post", { postId: post.id }, session?.uid);
-        // Message only — no stack dump for an expected offline/auth deferral.
-        console.warn(
-          "Post created locally, cloud sync deferred:",
-          error instanceof Error ? error.message : error,
-        );
+      } catch {
+        // Keep the local copy for review; save status may be unknown.
+        queueOfflineAction("create_post", { postId: post.id }, session.uid);
+        console.warn("Post cloud status needs review.");
       }
     },
     onError: (_err, _post, context) => {
@@ -400,11 +396,10 @@ export function useSocial(mode: "foryou" | "following" = "foryou", topicId: stri
             });
           }
         }
-      } catch (error) {
-        // Network/API failure — vote IS saved locally. Queue for sync.
-        // Do NOT rethrow — onError must not see this.
-        queueOfflineAction("post_reaction", { postId, reactionType }, session?.uid);
-        console.warn("Reaction saved locally, cloud sync deferred", error);
+      } catch {
+        // Server status is uncertain. Hold the local reaction for review.
+        queueOfflineAction("post_reaction", { postId, reactionType }, session.uid);
+        console.warn("Reaction status needs review.");
       }
     },
     // APEX-OMEGA R2: ALWAYS roll back when mutationFn throws. The only
