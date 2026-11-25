@@ -6,13 +6,12 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { trackEvent } from "@/lib/analytics";
 import { idb } from "@/lib/db";
-import { Brain, Topic, Post } from "@/lib/types";
+import { Brain, Topic, Post, SkillEntry } from "@/lib/types";
 import { useLocation, useSearch } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { RuntimeEngine } from "@/components/RuntimeEngine";
 import { BrainDrawer } from "@/components/BrainDrawer";
-import { useSkills } from "@/hooks/use-skills";
 import { useUserSearch, useFollowUser } from "@/hooks/use-discover";
 import { safeStorage } from "@/lib/safe-storage";
 import { deleteBrainData } from "@/lib/delete-brain";
@@ -70,9 +69,8 @@ export function SearchPage() {
   const [posts] = useState<Post[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
-  // Part 2 Task 6: Skills search (local IDB — server API is also available
-  // via /api/v1/search/skills but we search local IDB for instant results).
-  const { skills } = useSkills();
+  // Cached skills may contain private brain-derived steps and lack account scoping.
+  const [skills] = useState<SkillEntry[]>([]);
 
   // Phase 4 — server-side user search (fires when query is 3+ chars).
   const userSearch = useUserSearch(query);
@@ -252,7 +250,7 @@ export function SearchPage() {
         </form>
       </div>
 
-      <p role="status" className="mt-2 text-sm text-muted-foreground">Brain and post search is temporarily unavailable while privacy is reviewed. Existing data is retained.</p>
+      <p role="status" className="mt-2 text-sm text-muted-foreground">Brain and post search is temporarily unavailable while privacy is reviewed. Skill search is also paused. Existing data is retained.</p>
 
       {!query ? (
         <div className="mt-4">

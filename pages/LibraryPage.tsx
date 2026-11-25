@@ -196,7 +196,7 @@ function TimelineTab({ onView }: { onView: (brain: Brain) => void }) {
   );
 }
 
-export function LibraryPage() {
+function LibraryContent() {
   const [shareModalOpen, setShareModalOpen] = useState(false);
   const [selectedBrain, setSelectedBrain] = useState<Brain | null>(null);
   // B9: detail-dialog state — brain cards were dead clicks (onClick no-op)
@@ -336,6 +336,20 @@ export function LibraryPage() {
         onClose={() => setShareModalOpen(false)}
         brain={selectedBrain}
       />
+    </div>
+  );
+}
+
+/** Local brain records have neither account-scoped ownership nor current
+ * server-verified visibility. This is a UI containment, not access control. */
+function libraryVisibilityVerified(): boolean { return false; }
+
+export function LibraryPage() {
+  if (libraryVisibilityVerified()) return <LibraryContent />;
+  return (
+    <div className="container mx-auto p-6" role="status">
+      <h1 className="text-2xl font-bold">Brain library is temporarily unavailable</h1>
+      <p className="mt-2 text-muted-foreground">Brain viewing and editing are paused while privacy is reviewed. Existing device data is retained; do not clear browser data.</p>
     </div>
   );
 }
