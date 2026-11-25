@@ -118,7 +118,7 @@ export function enqueueAction(
   action: Omit<QueuedAction, "id" | "createdAt" | "retryCount">,
 ): QueuedAction[] {
   const key = actionKey(action);
-  const held = action.type === "post_reaction" || action.type === "create_post" || action.type === "update_brain";
+  const held = requiresManualSyncReview(action);
   const filtered = held ? queue : queue.filter((existing) => actionKey(existing) !== key);
   const baseId = `queue_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
   const existingIds = new Set(queue.map(item => item.id));
@@ -159,8 +159,10 @@ export function queueOfflineAction(
 /** Posts lack a trusted retry permit/review flow, brain edits lack versioned
  * conflict handling, and toggles can reverse an already-applied reaction.
  * Keep these actions for review; this is not a complete recovery interface. */
-export function requiresManualSyncReview(action: QueuedAction): boolean {
-  return action.type === "post_reaction" || action.type === "create_post" || action.type === "update_brain";
+export function requiresManualSyncReview(action: Pick<QueuedAction, "type">): boolean {
+  // Persisted queues may contain newer or malformed action types despite the
+  // TypeScript union. Only explicitly known local-only cases may be skipped.
+  return action.type !== "add_comment" && action.type !== "save_profile";
 }
 
 /** Unowned legacy entries and other accounts' work must never be replayed. */

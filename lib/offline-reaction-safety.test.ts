@@ -9,6 +9,9 @@ describe("non-idempotent offline actions",()=>{
     expect(requiresManualSyncReview(action("create_post"))).toBe(true);
     expect(requiresManualSyncReview(action("update_brain"))).toBe(true);
   });
+  it("holds unrecognized legacy or future action types instead of silently discarding them",()=>{
+    expect(requiresManualSyncReview(action("future_write" as QueuedAction["type"]))).toBe(true);
+  });
   it("does not change unrelated action handling",()=>{
     expect(requiresManualSyncReview(action("add_comment"))).toBe(false);
     expect(requiresManualSyncReview(action("save_profile"))).toBe(false);

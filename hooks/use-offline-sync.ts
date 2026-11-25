@@ -239,6 +239,6 @@ async function replayAction(
       return "skipped";
 
     default:
-      return "skipped";
+      throw new Error("Offline action requires review");
   }
 }
