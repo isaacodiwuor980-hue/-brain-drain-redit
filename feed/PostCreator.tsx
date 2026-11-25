@@ -66,7 +66,7 @@ export interface QuestionTarget {
 interface PostCreatorProps {
   isOpen: boolean;
   onClose: () => void;
-  onPostCreated: (post: Post) => void;
+  onPostCreated: (post: Post) => Promise<void>;
   topics: { id: string; name: string }[];
   communities?: CommunityOption[];
   postType?: PostType;
@@ -370,6 +370,21 @@ export function PostCreator({
     };
   };
 
+  const submitPost = async (post: Post) => {
+    setIsPublishing(true);
+    try {
+      await onPostCreated(post);
+      setIsWizardOpen(false);
+      reset();
+      onClose();
+      toast({ title: "Saved on this device", description: "Publishing status may need review. Do not repost until it is confirmed." });
+    } catch {
+      toast({ title: "Could not save", description: "Keep this editor open and try again; storage may be unavailable.", variant: "destructive" });
+    } finally {
+      setIsPublishing(false);
+    }
+  };
+
   const handlePublish = () => {
     // Submit guard — prevents duplicate posts on rapid double-click.
     // The button is disabled while isPublishing is true, but this guard
@@ -407,13 +422,7 @@ export function PostCreator({
       };
 
       triggerHaptic("success");
-      setIsPublishing(true);
-      onPostCreated(newPost);
-      handleClose();
-      toast({
-        title: "Question Asked",
-        description: "Your question has been posted to the community.",
-      });
+      void submitPost(newPost);
       return;
     }
 
@@ -448,13 +457,7 @@ export function PostCreator({
       };
 
       triggerHaptic("success");
-      setIsPublishing(true);
-      onPostCreated(newPost);
-      handleClose();
-      toast({
-        title: "Answer Submitted",
-        description: "Your answer has been published.",
-      });
+      void submitPost(newPost);
       return;
     }
 
@@ -482,11 +485,7 @@ export function PostCreator({
         createdAt: Date.now(),
       };
       triggerHaptic("success");
-      setIsPublishing(true);
-      onPostCreated(newPost);
-      handleClose();
-      setNoteAttachments([]);
-      toast({ title: "Note published", description: "Your inline note is now in the feed." });
+      void submitPost(newPost);
       return;
     }
 
@@ -529,13 +528,7 @@ export function PostCreator({
     };
 
     triggerHaptic("success");
-    setIsPublishing(true);
-    onPostCreated(newPost);
-    handleClose();
-    toast({
-      title: "Published",
-      description: "Your post is now live.",
-    });
+    void submitPost(newPost);
   };
 
   const handleBrainSave = async (data: BrainData) => {
@@ -596,7 +589,7 @@ export function PostCreator({
 
   return (
     <>
-      <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
+      <Dialog open={isOpen} onOpenChange={(open) => !open && !isPublishing && handleClose()}>
         <DialogContent
           id="q-and-a-post-creator-dialog"
           className="max-w-2xl max-h-[92vh] flex flex-col bg-card border-border/50 sm:rounded-[20px] p-0 overflow-hidden shadow-2xl"
@@ -1564,6 +1557,7 @@ export function PostCreator({
               size="sm"
               className="rounded-full text-xs text-muted-foreground hover:text-foreground"
               onClick={handleClose}
+              disabled={isPublishing}
             >
               Cancel
             </Button>

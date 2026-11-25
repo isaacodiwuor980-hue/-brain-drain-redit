@@ -29,6 +29,7 @@ import { useToast } from "./use-toast";
 import { mayStartVote } from "../lib/online-vote-policy";
 import { votingAvailable } from "../lib/vote-availability";
 import { hideCachedVoteDetailsV1 } from "../lib/vote-display-privacy";
+import { maySendPostAs } from "../lib/post-owner-safety";
 
 /** Posts fetched per page. Matches the server max (feed.ts limit.max = 50). */
 const PAGE_SIZE = 30;
@@ -257,21 +258,26 @@ export function useSocial(mode: "foryou" | "following" = "foryou", topicId: stri
       if (!env.apiEnabled) return;
 
       const session = await getAuthSession();
-      const token = session?.token;
-      // GUEST FIX: without a Firebase session there is nothing to sync to —
-      // post creation is local-only by design. Previously the guest seed
-      // flow still called POST /api/posts → 401 → the offline queue retried
-      // every seed 5× → saturated the server rate limiter → ALL /api/feed
-      // requests started returning 429 (the "app is down" cascade).
-      if (!session) return;
-      if (!token) {
+      // Do not attribute a saved local draft to whichever account happens to
+      // be active after the preceding asynchronous storage/analytics work.
+      if (!session || session.uid !== post.userId || post.userId === "me" || post.userId.startsWith("guest-")) {
+        toast({ title: "Post not published", description: "This item remains on this device and needs review.", variant: "destructive" });
+        return;
+      }
+      if (!session.token) {
         queueOfflineAction("create_post", { postId: post.id }, session.uid);
+        toast({ title: "Post not published", description: "This item remains on this device and needs review.", variant: "destructive" });
+        return;
+      }
+      const active = await getAuthSession();
+      if (!maySendPostAs(post.userId, active)) {
+        toast({ title: "Post not published", description: "This item remains on this device and needs review.", variant: "destructive" });
         return;
       }
       try {
         await createPostApi(
           toCreatePostInput(post),
-          token,
+          active!.token,
         );
       } catch {
         // Keep the local copy for review; save status may be unknown.
