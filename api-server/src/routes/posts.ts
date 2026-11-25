@@ -94,7 +94,8 @@ router.post("/posts", requireAuth, async (req, res) => {
         event: row.event,
         mediaUrls: row.media_urls,
         brainId: row.brain_id,
-        reactions: { upvote: 0, downvote: 0, repost: 0 },
+        // Do not expose vote counts, even placeholder zeros; match feed privacy.
+        reactions: { repost: 0 },
         commentCount: 0,
         repostCount: 0,
         createdAt: new Date(row.created_at).getTime(),

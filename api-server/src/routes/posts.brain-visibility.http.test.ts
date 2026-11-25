@@ -25,7 +25,13 @@ describe("public post attachment safety (mocked storage)",()=>{
     db.getOne.mockRejectedValue(new Error("synthetic-upstream-secret")); const response=await send("synthetic-public"); expect(response.status).toBe(503); expect(JSON.stringify(await response.json())).not.toContain("synthetic-upstream-secret");expect(db.insert).not.toHaveBeenCalled();
     expect((await send("a),injected")).status).toBe(400); expect(db.getOne).toHaveBeenCalledTimes(1);
   });
-  it("preserves creation without an attachment",async()=>{expect((await send()).status).toBe(201);expect(db.getOne).not.toHaveBeenCalled();expect(db.insert).toHaveBeenCalledWith("posts",expect.objectContaining({brain_id:null}));});
+  it("preserves creation without an attachment, without exposing vote fields",async()=>{
+    const response=await send(); expect(response.status).toBe(201);
+    const body=await response.json();
+    expect(body.post.reactions).toEqual({repost:0});
+    expect(body.post).not.toHaveProperty("userReactions");
+    expect(db.getOne).not.toHaveBeenCalled();expect(db.insert).toHaveBeenCalledWith("posts",expect.objectContaining({brain_id:null}));
+  });
   it("does not claim success for an unverified database conflict",async()=>{
     const error=new SupabaseError("synthetic confidential upstream",409);error.status=409;
     db.insert.mockRejectedValueOnce(error);
