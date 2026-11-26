@@ -6,6 +6,7 @@
  *                           v              v
  *                       declined       cancelled
  *
+ * Mutations are currently paused by the router-level gate below.
  * Endpoints:
  *   POST   /api/mentors              -- mentee requests a mentor (auth)
  *   GET    /api/mentors/me/mentee    -- my mentorship records as mentee (auth)
@@ -20,8 +21,19 @@ import { Router, type IRouter } from "express";
 import { z } from "zod";
 import { supabase, SupabaseError } from "../lib/supabase";
 import { requireAuth } from "../middleware/auth";
+import { requireMappedIdentity } from "../middleware/identity-map";
 
 const router: IRouter = Router();
+// The service client bypasses RLS. Identity must be resolved before every
+// mentorship route, and private responses must not be cached.
+router.use("/mentors", (_req, res, next) => { res.setHeader("Cache-Control", "no-store"); next(); }, requireAuth, requireMappedIdentity);
+// Legacy mutations use read-then-update without owner/status preconditions,
+// double-prefix filters and lack retry receipts. Preserve them below for review
+// but never invoke them while the authoritative workflow is unverified.
+router.use("/mentors", (req, res, next) => {
+  if (req.method === "POST") { res.status(503).json({ error: "Mentorship changes temporarily unavailable" }); return; }
+  next();
+});
 
 const RequestSchema = z.object({
   expertId: z.string().uuid(),
@@ -119,7 +131,7 @@ router.post("/mentors", requireAuth, async (req, res) => {
     res.status(201).json({ ok: true, status: "requested" });
   } catch (error) {
     if (error instanceof SupabaseError) {
-      req.log?.error?.({ err: error }, "Mentor request failed");
+      req.log?.error?.({ status: error.status }, "Mentor request failed");
       res.status(502).json({ error: "Storage unavailable" });
       return;
     }
@@ -131,7 +143,7 @@ router.post("/mentors", requireAuth, async (req, res) => {
  * GET /api/mentors/me/mentee
  * My mentorship records as mentee.
  */
-router.get("/mentors/me/mentee", requireAuth, async (req, res) => {
+router.get("/mentors/me/mentee", async (req, res) => {
   if (!supabase.isConfigured()) {
     res.status(503).json({ error: "Storage not configured" });
     return;
@@ -140,14 +152,17 @@ router.get("/mentors/me/mentee", requireAuth, async (req, res) => {
   try {
     const rows = await supabase.get<MentorRow>("mentors", {
       select: "id,expert_id,mentor_user_id,mentee_user_id,topic_id,status,goal,started_at,ends_at,completed_at,completion_notes,created_at",
-      filters: { mentee_user_id: `eq.${req.auth!.uid}` },
+      filters: { mentee_user_id: `eq.${req.mappedUserId!}` },
       order: { column: "created_at", ascending: false },
       limit: 100,
     });
+    if (rows.some(row => typeof row.mentee_user_id !== "string" || row.mentee_user_id.toLowerCase() !== req.mappedUserId!.toLowerCase())) {
+      res.status(502).json({ error: "Storage unavailable" }); return;
+    }
     res.json({ mentorships: rows.map(serialize) });
   } catch (error) {
     if (error instanceof SupabaseError) {
-      req.log?.error?.({ err: error }, "Mentee fetch failed");
+      req.log?.error?.({ status: error.status }, "Mentee fetch failed");
       res.status(502).json({ error: "Storage unavailable" });
       return;
     }
@@ -159,7 +174,7 @@ router.get("/mentors/me/mentee", requireAuth, async (req, res) => {
  * GET /api/mentors/me/mentor
  * My mentorship records as mentor.
  */
-router.get("/mentors/me/mentor", requireAuth, async (req, res) => {
+router.get("/mentors/me/mentor", async (req, res) => {
   if (!supabase.isConfigured()) {
     res.status(503).json({ error: "Storage not configured" });
     return;
@@ -168,14 +183,17 @@ router.get("/mentors/me/mentor", requireAuth, async (req, res) => {
   try {
     const rows = await supabase.get<MentorRow>("mentors", {
       select: "id,expert_id,mentor_user_id,mentee_user_id,topic_id,status,goal,started_at,ends_at,completed_at,completion_notes,created_at",
-      filters: { mentor_user_id: `eq.${req.auth!.uid}` },
+      filters: { mentor_user_id: `eq.${req.mappedUserId!}` },
       order: { column: "created_at", ascending: false },
       limit: 100,
     });
+    if (rows.some(row => typeof row.mentor_user_id !== "string" || row.mentor_user_id.toLowerCase() !== req.mappedUserId!.toLowerCase())) {
+      res.status(502).json({ error: "Storage unavailable" }); return;
+    }
     res.json({ mentorships: rows.map(serialize) });
   } catch (error) {
     if (error instanceof SupabaseError) {
-      req.log?.error?.({ err: error }, "Mentor fetch failed");
+      req.log?.error?.({ status: error.status }, "Mentor fetch failed");
       res.status(502).json({ error: "Storage unavailable" });
       return;
     }
@@ -245,7 +263,7 @@ router.post("/mentors/:id/accept", requireAuth, async (req, res) => {
     res.json({ ok: true, status: "accepted" });
   } catch (error) {
     if (error instanceof SupabaseError) {
-      req.log?.error?.({ err: error }, "Mentor accept failed");
+      req.log?.error?.({ status: error.status }, "Mentor accept failed");
       res.status(502).json({ error: "Storage unavailable" });
       return;
     }
@@ -282,7 +300,7 @@ router.post("/mentors/:id/start", requireAuth, async (req, res) => {
     res.json({ ok: true, status: "active" });
   } catch (error) {
     if (error instanceof SupabaseError) {
-      req.log?.error?.({ err: error }, "Mentor start failed");
+      req.log?.error?.({ status: error.status }, "Mentor start failed");
       res.status(502).json({ error: "Storage unavailable" });
       return;
     }
@@ -330,7 +348,7 @@ router.post("/mentors/:id/complete", requireAuth, async (req, res) => {
     res.json({ ok: true, status: "completed" });
   } catch (error) {
     if (error instanceof SupabaseError) {
-      req.log?.error?.({ err: error }, "Mentor complete failed");
+      req.log?.error?.({ status: error.status }, "Mentor complete failed");
       res.status(502).json({ error: "Storage unavailable" });
       return;
     }
@@ -364,7 +382,7 @@ router.post("/mentors/:id/decline", requireAuth, async (req, res) => {
     res.json({ ok: true, status: "declined" });
   } catch (error) {
     if (error instanceof SupabaseError) {
-      req.log?.error?.({ err: error }, "Mentor decline failed");
+      req.log?.error?.({ status: error.status }, "Mentor decline failed");
       res.status(502).json({ error: "Storage unavailable" });
       return;
     }
@@ -398,7 +416,7 @@ router.post("/mentors/:id/cancel", requireAuth, async (req, res) => {
     res.json({ ok: true, status: "cancelled" });
   } catch (error) {
     if (error instanceof SupabaseError) {
-      req.log?.error?.({ err: error }, "Mentor cancel failed");
+      req.log?.error?.({ status: error.status }, "Mentor cancel failed");
       res.status(502).json({ error: "Storage unavailable" });
       return;
     }

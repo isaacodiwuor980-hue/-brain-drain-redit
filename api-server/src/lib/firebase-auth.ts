@@ -118,7 +118,10 @@ async function fetchPublicKey(kid: string): Promise<CryptoKey> {
   }
 
   const next = keyCache.get(kid);
-  if (!next) {
+  // A successful refresh that omits this kid must not resurrect an expired
+  // cached key. In particular, rotation may remove a compromised key.
+  if (!next || next.expiresAt <= Date.now()) {
+    keyCache.delete(kid);
     throw new Error("Firebase public key not found");
   }
   return next.key;

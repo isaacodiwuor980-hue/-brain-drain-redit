@@ -203,10 +203,10 @@ export const mentorsApi = {
     authedApi.post<{ ok: boolean; status: "requested" }>("/api/mentors", input),
 
   myMentee: () =>
-    authedApi.get<{ mentorships: Mentorship[] }>("/api/mentors/me/mentee"),
+    authedApi.get<{ mentorships: Mentorship[] }>("/api/mentors/me/mentee", { cache: "no-store" }),
 
   myMentor: () =>
-    authedApi.get<{ mentorships: Mentorship[] }>("/api/mentors/me/mentor"),
+    authedApi.get<{ mentorships: Mentorship[] }>("/api/mentors/me/mentor", { cache: "no-store" }),
 
   accept: (id: string) =>
     authedApi.post<{ ok: boolean; status: "accepted" }>(`/api/mentors/${id}/accept`),

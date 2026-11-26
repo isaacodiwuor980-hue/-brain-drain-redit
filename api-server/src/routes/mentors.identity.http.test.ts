@@ -1,0 +1,23 @@
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import express from "express";
+import type {Server} from "node:http";
+const db=vi.hoisted(()=>({get:vi.fn(),getOne:vi.fn(),insert:vi.fn(),update:vi.fn(),isConfigured:vi.fn(()=>true)}));
+vi.mock("../lib/supabase",()=>({supabase:db,SupabaseError:class extends Error {status=500;}}));
+vi.mock("../middleware/auth",()=>({requireAuth(req:express.Request,res:express.Response,next:express.NextFunction){const uid=req.header("x-synthetic-user");if(!uid){res.status(401).json({error:"Authentication required"});return;}req.auth={uid};next();}}));
+import router from "./mentors";
+const alice="00000000-0000-4000-8000-000000000001",bob="00000000-0000-4000-8000-000000000002",id="12345678-1234-1234-1234-123456789abc";
+let server:Server,base:string;
+beforeAll(async()=>{const app=express();app.use(express.json());app.use("/api",router);await new Promise<void>(resolve=>{server=app.listen(0,"127.0.0.1",resolve);});const address=server.address();if(!address||typeof address==="string")throw new Error("No port");base=`http://127.0.0.1:${address.port}`;});
+afterAll(async()=>{await new Promise<void>((resolve,reject)=>server.close(err=>err?reject(err):resolve()));});
+beforeEach(()=>{vi.resetAllMocks();db.isConfigured.mockReturnValue(true);db.get.mockResolvedValue([]);db.getOne.mockImplementation(async(table:string,opts:{filters:Record<string,string>})=>{if(table!=="user_identity_map")return null;if(opts.filters.firebase_subject==="eq.offline")throw new Error("synthetic secret");return opts.filters.firebase_subject==="eq.alice"?{supabase_uid:alice}:opts.filters.firebase_subject==="eq.bob"?{supabase_uid:bob}:null;});});
+const get=(user:string,role:string)=>fetch(`${base}/api/mentors/me/${role}`,{headers:{"x-synthetic-user":user}});
+const post=(user:string,path:string)=>fetch(`${base}/api/mentors${path}`,{method:"POST",headers:{"x-synthetic-user":user,"content-type":"application/json"},body:JSON.stringify({expertId:id,notes:"synthetic"})});
+describe("mentorship mapped identity and mutation safety (mocked HTTP)",()=>{
+  it("does not treat an unmapped UUID-shaped Firebase subject as a database owner",async()=>{const response=await get(bob,"mentee");expect(response.status).toBe(403);expect(db.get).not.toHaveBeenCalled();expect(response.headers.get("cache-control")).toBe("no-store");});
+  it("scopes reads by server-resolved owner for each role",async()=>{expect((await get("alice","mentee")).status).toBe(200);expect(db.get).toHaveBeenCalledWith("mentors",expect.objectContaining({filters:{mentee_user_id:`eq.${alice}`}}));expect((await get("bob","mentor")).status).toBe(200);expect(db.get).toHaveBeenCalledWith("mentors",expect.objectContaining({filters:{mentor_user_id:`eq.${bob}`}}));});
+  it("does not expose a mismatched row returned by the privileged database client",async()=>{db.get.mockResolvedValueOnce([{mentee_user_id:bob,goal:"synthetic secret"}]);const response=await get("alice","mentee");expect(response.status).toBe(502);expect(JSON.stringify(await response.json())).not.toContain("synthetic secret");});
+  it("rejects a mismatched mentor-side row too",async()=>{db.get.mockResolvedValueOnce([{mentor_user_id:bob,completion_notes:"synthetic secret"}]);const response=await get("alice","mentor");expect(response.status).toBe(502);expect(JSON.stringify(await response.json())).not.toContain("synthetic secret");});
+  it("returns own allowed fields but not unselected extras",async()=>{db.get.mockResolvedValueOnce([{id,mentor_user_id:bob,mentee_user_id:alice,status:"requested",goal:"own goal",secret:"not returned"}]);const response=await get("alice","mentee");expect(response.status).toBe(200);const body=await response.json();expect(body.mentorships[0]).toMatchObject({id,goal:"own goal"});expect(JSON.stringify(body)).not.toContain("not returned");});
+  it("holds all unversioned mutations, even for a mapped account",async()=>{for(const path of ["",...['accept','start','complete','decline','cancel'].map(action=>`/${id}/${action}`)]){const response=await post("alice",path);expect(response.status).toBe(503);expect(response.headers.get("cache-control")).toBe("no-store");}expect(db.get).not.toHaveBeenCalled();expect(db.insert).not.toHaveBeenCalled();expect(db.update).not.toHaveBeenCalled();});
+  it("fails closed without leaking upstream identity errors",async()=>{const response=await get("offline","mentor");expect(response.status).toBe(503);expect(JSON.stringify(await response.json())).not.toContain("synthetic secret");expect(db.get).not.toHaveBeenCalled();});
+});

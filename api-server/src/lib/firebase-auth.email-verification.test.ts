@@ -60,6 +60,10 @@ describe("signed Firebase token required claims", () => {
   ])("rejects invalid required claim %#", async (claims) => {
     await expect(verifyFirebaseToken(await token(true, claims))).rejects.toThrow();
   });
+  it("rejects a signed token from another issuer or audience", async () => {
+    await expect(verifyFirebaseToken(await token(true, {aud:"other-project"}))).rejects.toThrow("audience");
+    await expect(verifyFirebaseToken(await token(true, {iss:"https://securetoken.google.com/other-project"}))).rejects.toThrow("issuer");
+  });
   it("rejects expired and future-issued tokens", async () => {
     const now = Math.floor(Date.now() / 1000);
     await expect(verifyFirebaseToken(await token(true, { exp: now - 30 }))).rejects.toThrow("expired");
