@@ -58,7 +58,7 @@ export function useNotifications() {
 
   /**
    * Task 14: create a real notification. Used by other hooks (comments,
-   * reactions, brain-run) to generate notifications when events happen.
+   * reactions, mind-run) to generate notifications when events happen.
    * Previously the only notifications were static seed data — clicking a
    * "reply" notification went to "/" because the seed had no postId.
    */
@@ -103,16 +103,16 @@ export function useNotifications() {
             id: "notif-3",
             type: "reaction",
             actorName: "Elena Rodriguez",
-            content: "loved your brain 'Medical Diagnosis'",
+            content: "loved your mind 'Medical Diagnosis'",
             read: true,
             postId: "demo-post-2",
             createdAt: Date.now() - 1000 * 60 * 60 * 2,
           },
           {
             id: "notif-4",
-            type: "brain_run",
+            type: "mind_run",
             actorName: "Anonymous",
-            content: "ran your 'Coffee Recommender' brain",
+            content: "ran your 'Coffee Recommender' mind",
             read: false,
             createdAt: Date.now() - 1000 * 60 * 60 * 5,
           },

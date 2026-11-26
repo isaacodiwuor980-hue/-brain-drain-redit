@@ -1,4 +1,4 @@
--- Brain Drain — seed data (idempotent)
+-- MindSpool — seed data (idempotent)
 -- Run with: psql "$DATABASE_URL" -f supabase/seeds/001_seed_data.sql
 -- Or via Supabase Studio SQL editor.
 --

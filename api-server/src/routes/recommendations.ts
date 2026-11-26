@@ -3,7 +3,7 @@ import { z } from "zod";
 import { getAnalyticsSummary, getRecentAnalyticsEvents } from "../lib/analytics-store";
 
 const RecommendationSchema = z.object({
-  brainId: z.string(),
+  mindId: z.string(),
   score: z.number().nonnegative(),
   confidence: z.enum(["low", "medium", "high"]),
   reasons: z.array(z.string()),
@@ -16,7 +16,7 @@ const RecommendationSchema = z.object({
   lastSignalAt: z.number().int().nullable(),
 });
 
-const BrainRecommendationsResponseSchema = z.object({
+const MindRecommendationsResponseSchema = z.object({
   generatedAt: z.string(),
   source: z.object({
     apiStyle: z.literal("flexible-product-api"),
@@ -27,7 +27,7 @@ const BrainRecommendationsResponseSchema = z.object({
   limit: z.number().int().positive(),
   readinessScore: z.number().int().min(0).max(100),
   signalSummary: z.object({
-    directBrainSignals: z.number().int().nonnegative(),
+    directMindsignals: z.number().int().nonnegative(),
     launchSignals: z.number().int().nonnegative(),
     searchSignals: z.number().int().nonnegative(),
     postSignals: z.number().int().nonnegative(),
@@ -65,7 +65,7 @@ function addReason(reasons: Set<string>, reason: string) {
 
 const router: IRouter = Router();
 
-router.get("/recommendations/brains", (req, res) => {
+router.get("/recommendations/minds", (req, res) => {
   const limitResult = z.coerce.number().int().min(1).max(25).safeParse(req.query.limit ?? 10);
   const limit = limitResult.success ? limitResult.data : 10;
 
@@ -84,8 +84,8 @@ router.get("/recommendations/brains", (req, res) => {
     }
   >();
 
-  const ensure = (brainId: string) => {
-    const existing = scored.get(brainId);
+  const ensure = (mindId: string) => {
+    const existing = scored.get(mindId);
     if (existing) return existing;
     const next = {
       score: 0,
@@ -96,27 +96,27 @@ router.get("/recommendations/brains", (req, res) => {
       comments: 0,
       lastSignalAt: null as number | null,
     };
-    scored.set(brainId, next);
+    scored.set(mindId, next);
     return next;
   };
 
-  let directBrainSignals = 0;
+  let directMindsignals = 0;
   let launchSignals = 0;
   let postSignals = 0;
 
   for (const event of recentEvents) {
     const payload = event.payload || {};
-    const brainId = asString(payload.brainId) || asString(payload.brain_id);
+    const mindId = asString(payload.mindId) || asString(payload.mind_id);
     const decay = ageDecay(event.createdAt);
 
-    if (!brainId) continue;
+    if (!mindId) continue;
 
-    directBrainSignals += 1;
-    const row = ensure(brainId);
+    directMindsignals += 1;
+    const row = ensure(mindId);
     row.lastSignalAt = Math.max(row.lastSignalAt || 0, event.createdAt);
 
     switch (event.type) {
-      case "brain_launch":
+      case "mind_launch":
         launchSignals += 1;
         row.launches += 1;
         row.score += 20 * decay;
@@ -150,12 +150,12 @@ router.get("/recommendations/brains", (req, res) => {
   const searchSignals = (summary.byType.search_submitted || 0) + (summary.byType.search_recent_selected || 0);
   const readinessScore = Math.max(
     0,
-    Math.min(100, Math.round(directBrainSignals * 18 + launchSignals * 12 + searchSignals * 8 + postSignals * 5)),
+    Math.min(100, Math.round(directMindsignals * 18 + launchSignals * 12 + searchSignals * 8 + postSignals * 5)),
   );
 
   const recommendations = [...scored.entries()]
-    .map(([brainId, value]) => ({
-      brainId,
+    .map(([mindId, value]) => ({
+      mindId,
       score: Number(value.score.toFixed(2)),
       confidence: confidenceFor(value.score),
       reasons: [...value.reasons],
@@ -170,7 +170,7 @@ router.get("/recommendations/brains", (req, res) => {
     .sort((a, b) => b.score - a.score || (b.lastSignalAt || 0) - (a.lastSignalAt || 0))
     .slice(0, limit);
 
-  const response = BrainRecommendationsResponseSchema.parse({
+  const response = MindRecommendationsResponseSchema.parse({
     generatedAt: new Date().toISOString(),
     source: {
       apiStyle: "flexible-product-api",
@@ -181,7 +181,7 @@ router.get("/recommendations/brains", (req, res) => {
     limit,
     readinessScore,
     signalSummary: {
-      directBrainSignals,
+      directMindsignals,
       launchSignals,
       searchSignals,
       postSignals,
@@ -191,10 +191,10 @@ router.get("/recommendations/brains", (req, res) => {
       needsSupabaseMetadata: true,
       message:
         recommendations.length > 0
-          ? "Brain IDs are ranked from analytics signals. Supabase brain metadata can hydrate titles, authors, categories, and access rules later."
-          : "No direct Brain IDs are available yet. Continue collecting brain_launch and brain-attached post events, then hydrate recommendations from Supabase metadata.",
+          ? "Mind IDs are ranked from analytics signals. Supabase mind metadata can hydrate titles, authors, categories, and access rules later."
+          : "No direct Mind IDs are available yet. Continue collecting mind_launch and mind-attached post events, then hydrate recommendations from Supabase metadata.",
     },
-    nextBackendStep: "Back this endpoint with Supabase brain_scores and brains metadata while keeping the response contract stable.",
+    nextBackendStep: "Back this endpoint with Supabase mind_scores and minds metadata while keeping the response contract stable.",
   });
 
   res.json(response);

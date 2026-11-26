@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { Brain, Node, BrainData } from "@/lib/types";
+import { Mind, Node, MindData } from "@/lib/types";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -11,14 +11,14 @@ import { idb } from "@/lib/db";
 interface ImportModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onImport: (data: BrainData[]) => Promise<void>;
+  onImport: (data: MindData[]) => Promise<void>;
 }
 
 export function ImportModal({ isOpen, onClose, onImport }: ImportModalProps) {
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
   
-  const [parsedData, setParsedData] = useState<{ brains: Brain[]; nodes: Node[] } | null>(null);
+  const [parsedData, setParsedData] = useState<{ minds: Mind[]; nodes: Node[] } | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [existingIds, setExistingIds] = useState<Set<string>>(new Set());
   const [isImporting, setIsImporting] = useState(false);
@@ -31,21 +31,21 @@ export function ImportModal({ isOpen, onClose, onImport }: ImportModalProps) {
     reader.onload = async (event) => {
       try {
         const json = JSON.parse(event.target?.result as string);
-        if (json.brains && json.nodes) {
+        if (json.minds && json.nodes) {
           const eIds = new Set<string>();
-          for (const b of json.brains) {
-            const existing = await idb.get<Brain>("brains", b.id);
+          for (const b of json.minds) {
+            const existing = await idb.get<Mind>("minds", b.id);
             if (existing) {
               eIds.add(b.id);
             }
           }
           setExistingIds(eIds);
           setParsedData(json);
-          // By default, don't check already existing brains
-          const toSelect = json.brains.map((b: Brain) => b.id).filter((id: string) => !eIds.has(id));
+          // By default, don't check already existing minds
+          const toSelect = json.minds.map((b: Mind) => b.id).filter((id: string) => !eIds.has(id));
           setSelectedIds(new Set(toSelect));
         } else {
-          toast({ title: "Invalid Format", description: "The file doesn't contain valid Brain Builder data.", variant: "destructive" });
+          toast({ title: "Invalid Format", description: "The file doesn't contain valid Mind Builder data.", variant: "destructive" });
         }
       } catch {
         toast({ title: "Parse Error", description: "Failed to read the JSON file.", variant: "destructive" });
@@ -57,14 +57,14 @@ export function ImportModal({ isOpen, onClose, onImport }: ImportModalProps) {
 
   const toggleSelectAll = () => {
     if (!parsedData) return;
-    if (selectedIds.size === parsedData.brains.length) {
+    if (selectedIds.size === parsedData.minds.length) {
       setSelectedIds(new Set());
     } else {
-      setSelectedIds(new Set(parsedData.brains.map(b => b.id)));
+      setSelectedIds(new Set(parsedData.minds.map(b => b.id)));
     }
   };
 
-  const toggleBrain = (id: string) => {
+  const toggleMind = (id: string) => {
     const next = new Set(selectedIds);
     if (next.has(id)) next.delete(id);
     else next.add(id);
@@ -76,14 +76,14 @@ export function ImportModal({ isOpen, onClose, onImport }: ImportModalProps) {
     setIsImporting(true);
     
     try {
-      const selectedBrains = parsedData.brains.filter(b => selectedIds.has(b.id));
-      const brainsToImport: BrainData[] = selectedBrains.map(b => ({
-        brain: b,
-        nodes: parsedData.nodes.filter(n => n.brain_id === b.id)
+      const selectedMinds = parsedData.minds.filter(b => selectedIds.has(b.id));
+      const mindsToImport: MindData[] = selectedMinds.map(b => ({
+        mind: b,
+        nodes: parsedData.nodes.filter(n => n.mind_id === b.id)
       }));
       
-      await onImport(brainsToImport);
-      toast({ title: "Import Successful", description: `Digested ${brainsToImport.length} brains into the system.` });
+      await onImport(mindsToImport);
+      toast({ title: "Import Successful", description: `Digested ${mindsToImport.length} minds into the system.` });
       setParsedData(null);
       setSelectedIds(new Set());
       onClose();
@@ -109,7 +109,7 @@ export function ImportModal({ isOpen, onClose, onImport }: ImportModalProps) {
             Receive Data Package
           </DialogTitle>
           <DialogDescription>
-            Import a serialized JSON export to digest new brains into your local system.
+            Import a serialized JSON export to digest new minds into your local system.
           </DialogDescription>
         </DialogHeader>
 
@@ -123,9 +123,9 @@ export function ImportModal({ isOpen, onClose, onImport }: ImportModalProps) {
         ) : (
           <div className="space-y-4">
             <div className="flex justify-between items-center p-3 bg-muted/20 rounded-md border border-border/50">
-              <span className="text-sm font-mono text-muted-foreground">Found {parsedData.brains.length} brains</span>
+              <span className="text-sm font-mono text-muted-foreground">Found {parsedData.minds.length} minds</span>
               <Button variant="ghost" size="sm" onClick={toggleSelectAll} className="h-8 px-2 font-mono text-xs">
-                {selectedIds.size === parsedData.brains.length ? (
+                {selectedIds.size === parsedData.minds.length ? (
                   <><Square className="w-4 h-4 mr-2" /> Deselect All</>
                 ) : (
                   <><CheckSquare className="w-4 h-4 mr-2" /> Select All</>
@@ -135,22 +135,22 @@ export function ImportModal({ isOpen, onClose, onImport }: ImportModalProps) {
             
             <ScrollArea className="h-64 border border-border/50 rounded-md bg-background/50">
               <div className="p-2 space-y-1">
-                {parsedData.brains.map((brain) => {
-                  const nodeCount = parsedData.nodes.filter(n => n.brain_id === brain.id).length;
-                  const isExisting = existingIds.has(brain.id);
+                {parsedData.minds.map((mind) => {
+                  const nodeCount = parsedData.nodes.filter(n => n.mind_id === mind.id).length;
+                  const isExisting = existingIds.has(mind.id);
                   return (
-                    <div key={brain.id} className="flex items-start gap-3 p-3 rounded-md hover:bg-muted/50 cursor-pointer transition-colors" onClick={() => toggleBrain(brain.id)}>
-                      <Checkbox checked={selectedIds.has(brain.id)} onCheckedChange={() => toggleBrain(brain.id)} className="mt-1" />
+                    <div key={mind.id} className="flex items-start gap-3 p-3 rounded-md hover:bg-muted/50 cursor-pointer transition-colors" onClick={() => toggleMind(mind.id)}>
+                      <Checkbox checked={selectedIds.has(mind.id)} onCheckedChange={() => toggleMind(mind.id)} className="mt-1" />
                       <div className="flex-1">
                         <div className="flex items-center justify-between">
-                          <p className="text-sm font-medium text-foreground leading-none mb-1">{brain.title}</p>
+                          <p className="text-sm font-medium text-foreground leading-none mb-1">{mind.title}</p>
                           {isExisting && (
                             <span className="flex items-center text-xs text-amber-500 font-medium">
                               <AlertTriangle className="w-3 h-3 mr-1" /> Already in library
                             </span>
                           )}
                         </div>
-                        <p className="text-xs font-mono text-muted-foreground">{nodeCount} nodes • {brain.category}</p>
+                        <p className="text-xs font-mono text-muted-foreground">{nodeCount} nodes • {mind.category}</p>
                       </div>
                     </div>
                   );

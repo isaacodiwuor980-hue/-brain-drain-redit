@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Brain, Node } from "@/lib/types";
+import { Mind, Node } from "@/lib/types";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { idb } from "@/lib/db";
@@ -10,12 +10,12 @@ import { trackEvent } from "@/lib/analytics";
 import { triggerHaptic } from "@/lib/device";
 
 interface RuntimeEngineProps {
-  brain: Brain | null;
+  mind: Mind | null;
   isOpen: boolean;
   onClose: () => void;
 }
 
-export function RuntimeEngine({ brain, isOpen, onClose }: RuntimeEngineProps) {
+export function RuntimeEngine({ mind, isOpen, onClose }: RuntimeEngineProps) {
   const [nodes, setNodes] = useState<Node[]>([]);
   const [currentNodeId, setCurrentNodeId] = useState<string | null>(null);
   const [path, setPath] = useState<{ node: Node; decision?: boolean }[]>([]);
@@ -23,22 +23,22 @@ export function RuntimeEngine({ brain, isOpen, onClose }: RuntimeEngineProps) {
   const { toast } = useToast();
 
   useEffect(() => {
-    if (brain && isOpen) {
-      // Guard: if the IDB read fails (e.g. the brain_id index isn't ready
+    if (mind && isOpen) {
+      // Guard: if the IDB read fails (e.g. the mind_id index isn't ready
       // on a fresh DB upgrade, or the browser is in private mode and IDB
       // is unavailable), don't crash the engine — show the empty state
       // instead so the user gets a helpful message.
-      idb.getAllByIndex<Node>("nodes", "brain_id", brain.id).then(loadedNodes => {
+      idb.getAllByIndex<Node>("nodes", "mind_id", mind.id).then(loadedNodes => {
         setNodes(loadedNodes);
-        // Bug fix: previously this set currentNodeId to brain.root_node_id,
-        // which can be null for a newly-created or incomplete brain. That
+        // Bug fix: previously this set currentNodeId to mind.root_node_id,
+        // which can be null for a newly-created or incomplete mind. That
         // made currentNode undefined → the engine showed "Engine Halted /
         // Incomplete logic path detected" and the user could never run the
-        // brain. Now we fall back to: (1) the declared root, (2) the first
+        // mind. Now we fall back to: (1) the declared root, (2) the first
         // question node, (3) the first node of any type, (4) null only if
-        // the brain has zero nodes.
+        // the mind has zero nodes.
         const fallbackStart =
-          brain.root_node_id ||
+          mind.root_node_id ||
           loadedNodes.find(n => n.node_type === "question")?.id ||
           loadedNodes[0]?.id ||
           null;
@@ -51,13 +51,13 @@ export function RuntimeEngine({ brain, isOpen, onClose }: RuntimeEngineProps) {
         setPath([]);
       });
     }
-  }, [brain, isOpen]);
+  }, [mind, isOpen]);
 
   const currentNode = nodes.find(n => n.id === currentNodeId);
-  // Detect the "brain has no nodes at all" case so we can show a helpful
+  // Detect the "mind has no nodes at all" case so we can show a helpful
   // message instead of the generic halt. This guides the user to the editor
   // instead of leaving them stuck.
-  const brainIsEmpty = nodes.length === 0;
+  const mindIsEmpty = nodes.length === 0;
 
   const handleDecision = (decision: boolean) => {
     if (!currentNode) return;
@@ -68,14 +68,14 @@ export function RuntimeEngine({ brain, isOpen, onClose }: RuntimeEngineProps) {
     if (nextNodeId) {
       const nextNode = nodes.find(n => n.id === nextNodeId);
       // BUG FIX: if the branch points to a node that doesn't exist (deleted,
-      // broken import, or a corrupted brain_id reference), don't jump to a
+      // broken import, or a corrupted mind_id reference), don't jump to a
       // non-existent ID — that would make currentNode undefined and halt the
       // engine with no recovery. Instead, show a clear "broken branch" state.
       if (!nextNode) {
         triggerHaptic("warning");
         toast({
           title: "Broken branch",
-          description: `The ${decision ? "YES" : "NO"} branch points to a node that no longer exists. Open the brain in the editor to fix it.`,
+          description: `The ${decision ? "YES" : "NO"} branch points to a node that no longer exists. Open the mind in the editor to fix it.`,
           variant: "destructive",
           duration: 5000,
         });
@@ -95,7 +95,7 @@ export function RuntimeEngine({ brain, isOpen, onClose }: RuntimeEngineProps) {
       // a clear toast so they know why nothing happened.
       toast({
         title: "No branch wired",
-        description: `This question has no ${decision ? "YES" : "NO"} branch. Open the brain in the editor to add one.`,
+        description: `This question has no ${decision ? "YES" : "NO"} branch. Open the mind in the editor to add one.`,
         variant: "destructive",
         duration: 5000,
       });
@@ -106,10 +106,10 @@ export function RuntimeEngine({ brain, isOpen, onClose }: RuntimeEngineProps) {
     triggerHaptic("light");
     // BUG FIX: use the same fallback chain as the useEffect so restart
     // doesn't re-introduce the null-root bug. If root_node_id is null
-    // (incomplete brain), fall back to the first question node, then
-    // the first node of any type, then null only if the brain is empty.
+    // (incomplete mind), fall back to the first question node, then
+    // the first node of any type, then null only if the mind is empty.
     const fallbackStart =
-      brain?.root_node_id ||
+      mind?.root_node_id ||
       nodes.find(n => n.node_type === "question")?.id ||
       nodes[0]?.id ||
       null;
@@ -117,7 +117,7 @@ export function RuntimeEngine({ brain, isOpen, onClose }: RuntimeEngineProps) {
     setPath([]);
   };
 
-  if (!brain) return null;
+  if (!mind) return null;
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
@@ -128,7 +128,7 @@ export function RuntimeEngine({ brain, isOpen, onClose }: RuntimeEngineProps) {
               <Activity className="w-4 h-4 text-primary animate-pulse" />
             </div>
             <div>
-              <h2 className="text-sm font-bold text-foreground leading-none">{brain.title}</h2>
+              <h2 className="text-sm font-bold text-foreground leading-none">{mind.title}</h2>
               <span className="text-[10px] font-mono text-muted-foreground uppercase tracking-wider">Edit & Repair Running</span>
             </div>
           </div>
@@ -186,7 +186,7 @@ export function RuntimeEngine({ brain, isOpen, onClose }: RuntimeEngineProps) {
                           className="h-11 px-5 text-sm font-semibold rounded-full gap-2 transition-all cursor-pointer"
                           onClick={async () => {
                             triggerHaptic("selection");
-                            const shareText = `🧠 Brain Diagnostic Result: ${brain.title}\n✅ Result: ${currentNode.result_text}\n📋 Next Steps: ${currentNode.next_steps}\n\nRan with Brain Builder: ${window.location.origin}`;
+                            const shareText = `🧠 Mind Diagnostic Result: ${mind.title}\n✅ Result: ${currentNode.result_text}\n📋 Next Steps: ${currentNode.next_steps}\n\nRan with Mind Builder: ${window.location.origin}`;
                             try {
                               if (navigator.clipboard && navigator.clipboard.writeText) {
                                 await navigator.clipboard.writeText(shareText);
@@ -197,7 +197,7 @@ export function RuntimeEngine({ brain, isOpen, onClose }: RuntimeEngineProps) {
                                 title: "Result Copied to Clipboard! 📋",
                                 description: "Your diagnostic conclusion and next steps are copied.",
                               });
-                              void trackEvent("puzzle_score_copied", { type: "diagnostic_engine", brainId: brain.id });
+                              void trackEvent("puzzle_score_copied", { type: "diagnostic_engine", mindId: mind.id });
                             } catch (e) {
                               console.error(e);
                             }
@@ -212,15 +212,15 @@ export function RuntimeEngine({ brain, isOpen, onClose }: RuntimeEngineProps) {
                           className="h-11 px-5 text-sm font-semibold rounded-full gap-2 cursor-pointer border-border/60"
                           onClick={async () => {
                             triggerHaptic("selection");
-                            const shareText = `🧠 Just resolved "${brain.title}" using Brain Builder!\nOutcome: ${currentNode.result_text}`;
+                            const shareText = `🧠 Just resolved "${mind.title}" using Mind Builder!\nOutcome: ${currentNode.result_text}`;
                             if (typeof navigator !== "undefined" && navigator.share) {
                               try {
                                 await navigator.share({
-                                  title: brain.title,
+                                  title: mind.title,
                                   text: shareText,
                                   url: window.location.origin,
                                 });
-                                void trackEvent("puzzle_score_shared", { channel: "native_share", brainId: brain.id });
+                                void trackEvent("puzzle_score_shared", { channel: "native_share", mindId: mind.id });
                                 return;
                               } catch {}
                             }
@@ -240,12 +240,12 @@ export function RuntimeEngine({ brain, isOpen, onClose }: RuntimeEngineProps) {
                 </motion.div>
               ) : (
                 <div className="text-center bg-card p-6 rounded-xl border border-border/50 max-w-sm mx-auto shadow-sm">
-                  {brainIsEmpty ? (
+                  {mindIsEmpty ? (
                     <>
                       <AlertTriangle className="w-8 h-8 text-amber-500 mx-auto mb-3" />
-                      <p className="text-sm font-medium text-foreground">This brain has no nodes yet</p>
+                      <p className="text-sm font-medium text-foreground">This mind has no nodes yet</p>
                       <p className="text-xs text-muted-foreground mt-1 mb-4">
-                        Open the brain in the editor and add at least one question node to run it.
+                        Open the mind in the editor and add at least one question node to run it.
                       </p>
                       <Button
                         variant="outline"
@@ -253,12 +253,12 @@ export function RuntimeEngine({ brain, isOpen, onClose }: RuntimeEngineProps) {
                         className="rounded-full text-xs"
                         onClick={() => {
                           onClose();
-                          // Route to the library with this brain pre-selected
+                          // Route to the library with this mind pre-selected
                           // so the user lands in the editor.
                           try {
-                            window.location.href = `${window.location.origin}/library?brainId=${encodeURIComponent(brain.id)}`;
+                            window.location.href = `${window.location.origin}/library?mindId=${encodeURIComponent(mind.id)}`;
                           } catch {
-                            toast({ title: "Open the Library", description: "Find this brain and tap Edit to add nodes." });
+                            toast({ title: "Open the Library", description: "Find this mind and tap Edit to add nodes." });
                           }
                         }}
                       >

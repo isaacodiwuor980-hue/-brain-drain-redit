@@ -44,7 +44,7 @@ export function TopicDetailPage({ params }: { params: { id: string } }) {
       }).catch(() => {
         toast({ title: action, description: "Sharing is available via the post's share button." });
       });
-    } else if (action === "Load Brain") {
+    } else if (action === "Load Mind") {
       setLocation("/library");
     } else {
       toast({ title: action, description: `Opening ${action.toLowerCase()}…` });
@@ -153,13 +153,13 @@ export function TopicDetailPage({ params }: { params: { id: string } }) {
                     </div>
                   )}
                   
-                  {post.brainId && (
-                    <div className="mb-4 p-3 rounded-[16px] border bg-card/50 flex items-center gap-3 cursor-pointer hover:bg-card transition-colors" onClick={() => handleAction("Load Brain")}>
+                  {post.mindId && (
+                    <div className="mb-4 p-3 rounded-[16px] border bg-card/50 flex items-center gap-3 cursor-pointer hover:bg-card transition-colors" onClick={() => handleAction("Load Mind")}>
                       <div className="p-2 rounded bg-primary/20 text-primary">
                         <Hash className="w-5 h-5" />
                       </div>
                       <div>
-                        <div className="font-medium text-sm">Attached Brain</div>
+                        <div className="font-medium text-sm">Attached Mind</div>
                         <div className="text-xs text-muted-foreground">Click to explore logic</div>
                       </div>
                     </div>

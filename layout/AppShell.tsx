@@ -7,8 +7,6 @@ import {
   Library,
   Hash,
   Settings,
-  Brain,
-  BrainCircuit,
   MessageSquare,
   Bell,
   Users,
@@ -167,7 +165,7 @@ export function AppShell({ children }: AppShellProps) {
   const primaryNav = [
     { href: "/", icon: Home, label: "Home" },
     { href: "/search", icon: Search, label: "Search" },
-    { href: "/library", icon: Library, label: "Brains" },
+    { href: "/library", icon: Library, label: "Minds" },
     { href: "/missions", icon: Rocket, label: "Pathways" },
   ];
 
@@ -253,16 +251,16 @@ export function AppShell({ children }: AppShellProps) {
             <Link
               href="/"
               onClick={(e) => handleLinkClick("/", e)}
-              aria-label="Brain Drain — Home"
+              aria-label="MindSpool — Home"
               className={cn(
                 "flex items-center gap-2.5 font-extrabold text-xl tracking-tight cursor-pointer hover:bg-muted/60 p-2 rounded-full transition-all duration-200 overflow-hidden group",
                 isSidebarCollapsed ? "w-10 h-10 justify-center mx-auto" : "w-auto inline-flex",
               )}
             >
-              <BrainCircuit className="w-6 h-6 shrink-0 text-primary group-hover:scale-105 transition-transform" />
+              <img src="/logo.png" alt="MindSpool" className="w-6 h-6 shrink-0 rounded-md object-contain group-hover:scale-105 transition-transform" />
               {!isSidebarCollapsed && (
                 <span className="truncate whitespace-nowrap bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text text-transparent font-bold">
-                  Brain Drain
+                  MindSpool
                 </span>
               )}
             </Link>
@@ -367,10 +365,10 @@ export function AppShell({ children }: AppShellProps) {
             href="/"
             onClick={(e) => handleLinkClick("/", e)}
             className="flex items-center gap-2 font-bold text-foreground"
-            aria-label="Brain Drain home"
+            aria-label="MindSpool home"
           >
-            <Brain className="h-5 w-5 text-primary" aria-hidden />
-            <span className="text-base tracking-tight">Brain Drain</span>
+            <img src="/logo.png" alt="MindSpool" className="h-5 w-5 object-contain" aria-hidden />
+            <span className="text-base tracking-tight">MindSpool</span>
           </Link>
           <div className="flex items-center gap-1">
             <CreateMenu variant="compact" />
@@ -446,18 +444,18 @@ export function AppShell({ children }: AppShellProps) {
                 { title: "Advanced TypeScript", author: "@alice_dev", color: "text-blue-500", bg: "bg-blue-500/10" },
                 { title: "Node.js Microservices", author: "@bob_builder", color: "text-emerald-500", bg: "bg-emerald-500/10" },
                 { title: "Quantum Computing", author: "@physics_fan", color: "text-purple-500", bg: "bg-purple-500/10" },
-              ].map((brain, i) => (
+              ].map((mind, i) => (
                 <button
                   key={i}
                   onClick={(e) => handleLinkClick("/library", e)}
                   className="w-full text-left flex items-center gap-3 cursor-pointer group hover:bg-muted/40 focus-visible:bg-muted/40 p-2 -mx-2 rounded-xl transition-all outline-none focus-visible:ring-2 focus-visible:ring-ring active:scale-[0.98]"
                 >
-                  <div className={cn("w-9 h-9 rounded-xl flex items-center justify-center transition-colors shrink-0", brain.bg, brain.color)}>
-                    <BrainCircuit className="w-5 h-5" aria-hidden />
+                  <div className={cn("w-9 h-9 rounded-xl flex items-center justify-center transition-colors shrink-0", mind.bg, mind.color)}>
+                    <img src="/logo.png" alt="MindSpool" className="w-5 h-5 object-contain" aria-hidden />
                   </div>
                   <div className="flex-1 overflow-hidden">
-                    <div className="text-sm font-semibold truncate group-hover:text-primary text-foreground">{brain.title}</div>
-                    <div className="text-xs text-muted-foreground truncate">{brain.author}</div>
+                    <div className="text-sm font-semibold truncate group-hover:text-primary text-foreground">{mind.title}</div>
+                    <div className="text-xs text-muted-foreground truncate">{mind.author}</div>
                   </div>
                 </button>
               ))}

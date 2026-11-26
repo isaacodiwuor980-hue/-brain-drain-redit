@@ -6,7 +6,7 @@ import clientErrorsRouter from "./client-errors";
 import feedRouter from "./feed";
 import postsRouter from "./posts";
 import topicsRouter from "./topics";
-import brainsRouter from "./brains";
+import mindsRouter from "./minds";
 import dataApiRouter from "./data-api";
 import searchRouter from "./search";
 import skillsRouter from "./skills";
@@ -29,7 +29,7 @@ router.use(clientErrorsRouter);
 router.use(feedRouter);
 router.use(postsRouter);
 router.use(topicsRouter);
-router.use(brainsRouter);
+router.use(mindsRouter);
 // Phase 3: verify + provenance routers removed (501 stubs that advertised
 // non-existent functionality in llms.txt and /data-quality). Restore them
 // only when the real SSR implementations land.

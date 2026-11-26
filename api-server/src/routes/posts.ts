@@ -21,7 +21,7 @@ const CreatePostSchema = z.object({
     })
     .optional(),
   mediaUrls: z.array(z.string().url().max(2000)).max(10).optional(),
-  brainId: z.string().max(120).optional(),
+  mindId: z.string().max(120).optional(),
   createdAt: z.number().int().positive().optional(),
 });
 
@@ -56,7 +56,7 @@ router.post("/posts", requireAuth, async (req, res) => {
     post_type: input.postType,
     event: input.event ?? null,
     media_urls: input.mediaUrls ?? [],
-    brain_id: input.brainId ?? null,
+    mind_id: input.mindId ?? null,
     created_at: new Date(input.createdAt ?? Date.now()).toISOString(),
   };
 
@@ -71,7 +71,7 @@ router.post("/posts", requireAuth, async (req, res) => {
         postType: row.post_type,
         event: row.event,
         mediaUrls: row.media_urls,
-        brainId: row.brain_id,
+        mindId: row.mind_id,
         reactions: { upvote: 0, downvote: 0, repost: 0 },
         commentCount: 0,
         repostCount: 0,

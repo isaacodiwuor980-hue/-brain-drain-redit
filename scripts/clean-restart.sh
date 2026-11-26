@@ -1,5 +1,5 @@
 #!/bin/bash
-# clean-restart.sh — kill all Brain Drain server processes (wrapper + node),
+# clean-restart.sh — kill all MindSpool server processes (wrapper + node),
 # verify clean, then start fresh via ensure-server.sh.
 #
 # WHY THIS EXISTS: killing via an inline `pgrep -f "keep-server-alive.sh"`
@@ -8,7 +8,7 @@
 # the script runner's cmdline is `bash scripts/clean-restart.sh`, which
 # contains neither search pattern. Verified 2026-11-14.
 set -u
-cd /home/z/my-project/BRAIN-DRAIN-latest-
+cd /home/z/my-project/MindSpool-latest-
 
 echo "▶ killing wrapper(s)…"
 for p in $(pgrep -f "keep-server-alive.sh" 2>/dev/null); do

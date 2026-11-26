@@ -78,7 +78,7 @@ router.get("/v1/search/skills", async (req, res) => {
     // Supabase) but its result was discarded — doubling the Supabase quota
     // usage on every keyword search and adding a wasted network round-trip.
     // Now we build the query options ONCE and call supabase.get ONCE.
-    const baseSelect = "id,title,domain,make,model,year,part,version,author_name,author_years_experience,status,source_brain_id";
+    const baseSelect = "id,title,domain,make,model,year,part,version,author_name,author_years_experience,status,source_mind_id";
     const queryFilters: Record<string, string> = { ...filters };
     if (q && layers !== "rule_only") {
       // FTS on title — this is the BM25-style keyword layer.
@@ -156,7 +156,7 @@ router.get("/v1/search/skills", async (req, res) => {
       authorName: r.author_name,
       authorYearsExperience: r.author_years_experience,
       status: r.status,
-      sourceBrainId: r.source_brain_id,
+      sourceMindId: r.source_mind_id,
       matchLayer: r._layer,
     }));
 

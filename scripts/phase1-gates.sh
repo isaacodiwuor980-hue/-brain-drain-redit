@@ -2,7 +2,7 @@
 # Phase 1 gates — run every check, save full outputs, print compact summary.
 # Read-only with respect to source; only writes logs + rebuilds dist/.
 set -u
-cd /home/z/my-project/BRAIN-DRAIN-latest-
+cd /home/z/my-project/MindSpool-latest-
 OUT=/home/z/my-project/scripts/phase1-outputs
 mkdir -p "$OUT"
 

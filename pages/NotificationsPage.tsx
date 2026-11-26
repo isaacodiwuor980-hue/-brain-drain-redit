@@ -26,7 +26,7 @@ export function NotificationsPage() {
     switch (type) {
       case "reply": return <MessageCircle className="w-4 h-4 text-blue-500" />;
       case "reaction": return <Heart className="w-4 h-4 text-red-500" />;
-      case "brain_run": return <Zap className="w-4 h-4 text-yellow-500" />;
+      case "mind_run": return <Zap className="w-4 h-4 text-yellow-500" />;
       case "mention": return <AtSign className="w-4 h-4 text-green-500" />;
       default: return <MessageCircle className="w-4 h-4" />;
     }
@@ -55,7 +55,7 @@ export function NotificationsPage() {
         // home feed already renders a missing-post state).
       }
       setLocation(`/?postId=${notif.postId}`);
-    } else if (notif.type === "brain_run") {
+    } else if (notif.type === "mind_run") {
       setLocation("/library");
     } else {
       setLocation("/");
@@ -101,7 +101,7 @@ export function NotificationsPage() {
               </div>
               <h3 className="font-bold text-lg text-foreground">You're all caught up</h3>
               <p className="text-sm text-muted-foreground leading-relaxed">
-                When someone replies to your posts, mentions you, or runs your brains, you'll see it here.
+                When someone replies to your posts, mentions you, or runs your minds, you'll see it here.
               </p>
               <Button
                 variant="outline"

@@ -73,7 +73,7 @@ async function countRows(name: string) {
 }
 
 console.log("\n2. REST API reachability + per-table query:");
-const tables = ["posts", "topics", "profiles", "reactions", "comments", "brains", "pathways"];
+const tables = ["posts", "topics", "profiles", "reactions", "comments", "minds", "pathways"];
 const results = [];
 for (const t of tables) {
   const r = await probeTable(t);

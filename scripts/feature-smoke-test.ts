@@ -68,18 +68,18 @@ await test("P1-T6: FAB no nested circle", async () => {
   return src.includes("no-default-hover-elevate");
 });
 
-await test("P1-T7: Brain DNA + Read tab removed", async () => {
+await test("P1-T7: Mind DNA + Read tab removed", async () => {
   const src = r("pages/LibraryPage.tsx");
-  return !src.includes("BrainDNA") && !src.includes("ReadTab");
+  return !src.includes("MindDNA") && !src.includes("ReadTab");
 });
 
-await test("P1-T8: Diagnostic Engine → Edit & Repair Brain", async () => {
-  const src = r("BrainDrawer.tsx");
-  return src.includes("Edit & Repair Brain") && !src.includes("Launch Diagnostic Engine");
+await test("P1-T8: Diagnostic Engine → Edit & Repair Mind", async () => {
+  const src = r("MindDrawer.tsx");
+  return src.includes("Edit & Repair Mind") && !src.includes("Launch Diagnostic Engine");
 });
 
 await test("P1-T9: swipe gestures + large text in chat", async () => {
-  const src = r("runtime/BrainChatRuntime.tsx");
+  const src = r("runtime/MindChatRuntime.tsx");
   return src.includes("drag=\"x\"") && src.includes("handleSwipeEnd") && src.includes("hasImage");
 });
 
@@ -89,7 +89,7 @@ await test("P1-T10: create tag in branch section", async () => {
 });
 
 await test("P1-T11: branch fork copies nodes", async () => {
-  const src = r("hooks/use-brain-repo.ts");
+  const src = r("hooks/use-mind-repo.ts");
   return src.includes("forked_from_node_id") && src.includes("branch_id") && src.includes("idMap");
 });
 
@@ -139,7 +139,7 @@ await test("P2-T4: @Habit picker + habit template", async () => {
 await test("P2-T5: SkillEntry type + use-skills hook", async () => {
   const types = r("lib/types.ts");
   const hook = r("hooks/use-skills.ts");
-  return types.includes("SkillEntry") && types.includes("SkillStep") && hook.includes("createSkillFromBrain");
+  return types.includes("SkillEntry") && types.includes("SkillStep") && hook.includes("createSkillFromMind");
 });
 
 await test("P2-T6: three-layer search route", async () => {

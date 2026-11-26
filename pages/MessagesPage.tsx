@@ -12,26 +12,26 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Conversation, Message } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
 
-// ── Brain-attachment markup ─────────────────────────────────────
-// Messages can embed a brain reference using the compact markup
-//   [brain:ID|title]
+// ── Mind-attachment markup ─────────────────────────────────────
+// Messages can embed a mind reference using the compact markup
+//   [mind:ID|title]
 // The renderer (renderMessageContent below) detects this and renders
-// an inline brain card instead of the raw markup. This keeps the
+// an inline mind card instead of the raw markup. This keeps the
 // storage format simple (plain string in IDB) while giving the UI
 // a rich preview. The same pattern will be reused for file/html
 // attachments in UI-9.
-const BRAIN_MARKUP_RE = /\[brain:([a-f0-9-]{36})\|([^\]]+)\]/g;
+const MIND_MARKUP_RE = /\[mind:([a-f0-9-]{36})\|([^\]]+)\]/g;
 
-function renderMessageContent(content: string, onOpenBrain?: (brainId: string) => void) {
-  const parts: Array<{ type: "text" | "brain"; text: string; brainId?: string }> = [];
+function renderMessageContent(content: string, onOpenMind?: (mindId: string) => void) {
+  const parts: Array<{ type: "text" | "mind"; text: string; mindId?: string }> = [];
   let lastIndex = 0;
-  BRAIN_MARKUP_RE.lastIndex = 0;
+  MIND_MARKUP_RE.lastIndex = 0;
   let match: RegExpExecArray | null;
-  while ((match = BRAIN_MARKUP_RE.exec(content)) !== null) {
+  while ((match = MIND_MARKUP_RE.exec(content)) !== null) {
     if (match.index > lastIndex) {
       parts.push({ type: "text", text: content.slice(lastIndex, match.index) });
     }
-    parts.push({ type: "brain", text: match[2], brainId: match[1] });
+    parts.push({ type: "mind", text: match[2], mindId: match[1] });
     lastIndex = match.index + match[0].length;
   }
   if (lastIndex < content.length) {
@@ -39,14 +39,14 @@ function renderMessageContent(content: string, onOpenBrain?: (brainId: string) =
   }
   if (parts.length === 0) return content;
   return parts.map((p, i) => {
-    if (p.type === "brain") {
+    if (p.type === "mind") {
       return (
         <button
           key={i}
           type="button"
           onClick={(e) => {
             e.stopPropagation();
-            onOpenBrain?.(p.brainId!);
+            onOpenMind?.(p.mindId!);
           }}
           className="inline-flex items-center gap-1.5 bg-primary/10 text-primary border border-primary/20 rounded-lg px-2 py-1 text-xs font-medium hover:bg-primary/20 transition-colors my-0.5"
         >
@@ -63,10 +63,10 @@ export function MessagesPage() {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [newMessage, setNewMessage] = useState("");
   const { conversations, messages: storedMessages, addConversation, addMessage } = useMessages(activeId || undefined);
-  const { brains } = useDatabase();
+  const { minds } = useDatabase();
   const [isNewChatOpen, setIsNewChatOpen] = useState(false);
   const [newChatUser, setNewChatUser] = useState("");
-  const [isBrainPickerOpen, setIsBrainPickerOpen] = useState(false);
+  const [isMindPickerOpen, setIsMindPickerOpen] = useState(false);
   // Send guard — prevents duplicate messages on rapid Enter pressing.
   // The send button is disabled while isSending is true.
   const [isSending, setIsSending] = useState(false);
@@ -102,26 +102,26 @@ export function MessagesPage() {
     }
   }, []);
 
-  const favoriteBrains = useMemo(() => brains.filter(b => b.isFavorite), [brains]);
+  const favoriteMinds = useMemo(() => minds.filter(b => b.isFavorite), [minds]);
   
   const combinedConversations: Conversation[] = useMemo(() => {
-    const brainConvs = favoriteBrains.map(b => ({
-      id: `brain-${b.id}`,
+    const mindConvs = favoriteMinds.map(b => ({
+      id: `mind-${b.id}`,
       participantIds: [b.title, "me"],
       lastMessage: `Automated push: "Post related to ${b.title} highlights new structural gating."`,
       lastMessageAt: now - 3600000, // Fixed 1 hour ago (was Math.random — flickered every render)
       unreadCount: 1,
-      isBrain: true
+      isMind: true
     }));
-    return [...conversations, ...brainConvs];
-  }, [conversations, favoriteBrains, now]);
+    return [...conversations, ...mindConvs];
+  }, [conversations, favoriteMinds, now]);
 
   const activeConversation = combinedConversations.find((c) => c.id === activeId);
-  const isBrainChat = activeId?.startsWith("brain-");
+  const isMindChat = activeId?.startsWith("mind-");
 
   const messages: Message[] = useMemo(() => {
-    if (isBrainChat) {
-      const bTitle = activeConversation?.participantIds[0] || "Brain";
+    if (isMindChat) {
+      const bTitle = activeConversation?.participantIds[0] || "Mind";
       return [
         {
           id: "sys-1",
@@ -133,17 +133,17 @@ export function MessagesPage() {
       ];
     }
     return storedMessages;
-  }, [isBrainChat, storedMessages, activeId, activeConversation, now]);
+  }, [isMindChat, storedMessages, activeId, activeConversation, now]);
 
   const handleAction = (action: string) => {
-    if (action === "Attach Brain/Library") {
-      // Open the brain picker instead of routing away. The user stays in
-      // the chat context and picks a brain to embed as a card.
-      if (brains.length === 0) {
-        toast({ title: "No brains yet", description: "Create a brain in the Library first, then attach it here.", duration: 4000 });
+    if (action === "Attach Mind/Library") {
+      // Open the mind picker instead of routing away. The user stays in
+      // the chat context and picks a mind to embed as a card.
+      if (minds.length === 0) {
+        toast({ title: "No minds yet", description: "Create a mind in the Library first, then attach it here.", duration: 4000 });
         return;
       }
-      setIsBrainPickerOpen(true);
+      setIsMindPickerOpen(true);
       return;
     }
     if (action === "Attach Photo") {
@@ -174,7 +174,7 @@ export function MessagesPage() {
 
   const handleSend = async () => {
     if (!newMessage.trim() || !activeId) return;
-    if (isBrainChat) return; // Cannot send to brain chats
+    if (isMindChat) return; // Cannot send to mind chats
     // Send guard — prevents duplicate messages on rapid Enter pressing.
     if (isSending) return;
     setIsSending(true);
@@ -218,20 +218,20 @@ export function MessagesPage() {
     }
   };
 
-  // Insert a brain-card markup into the message input. The renderer
-  // (renderMessageContent) detects [brain:ID|title] and renders an
+  // Insert a mind-card markup into the message input. The renderer
+  // (renderMessageContent) detects [mind:ID|title] and renders an
   // inline card. The user can keep typing around it.
-  const handleAttachBrain = (brainId: string, brainTitle: string) => {
-    const markup = `[brain:${brainId}|${brainTitle}]`;
+  const handleAttachMind = (mindId: string, mindTitle: string) => {
+    const markup = `[mind:${mindId}|${mindTitle}]`;
     setNewMessage((prev) => (prev ? `${prev} ${markup}` : markup));
-    setIsBrainPickerOpen(false);
-    toast({ title: "Brain attached", description: `"${brainTitle}" added to your message. Press send when ready.`, duration: 3000 });
+    setIsMindPickerOpen(false);
+    toast({ title: "Mind attached", description: `"${mindTitle}" added to your message. Press send when ready.`, duration: 3000 });
   };
 
-  const handleOpenBrain = (brainId: string) => {
-    // Navigate to the library with the brain pre-selected. The Library
-    // page reads ?brainId=… on mount and opens the brain drawer.
-    setLocation(`/library?brainId=${encodeURIComponent(brainId)}`);
+  const handleOpenMind = (mindId: string) => {
+    // Navigate to the library with the mind pre-selected. The Library
+    // page reads ?mindId=… on mount and opens the mind drawer.
+    setLocation(`/library?mindId=${encodeURIComponent(mindId)}`);
   };
 
   const activeView = activeId ? "chat" : "list";
@@ -274,7 +274,7 @@ export function MessagesPage() {
               </div>
             ) : (
               combinedConversations.map((conv) => {
-                 const isBrain = conv.id.startsWith("brain-");
+                 const isMind = conv.id.startsWith("mind-");
                  return (
                 <button
                   key={conv.id}
@@ -284,20 +284,20 @@ export function MessagesPage() {
                     activeId === conv.id ? "bg-accent" : ""
                   }`}
                 >
-                  <Avatar className={isBrain ? "bg-primary/20 text-primary" : ""}>
-                    {isBrain ? <BrainCircuit className="w-5 h-5 m-auto" /> : <AvatarFallback>{conv.participantIds.find(id => id !== "me")?.substring(0, 2).toUpperCase() || "??"}</AvatarFallback>}
+                  <Avatar className={isMind ? "bg-primary/20 text-primary" : ""}>
+                    {isMind ? <BrainCircuit className="w-5 h-5 m-auto" /> : <AvatarFallback>{conv.participantIds.find(id => id !== "me")?.substring(0, 2).toUpperCase() || "??"}</AvatarFallback>}
                   </Avatar>
                   <div className="flex-1 overflow-hidden">
                     <div className="flex justify-between items-baseline mb-1">
                       <span className="font-semibold text-sm truncate flex items-center gap-1">
                         {conv.participantIds.find((id: string) => id !== "me") || "User"}
-                        {isBrain && <span className="text-[10px] text-primary uppercase font-mono tracking-tighter">System Push</span>}
+                        {isMind && <span className="text-[10px] text-primary uppercase font-mono tracking-tighter">System Push</span>}
                       </span>
                       <span className="text-[10px] text-muted-foreground whitespace-nowrap ml-2">
                         {formatDistanceToNow(conv.lastMessageAt, { addSuffix: true })}
                       </span>
                     </div>
-                    <p className={`text-sm truncate ${isBrain ? "text-primary/70 font-mono" : "text-muted-foreground"}`}>{conv.lastMessage}</p>
+                    <p className={`text-sm truncate ${isMind ? "text-primary/70 font-mono" : "text-muted-foreground"}`}>{conv.lastMessage}</p>
                   </div>
                   {conv.unreadCount > 0 && (
                     <div className="bg-primary text-primary-foreground text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
@@ -319,11 +319,11 @@ export function MessagesPage() {
               <Button size="icon" aria-label="Back to conversation list" variant="ghost" className="md:hidden" onClick={() => setActiveId(null)}>
                  <ArrowLeft className="w-5 h-5" />
               </Button>
-              <Avatar className={`w-8 h-8 ${isBrainChat ? 'bg-primary/20 text-primary' : ''}`}>
-                 {isBrainChat ? <BrainCircuit className="w-4 h-4 m-auto" /> : <AvatarFallback>{activeConversation?.participantIds.find((id: string) => id !== "me")?.substring(0, 2).toUpperCase() || "??"}</AvatarFallback>}
+              <Avatar className={`w-8 h-8 ${isMindChat ? 'bg-primary/20 text-primary' : ''}`}>
+                 {isMindChat ? <BrainCircuit className="w-4 h-4 m-auto" /> : <AvatarFallback>{activeConversation?.participantIds.find((id: string) => id !== "me")?.substring(0, 2).toUpperCase() || "??"}</AvatarFallback>}
               </Avatar>
               <span className="font-semibold">{activeConversation?.participantIds.find((id: string) => id !== "me") || (activeId.startsWith('new-conv') ? "New User" : "User")}</span>
-              {isBrainChat && <span className="text-[10px] bg-primary/10 text-primary px-2 py-1 rounded-md font-mono uppercase tracking-widest ml-2">Brain Push Channel</span>}
+              {isMindChat && <span className="text-[10px] bg-primary/10 text-primary px-2 py-1 rounded-md font-mono uppercase tracking-widest ml-2">Mind Push Channel</span>}
             </div>
 
             {/* Battleground context banner — shown when this conversation was
@@ -363,14 +363,14 @@ export function MessagesPage() {
                     <div key={msg.id} className={`flex ${isMe ? "justify-end" : "justify-start"}`}>
                       <div
                         className={`max-w-[80%] rounded-[16px] px-4 py-2 text-sm ${
-                          isBrainChat
+                          isMindChat
                             ? "bg-primary/10 text-primary border border-primary/20 font-mono"
                             : isMe
                               ? "bg-primary text-primary-foreground rounded-tr-sm"
                               : "bg-muted text-foreground rounded-tl-sm"
                         }`}
                       >
-                        {isBrainChat ? msg.content : renderMessageContent(msg.content, handleOpenBrain)}
+                        {isMindChat ? msg.content : renderMessageContent(msg.content, handleOpenMind)}
                       </div>
                     </div>
                   );
@@ -379,7 +379,7 @@ export function MessagesPage() {
             </ScrollArea>
             
             <div className="p-4 border-t border-border/50 bg-background">
-              {isBrainChat ? (
+              {isMindChat ? (
                 <div className="text-center text-xs text-muted-foreground font-mono bg-muted/30 p-3 rounded-md">
                    This is an automated cognitive push channel. Replies are disabled.
                 </div>
@@ -388,7 +388,7 @@ export function MessagesPage() {
                   onSubmit={(e) => { e.preventDefault(); handleSend(); }}
                   className="flex gap-2"
                 >
-                  <Button type="button" variant="ghost" size="icon" aria-label="Attach brain" className="shrink-0" onClick={() => handleAction("Attach Brain/Library")}>
+                  <Button type="button" variant="ghost" size="icon" aria-label="Attach mind" className="shrink-0" onClick={() => handleAction("Attach Mind/Library")}>
                      <BrainCircuit className="w-5 h-5" />
                   </Button>
                   <Button type="button" variant="ghost" size="icon" aria-label="Attach photo" className="shrink-0" onClick={() => handleAction("Attach Photo")}>
@@ -415,27 +415,27 @@ export function MessagesPage() {
         )}
       </div>
 
-      {/* Brain picker — opens when the user taps the BrainCircuit icon in
+      {/* Mind picker — opens when the user taps the BrainCircuit icon in
           the composer. Replaces the old toast-and-route-away behavior. */}
-      <Dialog open={isBrainPickerOpen} onOpenChange={setIsBrainPickerOpen}>
+      <Dialog open={isMindPickerOpen} onOpenChange={setIsMindPickerOpen}>
         <DialogContent className="max-w-md rounded-[20px]">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <BrainCircuit className="w-5 h-5 text-primary" />
-              Attach a brain
+              Attach a mind
             </DialogTitle>
           </DialogHeader>
           <div className="py-2 max-h-[60vh] overflow-y-auto -mx-2 px-2 space-y-1">
-            {brains.length === 0 ? (
+            {minds.length === 0 ? (
               <p className="text-sm text-muted-foreground text-center py-6">
-                You have no brains yet. Create one in the Library first.
+                You have no minds yet. Create one in the Library first.
               </p>
             ) : (
-              brains.map((b) => (
+              minds.map((b) => (
                 <button
                   key={b.id}
                   type="button"
-                  onClick={() => handleAttachBrain(b.id, b.title)}
+                  onClick={() => handleAttachMind(b.id, b.title)}
                   className="w-full flex items-center gap-3 p-3 rounded-[12px] text-left hover:bg-accent/60 transition-colors border border-transparent hover:border-border/50"
                 >
                   <div className="w-9 h-9 rounded-[10px] bg-primary/10 text-primary flex items-center justify-center shrink-0">

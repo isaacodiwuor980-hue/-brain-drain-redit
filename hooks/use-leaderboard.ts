@@ -64,9 +64,9 @@ const SEED_LEADERBOARDS: Leaderboard[] = [
     ],
   },
   {
-    id: "all_time_brains_built_global",
+    id: "all_time_minds_built_global",
     timeframe: "all_time",
-    metric: "brains_built",
+    metric: "minds_built",
     updatedAt: Date.now(),
     entries: [
       {

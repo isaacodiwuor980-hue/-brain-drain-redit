@@ -64,7 +64,7 @@ export interface CreatePostInput {
   postType?: "post" | "question" | "answer" | "note";
   event?: Post["event"];
   mediaUrls?: string[];
-  brainId?: string;
+  mindId?: string;
   createdAt?: number;
 }
 

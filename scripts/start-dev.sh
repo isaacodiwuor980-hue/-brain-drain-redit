@@ -2,9 +2,9 @@
 # Permanent dev server supervisor — auto-restarts on crash.
 # Uses the direct tsx binary path (not npx) to avoid resolution delays.
 # The infinite loop restarts the server within 3 seconds if it dies.
-cd /home/z/my-project/BRAIN-DRAIN-latest-
+cd /home/z/my-project/MindSpool-latest-
 
-TXS_BIN="/home/z/my-project/BRAIN-DRAIN-latest-/node_modules/.bin/tsx"
+TXS_BIN="/home/z/my-project/MindSpool-latest-/node_modules/.bin/tsx"
 
 while true; do
   echo "[$(date)] Starting dev server..." >> /home/z/my-project/dev-supervisor.log

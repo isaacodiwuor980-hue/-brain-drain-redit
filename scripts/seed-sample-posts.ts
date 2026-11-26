@@ -40,7 +40,7 @@ const SAMPLE_POSTS = [
   {
     id: "seed-post-1",
     topic_id: "seed-neuroscience",
-    content: "Welcome to Brain Drain! This is a sample post to seed the feed. The default-mode network is the set of brain regions active during rest, mind-wandering, and self-referential thought.",
+    content: "Welcome to MindSpool! This is a sample post to seed the feed. The default-mode network is the set of mind regions active during rest, mind-wandering, and self-referential thought.",
     post_type: "post",
   },
   {

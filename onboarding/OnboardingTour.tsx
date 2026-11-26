@@ -17,20 +17,20 @@ interface Slide {
 const SLIDES: Slide[] = [
   {
     icon: <BrainCircuit className="w-10 h-10" />,
-    title: "Build decision brains",
-    body: "A brain is a short, yes/no guide that helps people make a decision — like a smart checklist. Create one in minutes, or try a sample below.",
+    title: "Build decision minds",
+    body: "A mind is a short, yes/no guide that helps people make a decision — like a smart checklist. Create one in minutes, or try a sample below.",
     accent: "text-primary bg-primary/10",
   },
   {
     icon: <Wifi className="w-10 h-10" />,
     title: "Works fully offline",
-    body: "Run brains anywhere, even with no signal. Your work is saved on this device. Sign in later to sync it across phones.",
+    body: "Run minds anywhere, even with no signal. Your work is saved on this device. Sign in later to sync it across phones.",
     accent: "text-emerald-500 bg-emerald-500/10",
   },
   {
     icon: <PlayCircle className="w-10 h-10" />,
     title: "Share in one tap",
-    body: "Send a brain to a friend with a link. No account needed to try one. You can also post, follow topics, and join communities when you're ready.",
+    body: "Send a mind to a friend with a link. No account needed to try one. You can also post, follow topics, and join communities when you're ready.",
     accent: "text-sky-500 bg-sky-500/10",
   },
 ];
@@ -81,7 +81,7 @@ export function OnboardingTour({ onFinish, onTrySample }: OnboardingTourProps) {
 
           {isLast && (
             <Button onClick={onTrySample} variant="outline" size="lg" className="w-full h-12 rounded-[16px] text-base gap-2">
-              <PlayCircle className="w-4 h-4" /> Try a sample brain
+              <PlayCircle className="w-4 h-4" /> Try a sample mind
             </Button>
           )}
 

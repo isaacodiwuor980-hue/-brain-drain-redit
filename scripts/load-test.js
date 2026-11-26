@@ -1,4 +1,4 @@
-// k6 load test for Brain Drain API
+// k6 load test for MindSpool API
 // Install k6: https://k6.io/docs/get-started/installation/
 // Run: k6 run scripts/load-test.js
 //
@@ -9,7 +9,7 @@
 //
 // Usage:
 //   k6 run scripts/load-test.js
-//   k6 run -e BASE_URL=https://braindrain.app scripts/load-test.js
+//   k6 run -e BASE_URL=https://MindSpool.app scripts/load-test.js
 //   k6 run -e STAGE=ramp scripts/load-test.js
 
 import http from 'k6/http';

@@ -19,7 +19,7 @@ import {
   MessageSquare,
   StickyNote,
 } from "lucide-react";
-import { Brain, getPostDownvoteCount, getPostUpvoteCount, Post } from "@/lib/types";
+import { Mind, getPostDownvoteCount, getPostUpvoteCount, Post } from "@/lib/types";
 import { sanitizeHtml } from "@/lib/sanitize-html";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -47,8 +47,8 @@ import { useMessages } from "@/hooks/use-messages";
 // votes never trigger confetti. The isConfettiAllowed() check is inlined
 // below so the 80% LIGHT tier doesn't need to load the module at all.
 
-const BrainChatRuntime = lazy(() =>
-  import("@/components/runtime/BrainChatRuntime").then((module) => ({ default: module.BrainChatRuntime })),
+const MindChatRuntime = lazy(() =>
+  import("@/components/runtime/MindChatRuntime").then((module) => ({ default: module.MindChatRuntime })),
 );
 
 interface PostCardProps {
@@ -70,8 +70,8 @@ export function PostCard({
 }: PostCardProps) {
   const [isCommentsOpen, setIsCommentsOpen] = useState(false);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
-  const [activeBrain, setActiveBrain] = useState<Brain | null>(null);
-  const [isBrainOpen, setIsBrainOpen] = useState(false);
+  const [activeMind, setActiveMind] = useState<Mind | null>(null);
+  const [isMindOpen, setIsMindOpen] = useState(false);
   
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
@@ -217,10 +217,10 @@ export function PostCard({
     if (action === "Hide Post") {
       // Hide post locally — remove from the user's feed by marking it hidden.
       try {
-        const hiddenIds = JSON.parse(localStorage.getItem("brainDrain_hiddenPosts") || "[]") as string[];
+        const hiddenIds = JSON.parse(localStorage.getItem("MindSpool_hiddenPosts") || "[]") as string[];
         if (!hiddenIds.includes(post.id)) {
           hiddenIds.push(post.id);
-          localStorage.setItem("brainDrain_hiddenPosts", JSON.stringify(hiddenIds));
+          localStorage.setItem("MindSpool_hiddenPosts", JSON.stringify(hiddenIds));
         }
         toast({ title: "Post hidden", description: "This post will no longer appear in your feed." });
       } catch {
@@ -229,10 +229,10 @@ export function PostCard({
     } else {
       // Report post — store the report locally for now.
       try {
-        const reports = JSON.parse(localStorage.getItem("brainDrain_reportedPosts") || "[]") as string[];
+        const reports = JSON.parse(localStorage.getItem("MindSpool_reportedPosts") || "[]") as string[];
         if (!reports.includes(post.id)) {
           reports.push(post.id);
-          localStorage.setItem("brainDrain_reportedPosts", JSON.stringify(reports));
+          localStorage.setItem("MindSpool_reportedPosts", JSON.stringify(reports));
           toast({ title: "Post reported", description: "Thank you. Our team will review this content." });
         } else {
           toast({ title: "Already reported", description: "You've already reported this post." });
@@ -260,7 +260,7 @@ export function PostCard({
         createdAt: Date.now(),
         authorName: profile?.displayName || "Me",
         mediaUrls: post.mediaUrls,
-        brainId: post.brainId,
+        mindId: post.mindId,
         answeredPostId: post.id,
         answeredQuestionTitle: `Repost of ${authorName}'s post`,
       };
@@ -290,7 +290,7 @@ export function PostCard({
         createdAt: Date.now(),
         authorName: profile?.displayName || "Me",
         mediaUrls: post.mediaUrls,
-        brainId: post.brainId,
+        mindId: post.mindId,
         communityId,
         communityName,
         answeredPostId: post.id,
@@ -347,23 +347,23 @@ export function PostCard({
     toast({ title: isBookmarked ? "Post removed from bookmarks" : "Post bookmarked" });
   };
 
-  const handleRunBrain = async (e: React.MouseEvent) => {
+  const handleRunMind = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!post.brainId) return;
+    if (!post.mindId) return;
     try {
-      const brain = await idb.get<Brain>("brains", post.brainId);
-      if (brain) {
-        setActiveBrain(brain);
-        setIsBrainOpen(true);
+      const mind = await idb.get<Mind>("minds", post.mindId);
+      if (mind) {
+        setActiveMind(mind);
+        setIsMindOpen(true);
       } else {
         toast({
-          title: "Brain Not Found",
-          description: "This brain module could not be loaded.",
+          title: "Mind Not Found",
+          description: "This mind module could not be loaded.",
           variant: "destructive",
         });
       }
     } catch {
-      toast({ title: "Error", description: "Could not load the brain module.", variant: "destructive" });
+      toast({ title: "Error", description: "Could not load the mind module.", variant: "destructive" });
     }
   };
 
@@ -602,18 +602,18 @@ export function PostCard({
                 </div>
               )}
 
-              {post.brainId && (
-                <div className="mt-2.5 p-3.5 rounded-2xl border border-border/60 bg-muted/20 hover:bg-muted/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer transition-all duration-200" onClick={handleRunBrain}>
+              {post.mindId && (
+                <div className="mt-2.5 p-3.5 rounded-2xl border border-border/60 bg-muted/20 hover:bg-muted/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer transition-all duration-200" onClick={handleRunMind}>
                   <div className="flex items-center gap-3">
                     <div className="w-9 h-9 rounded-full bg-primary/15 flex items-center justify-center text-primary shrink-0">
                       <BrainCircuit className="w-4.5 h-4.5" />
                     </div>
                     <div>
-                      <h4 className="text-[14px] font-bold text-foreground leading-tight">Attached Brain</h4>
+                      <h4 className="text-[14px] font-bold text-foreground leading-tight">Attached Mind</h4>
                       <p className="text-[12px] text-muted-foreground">Interactive Decision Module</p>
                     </div>
                   </div>
-                  <Button variant="secondary" size="sm" className="rounded-full w-full sm:w-auto text-xs h-7 px-3.5 font-semibold" onClick={handleRunBrain}>Run Brain</Button>
+                  <Button variant="secondary" size="sm" className="rounded-full w-full sm:w-auto text-xs h-7 px-3.5 font-semibold" onClick={handleRunMind}>Run Mind</Button>
                 </div>
               )}
 
@@ -901,12 +901,12 @@ export function PostCard({
         </DialogContent>
       </Dialog>
 
-      {isBrainOpen && (
+      {isMindOpen && (
         <Suspense fallback={null}>
-          <BrainChatRuntime
-            brain={activeBrain}
-            isOpen={isBrainOpen}
-            onClose={() => { setIsBrainOpen(false); setActiveBrain(null); }}
+          <MindChatRuntime
+            mind={activeMind}
+            isOpen={isMindOpen}
+            onClose={() => { setIsMindOpen(false); setActiveMind(null); }}
           />
         </Suspense>
       )}

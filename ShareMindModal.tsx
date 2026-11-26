@@ -3,12 +3,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { BrainCircuit, Download, X, CheckCircle2 } from "lucide-react";
-import { Brain, Node } from "@/lib/types";
+import { Mind, Node } from "@/lib/types";
 import { idb } from "@/lib/db";
 import { useToast } from "@/hooks/use-toast";
 
 interface DecodedShare {
-  brain: Brain;
+  mind: Mind;
   nodes: Node[];
 }
 
@@ -18,14 +18,14 @@ function decodeShareHash(hash: string): DecodedShare | null {
     const encoded = hash.slice("#share=".length);
     const json = decodeURIComponent(atob(encoded));
     const data = JSON.parse(json) as DecodedShare;
-    if (!data.brain?.id || !Array.isArray(data.nodes)) return null;
+    if (!data.mind?.id || !Array.isArray(data.nodes)) return null;
     return data;
   } catch {
     return null;
   }
 }
 
-export function ShareBrainModal() {
+export function ShareMindModal() {
   const [decoded, setDecoded] = useState<DecodedShare | null>(() => decodeShareHash(window.location.hash));
   const [imported, setImported] = useState(false);
   const { toast } = useToast();
@@ -39,19 +39,19 @@ export function ShareBrainModal() {
   const handleImport = async () => {
     if (!decoded) return;
     try {
-      const newBrainId = crypto.randomUUID();
-      const newBrain: Brain = {
-        ...decoded.brain,
-        id: newBrainId,
+      const newMindId = crypto.randomUUID();
+      const newMind: Mind = {
+        ...decoded.mind,
+        id: newMindId,
         created_at: Date.now(),
-        title: decoded.brain.title.endsWith(" (imported)")
-          ? decoded.brain.title
-          : decoded.brain.title + " (imported)",
+        title: decoded.mind.title.endsWith(" (imported)")
+          ? decoded.mind.title
+          : decoded.mind.title + " (imported)",
       };
       const newNodes: Node[] = decoded.nodes.map(n => ({
         ...n,
         id: crypto.randomUUID(),
-        brain_id: newBrainId,
+        mind_id: newMindId,
       }));
 
       // Remap node references to use new IDs
@@ -62,16 +62,16 @@ export function ShareBrainModal() {
         if (n.if_false_node_id) n.if_false_node_id = oldToNew.get(n.if_false_node_id) ?? n.if_false_node_id;
       }
 
-      await idb.put("brains", newBrain);
+      await idb.put("minds", newMind);
       for (const node of newNodes) await idb.put("nodes", node);
 
       setImported(true);
-      toast({ title: "Brain Imported!", description: `"${newBrain.title}" has been added to your library.` });
+      toast({ title: "Mind Imported!", description: `"${newMind.title}" has been added to your library.` });
       setTimeout(handleClose, 1800);
     } catch (error) {
       toast({
         title: "Import failed",
-        description: error instanceof Error ? error.message : "Could not import this brain.",
+        description: error instanceof Error ? error.message : "Could not import this mind.",
         variant: "destructive",
       });
     }
@@ -79,7 +79,7 @@ export function ShareBrainModal() {
 
   if (!decoded) return null;
 
-  const tags = (decoded.brain.category || "").split(",").map(t => t.trim()).filter(Boolean);
+  const tags = (decoded.mind.category || "").split(",").map(t => t.trim()).filter(Boolean);
   const qCount = decoded.nodes.filter(n => n.node_type === "question").length;
   const oCount = decoded.nodes.filter(n => n.node_type === "outcome").length;
 
@@ -89,11 +89,11 @@ export function ShareBrainModal() {
         <DialogHeader>
           <div className="flex items-center gap-2 mb-1">
             <BrainCircuit className="w-5 h-5 text-primary" />
-            <span className="text-xs font-mono text-primary uppercase tracking-wider">Shared Brain Received</span>
+            <span className="text-xs font-mono text-primary uppercase tracking-wider">Shared Mind Received</span>
           </div>
-          <DialogTitle className="text-xl font-bold">{decoded.brain.title}</DialogTitle>
+          <DialogTitle className="text-xl font-bold">{decoded.mind.title}</DialogTitle>
           <DialogDescription className="text-sm text-muted-foreground leading-relaxed mt-1">
-            {decoded.brain.description || "No description provided."}
+            {decoded.mind.description || "No description provided."}
           </DialogDescription>
         </DialogHeader>
 

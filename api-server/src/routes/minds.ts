@@ -7,7 +7,7 @@ const router: IRouter = Router();
 
 const NodeSchema = z.object({
   id: z.string().min(1).max(120).regex(/^[A-Za-z0-9_-]+$/, "id must be a slug"),
-  brain_id: z.string().min(1).max(120).regex(/^[A-Za-z0-9_-]+$/, "brain_id must be a slug"),
+  mind_id: z.string().min(1).max(120).regex(/^[A-Za-z0-9_-]+$/, "mind_id must be a slug"),
   node_type: z.enum(["question", "outcome"]),
   question_text: z.string().max(5000).nullable().optional(),
   result_text: z.string().max(5000).nullable().optional(),
@@ -17,7 +17,7 @@ const NodeSchema = z.object({
   attachments: z.array(z.unknown()).default([]),
 });
 
-const BrainSchema = z.object({
+const Mindschema = z.object({
   id: z.string().min(1).max(120).regex(/^[A-Za-z0-9_-]+$/, "id must be a slug"),
   title: z.string().min(1).max(200),
   category: z.string().max(200).default(""),
@@ -44,7 +44,7 @@ const ListQuerySchema = z.object({
     .default(false),
 });
 
-interface BrainRow {
+interface MindRow {
   id: string;
   author_id: string | null;
   title: string;
@@ -58,9 +58,9 @@ interface BrainRow {
   created_at: string;
 }
 
-interface BrainNodeRow {
+interface MindNodeRow {
   id: string;
-  brain_id: string;
+  mind_id: string;
   node_type: "question" | "outcome";
   question_text: string | null;
   result_text: string | null;
@@ -70,7 +70,7 @@ interface BrainNodeRow {
   attachments: unknown;
 }
 
-function toClientBrain(row: BrainRow) {
+function toClientMind(row: MindRow) {
   return {
     id: row.id,
     authorId: row.author_id,
@@ -86,10 +86,10 @@ function toClientBrain(row: BrainRow) {
   };
 }
 
-function toClientNode(row: BrainNodeRow) {
+function toClientNode(row: MindNodeRow) {
   return {
     id: row.id,
-    brain_id: row.brain_id,
+    mind_id: row.mind_id,
     node_type: row.node_type,
     question_text: row.question_text ?? undefined,
     result_text: row.result_text ?? undefined,
@@ -100,15 +100,15 @@ function toClientNode(row: BrainNodeRow) {
   };
 }
 
-/** List public brains, or the signed-in user's own brains with ?mine=true. */
-router.get("/brains", optionalAuth, async (req, res) => {
+/** List public minds, or the signed-in user's own minds with ?mine=true. */
+router.get("/minds", optionalAuth, async (req, res) => {
   const parsed = ListQuerySchema.safeParse(req.query);
   if (!parsed.success) {
     res.status(400).json({ error: "Invalid query" });
     return;
   }
   if (!supabase.isConfigured()) {
-    res.json({ brains: [], hasMore: false, source: "degraded" });
+    res.json({ minds: [], hasMore: false, source: "degraded" });
     return;
   }
 
@@ -125,104 +125,104 @@ router.get("/brains", optionalAuth, async (req, res) => {
   }
 
   try {
-    const rows = await supabase.get<BrainRow>("brains", {
+    const rows = await supabase.get<MindRow>("minds", {
       filters,
       order: { column: "created_at", ascending: false },
       limit: limit + 1,
       offset,
     });
     res.json({
-      brains: rows.slice(0, limit).map(toClientBrain),
+      minds: rows.slice(0, limit).map(toClientMind),
       hasMore: rows.length > limit,
       source: "supabase",
     });
   } catch (error) {
     if (error instanceof SupabaseError) {
-      res.status(502).json({ error: "Brains unavailable" });
+      res.status(502).json({ error: "Minds unavailable" });
       return;
     }
     throw error;
   }
 });
 
-/** Fetch a single brain with all of its nodes. Public brains are readable by
- *  anyone; private brains only by their author. */
-router.get("/brains/:id", optionalAuth, async (req, res) => {
+/** Fetch a single mind with all of its nodes. Public minds are readable by
+ *  anyone; private minds only by their author. */
+router.get("/minds/:id", optionalAuth, async (req, res) => {
   const id = String(req.params.id ?? "");
   if (!/^[A-Za-z0-9_-]+$/.test(id)) {
-    res.status(400).json({ error: "Invalid brain id" });
+    res.status(400).json({ error: "Invalid mind id" });
     return;
   }
   if (!supabase.isConfigured()) {
-    res.status(503).json({ error: "Brains not configured" });
+    res.status(503).json({ error: "Minds not configured" });
     return;
   }
   try {
-    const brain = await supabase.getOne<BrainRow>("brains", {
+    const mind = await supabase.getOne<MindRow>("minds", {
       filters: { id: `eq.${req.params.id}` },
     });
-    if (!brain) {
-      res.status(404).json({ error: "Brain not found" });
+    if (!mind) {
+      res.status(404).json({ error: "Mind not found" });
       return;
     }
-    // Security: enforce visibility. Private brains are only accessible to their owner.
+    // Security: enforce visibility. Private minds are only accessible to their owner.
     // repo_status "private" or null = private; "public_repo" = public; "archived" = read-only public.
-    const isPrivate = !brain.is_public && brain.repo_status !== "public_repo" && brain.repo_status !== "archived";
-    if (isPrivate && brain.author_id !== req.auth?.uid) {
-      res.status(404).json({ error: "Brain not found" });
+    const isPrivate = !mind.is_public && mind.repo_status !== "public_repo" && mind.repo_status !== "archived";
+    if (isPrivate && mind.author_id !== req.auth?.uid) {
+      res.status(404).json({ error: "Mind not found" });
       return;
     }
 
-    const nodes = await supabase.get<BrainNodeRow>("brain_nodes", {
-      filters: { brain_id: `eq.${brain.id}` },
+    const nodes = await supabase.get<MindNodeRow>("mind_nodes", {
+      filters: { mind_id: `eq.${mind.id}` },
     });
 
     res.json({
-      brain: toClientBrain(brain),
+      mind: toClientMind(mind),
       nodes: nodes.map(toClientNode),
       source: "supabase",
     });
   } catch (error) {
     if (error instanceof SupabaseError) {
-      res.status(502).json({ error: "Brain unavailable" });
+      res.status(502).json({ error: "Mind unavailable" });
       return;
     }
     throw error;
   }
 });
 
-const UpsertBrainSchema = z.object({
-  brain: BrainSchema,
+const UpsertMindschema = z.object({
+  mind: Mindschema,
   nodes: z.array(NodeSchema).max(500),
 });
 
-/** Create or update a brain and its nodes in one transaction-like call.
+/** Create or update a mind and its nodes in one transaction-like call.
  *  Nodes are replaced wholesale to keep the client/server topology simple. */
-router.post("/brains", requireAuth, async (req, res) => {
-  const parsed = UpsertBrainSchema.safeParse(req.body);
+router.post("/minds", requireAuth, async (req, res) => {
+  const parsed = UpsertMindschema.safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json({ error: "Invalid brain", details: parsed.error.flatten() });
+    res.status(400).json({ error: "Invalid mind", details: parsed.error.flatten() });
     return;
   }
   if (!supabase.isConfigured()) {
-    res.status(503).json({ error: "Brains not configured" });
+    res.status(503).json({ error: "Minds not configured" });
     return;
   }
 
-  const { brain: input, nodes } = parsed.data;
+  const { mind: input, nodes } = parsed.data;
   const uid = req.auth!.uid;
 
   try {
-    // Check ownership if the brain already exists.
-    const existing = await supabase.getOne<BrainRow>("brains", {
+    // Check ownership if the mind already exists.
+    const existing = await supabase.getOne<MindRow>("minds", {
       filters: { id: `eq.${input.id}` },
     });
     if (existing && existing.author_id !== uid) {
-      res.status(403).json({ error: "You do not own this brain" });
+      res.status(403).json({ error: "You do not own this mind" });
       return;
     }
 
-    const brainRow = {
+    const mindRow = {
       id: input.id,
       author_id: uid,
       title: input.title,
@@ -235,17 +235,17 @@ router.post("/brains", requireAuth, async (req, res) => {
       active_branch: input.active_branch ?? null,
     };
 
-    await supabase.insert("brains", brainRow, "resolution=merge-duplicates");
+    await supabase.insert("minds", mindRow, "resolution=merge-duplicates");
 
     // Replace nodes safely: insert/upsert the new set FIRST, then delete any
     // old nodes that are not part of the new set. This avoids a window where
-    // a failed insert would leave the brain with no nodes at all.
+    // a failed insert would leave the mind with no nodes at all.
     if (nodes.length > 0) {
       await supabase.insert(
-        "brain_nodes",
+        "mind_nodes",
         nodes.map((n) => ({
           id: n.id,
-          brain_id: brainRow.id,
+          mind_id: mindRow.id,
           node_type: n.node_type,
           question_text: n.question_text ?? null,
           result_text: n.result_text ?? null,
@@ -258,64 +258,64 @@ router.post("/brains", requireAuth, async (req, res) => {
       );
     }
 
-    // Delete stale nodes belonging to this brain that were not in the upsert.
+    // Delete stale nodes belonging to this mind that were not in the upsert.
     // PostgREST filters with `not.in.(...)`; an empty new set deletes all.
     const newIds = nodes.map((n) => n.id);
     if (newIds.length > 0) {
       await supabase.deleteNotIn(
-        "brain_nodes",
-        { brain_id: brainRow.id },
+        "mind_nodes",
+        { mind_id: mindRow.id },
         "id",
         newIds,
       );
     } else {
-      await supabase.delete("brain_nodes", { brain_id: brainRow.id });
+      await supabase.delete("mind_nodes", { mind_id: mindRow.id });
     }
 
     res.status(existing ? 200 : 201).json({
-      brain: toClientBrain({
-        ...brainRow,
+      mind: toClientMind({
+        ...mindRow,
         created_at: existing?.created_at ?? new Date().toISOString(),
-      } as BrainRow),
+      } as MindRow),
       nodeCount: nodes.length,
     });
   } catch (error) {
     if (error instanceof SupabaseError) {
-      res.status(502).json({ error: "Could not save brain" });
+      res.status(502).json({ error: "Could not save mind" });
       return;
     }
     throw error;
   }
 });
 
-/** Delete a brain (author only). Cascades to nodes via the schema. */
-router.delete("/brains/:id", requireAuth, async (req, res) => {
+/** Delete a mind (author only). Cascades to nodes via the schema. */
+router.delete("/minds/:id", requireAuth, async (req, res) => {
   const id = String(req.params.id ?? "");
   if (!/^[A-Za-z0-9_-]+$/.test(id)) {
-    res.status(400).json({ error: "Invalid brain id" });
+    res.status(400).json({ error: "Invalid mind id" });
     return;
   }
   if (!supabase.isConfigured()) {
-    res.status(503).json({ error: "Brains not configured" });
+    res.status(503).json({ error: "Minds not configured" });
     return;
   }
   try {
-    const existing = await supabase.getOne<BrainRow>("brains", {
+    const existing = await supabase.getOne<MindRow>("minds", {
       filters: { id: `eq.${id}` },
     });
     if (!existing) {
-      res.status(404).json({ error: "Brain not found" });
+      res.status(404).json({ error: "Mind not found" });
       return;
     }
     if (existing.author_id !== req.auth!.uid) {
-      res.status(403).json({ error: "You do not own this brain" });
+      res.status(403).json({ error: "You do not own this mind" });
       return;
     }
-    await supabase.delete("brains", { id: existing.id });
+    await supabase.delete("minds", { id: existing.id });
     res.status(204).end();
   } catch (error) {
     if (error instanceof SupabaseError) {
-      res.status(502).json({ error: "Could not delete brain" });
+      res.status(502).json({ error: "Could not delete mind" });
       return;
     }
     throw error;

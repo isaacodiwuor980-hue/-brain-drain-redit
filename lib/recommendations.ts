@@ -1,5 +1,5 @@
 import { AnalyticsEvent } from "./analytics";
-import { Brain, getPostDownvoteCount, getPostUpvoteCount, Mission, Notification as AppNotification, Post, Topic } from "./types";
+import { Mind, getPostDownvoteCount, getPostUpvoteCount, Mission, Notification as AppNotification, Post, Topic } from "./types";
 
 export type FeedMode = "foryou" | "following";
 
@@ -56,7 +56,7 @@ function buildTopicScores(events: AnalyticsEvent[], posts: Post[], topics: Topic
 
     switch (event.type) {
       case "post_created":
-        addTopic(asString(payload.topicId), asBoolean(payload.hasBrain) ? 10 : 8, event.createdAt);
+        addTopic(asString(payload.topicId), asBoolean(payload.hasMind) ? 10 : 8, event.createdAt);
         break;
       case "post_reaction":
         addPostTopic(asString(payload.postId), asBoolean(payload.active) ? 6 : -2, event.createdAt);
@@ -99,10 +99,10 @@ function buildTopicScores(events: AnalyticsEvent[], posts: Post[], topics: Topic
         if (topicMatch?.[1]) addTopic(decodeURIComponent(topicMatch[1]), 4, event.createdAt);
         break;
       }
-      case "brain_launch": {
-        const brainId = asString(payload.brainId);
+      case "mind_launch": {
+        const mindId = asString(payload.mindId);
         for (const post of posts) {
-          if (post.brainId === brainId) addTopic(post.topicId, 8, event.createdAt);
+          if (post.mindId === mindId) addTopic(post.topicId, 8, event.createdAt);
         }
         break;
       }
@@ -126,8 +126,8 @@ function forYouScore(post: Post, topicScores: Record<string, number>) {
     engagementBoost += expertiseBoost;
   }
   const interestBoost = topicScores[post.topicId] || 0;
-  const brainBoost = post.brainId ? 1.5 : 0;
-  return recencyBoost + engagementBoost + interestBoost + brainBoost;
+  const mindBoost = post.mindId ? 1.5 : 0;
+  return recencyBoost + engagementBoost + interestBoost + mindBoost;
 }
 
 export function rankHomeFeedPosts({ posts, topics, events, mode, selectedTopicId, currentUserId = "me" }: RankHomeFeedInput) {
@@ -178,36 +178,36 @@ export function rankRelatedTopics(posts: Post[], topics: Topic[], events: Analyt
     .map(({ topic }) => topic);
 }
 
-export function rankBrainsByLocalSignals(brains: Brain[], events: AnalyticsEvent[]) {
+export function rankMindsByLocalSignals(minds: Mind[], events: AnalyticsEvent[]) {
   const queryTerms = events
     .filter((event) => event.type === "search_submitted" || event.type === "search_recent_selected")
     .map((event) => asString(event.payload?.query).toLowerCase())
     .filter(Boolean);
 
-  const launchedBrainScores = events.reduce((acc, event) => {
-    if (event.type === "brain_launch") {
-      const brainId = asString(event.payload?.brainId);
-      if (brainId) acc[brainId] = (acc[brainId] || 0) + 10 * ageDecay(event.createdAt);
+  const launchedMindscores = events.reduce((acc, event) => {
+    if (event.type === "mind_launch") {
+      const mindId = asString(event.payload?.mindId);
+      if (mindId) acc[mindId] = (acc[mindId] || 0) + 10 * ageDecay(event.createdAt);
     }
     return acc;
   }, {} as Record<string, number>);
 
-  const scoreBrain = (brain: Brain) => {
-    const searchable = `${brain.title} ${brain.category} ${brain.description}`.toLowerCase();
+  const scoreMind = (mind: Mind) => {
+    const searchable = `${mind.title} ${mind.category} ${mind.description}`.toLowerCase();
     const searchBoost = queryTerms.reduce((score, query) => {
       if (!query) return score;
       if (searchable.includes(query)) return score + 6;
       return score + query.split(/\s+/).filter((term) => term.length > 2 && searchable.includes(term)).length * 1.5;
     }, 0);
 
-    const favoriteBoost = brain.isFavorite ? 8 : 0;
-    const launchedBoost = launchedBrainScores[brain.id] || 0;
-    const recencyBoost = ageDecay(brain.created_at || Date.now()) * 2;
+    const favoriteBoost = mind.isFavorite ? 8 : 0;
+    const launchedBoost = launchedMindscores[mind.id] || 0;
+    const recencyBoost = ageDecay(mind.created_at || Date.now()) * 2;
 
     return searchBoost + favoriteBoost + launchedBoost + recencyBoost;
   };
 
-  return [...brains].sort((a, b) => scoreBrain(b) - scoreBrain(a) || (b.created_at || 0) - (a.created_at || 0));
+  return [...minds].sort((a, b) => scoreMind(b) - scoreMind(a) || (b.created_at || 0) - (a.created_at || 0));
 }
 
 export function rankNotificationsByRelevance(notifications: AppNotification[], events: AnalyticsEvent[]) {
@@ -220,7 +220,7 @@ export function rankNotificationsByRelevance(notifications: AppNotification[], e
   const typeWeight: Record<AppNotification["type"], number> = {
     mention: 14,
     reply: 12,
-    brain_run: 10,
+    mind_run: 10,
     reaction: 7,
   };
 

@@ -7,7 +7,7 @@
  *
  * GET /api/v1/search?q=...
  *   Semantic search across all public records. Returns JSON results
- *   with provenance + confidence scores. This is what makes Brain Drain
+ *   with provenance + confidence scores. This is what makes MindSpool
  *   outperform Google for expert knowledge — structured, verified,
  *   confidence-scored answers instead of SEO-optimized blog posts.
  *
@@ -26,12 +26,12 @@ router.get("/v1/datasets", (_req, res) => {
   // data itself. AI labs use this to decide whether to license.
   // When the server-side store lands, these counts will be real.
   res.json({
-    platform: "Brain Drain",
+    platform: "MindSpool",
     description: "Human-verified knowledge with provenance chains, confidence scores, and per-record licensing.",
     datasets: [
       {
         id: "drain-entries",
-        name: "Drained expert brains",
+        name: "Drained expert minds",
         description: "Lifelong timeline of expert techniques, secrets, and mentorship lessons. Each entry has a SHA-256 provenance chain and a legacy/will status.",
         recordCount: "dynamic",
         license: "per-record (CC0 / CC-BY / CC-BY-SA / CC-BY-NC / proprietary)",
@@ -73,7 +73,7 @@ router.get("/v1/datasets", (_req, res) => {
       },
     ],
     licensing: {
-      portal: "Contact licensing@braindrain.app for API keys",
+      portal: "Contact licensing@MindSpool.app for API keys",
       pricing: "Per-dataset, based on record count + license terms",
       trial: "Free tier: 100 API calls/day for evaluation",
     },

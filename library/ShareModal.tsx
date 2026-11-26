@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Brain } from "@/lib/types";
+import { Mind } from "@/lib/types";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Share, Copy, Link as LinkIcon, Network } from "lucide-react";
@@ -8,29 +8,29 @@ import { useToast } from "@/hooks/use-toast";
 interface ShareModalProps {
   isOpen: boolean;
   onClose: () => void;
-  brain: Brain | null;
+  mind: Mind | null;
 }
 
-export function ShareModal({ isOpen, onClose, brain }: ShareModalProps) {
+export function ShareModal({ isOpen, onClose, mind }: ShareModalProps) {
   const { toast } = useToast();
   const [isCopied, setIsCopied] = useState(false);
 
-  if (!brain) return null;
+  if (!mind) return null;
 
   const handleCopyLink = () => {
-    navigator.clipboard.writeText(`https://brainbuilder.app/shared/${brain.id}`);
+    navigator.clipboard.writeText(`https://mindbuilder.app/shared/${mind.id}`);
     setIsCopied(true);
     toast({ title: "Link Copied", description: "Sharing link copied to clipboard." });
     setTimeout(() => setIsCopied(false), 2000);
   };
 
   const handleShareModule = () => {
-    toast({ title: "Module Shared", description: "Brain shared as an independent module." });
+    toast({ title: "Module Shared", description: "Mind shared as an independent module." });
     onClose();
   };
 
   const handleShareClone = () => {
-    toast({ title: "Brain Cloned", description: "Full brain cloned with DNA linkage." });
+    toast({ title: "Mind Cloned", description: "Full mind cloned with DNA linkage." });
     onClose();
   };
 
@@ -43,7 +43,7 @@ export function ShareModal({ isOpen, onClose, brain }: ShareModalProps) {
             Advanced Sharing
           </DialogTitle>
           <DialogDescription>
-            Share "{brain.title}" with the network.
+            Share "{mind.title}" with the network.
           </DialogDescription>
         </DialogHeader>
 
@@ -81,7 +81,7 @@ export function ShareModal({ isOpen, onClose, brain }: ShareModalProps) {
           <div className="pt-4 border-t border-border/50">
             <div className="flex items-center gap-2">
               <div className="flex-1 truncate bg-muted p-2 rounded-md text-sm font-mono text-muted-foreground">
-                https://brainbuilder.app/shared/{brain.id}
+                https://mindbuilder.app/shared/{mind.id}
               </div>
               <Button variant="outline" size="icon" aria-label="Copy share link" onClick={handleCopyLink}>
                 <Copy className={`w-4 h-4 ${isCopied ? "text-primary" : ""}`} />

@@ -1,6 +1,6 @@
 // Sweep across EVERY plausible iframe sandbox configuration a host like
 // chat.z.ai might use, served from a real localhost origin (data: URLs cannot
-// reliably embed cross-origin iframes). Verifies the deployed Brain Drain
+// reliably embed cross-origin iframes). Verifies the deployed MindSpool
 // preview renders posts in each sandbox configuration.
 //
 // We do NOT claim any of these exactly matches chat.z.ai — that requires

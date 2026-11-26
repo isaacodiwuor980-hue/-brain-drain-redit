@@ -32,7 +32,7 @@ import {
   Code,
   FileText,
 } from "lucide-react";
-import { BrainData, Post, PostEvent, PostType, NoteAttachment } from "@/lib/types";
+import { MindData, Post, PostEvent, PostType, NoteAttachment } from "@/lib/types";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { idb } from "@/lib/db";
 import { useToast } from "@/hooks/use-toast";
@@ -144,7 +144,7 @@ const DEFAULT_COMMUNITY_QUESTIONS: QuestionTarget[] = [
   },
   {
     id: "q-philosophy-eval",
-    title: "If a decision brain encodes heuristics from multiple experts with conflicting approaches, how should tie-breaking be modeled?",
+    title: "If a decision mind encodes heuristics from multiple experts with conflicting approaches, how should tie-breaking be modeled?",
     details: "Comparing Bayesian updating, weighted epistemic confidence scores, and minimax regret models.",
     authorName: "Marcus Vance",
     communityName: "Philosophy",
@@ -196,7 +196,7 @@ export function PostCreator({
   const [selectedTopicId, setSelectedTopicId] = useState("");
   const [selectedCommunityId, setSelectedCommunityId] = useState("");
   const [mediaUrls, setMediaUrls] = useState<string[]>([]);
-  const [attachedBrainId, setAttachedBrainId] = useState<string | null>(null);
+  const [attachedMindId, setAttachedMindId] = useState<string | null>(null);
   // Edit policy — who can edit this post after it's published.
   // Default "me-only" is the safest choice; the author can always edit
   // their own post regardless. See Post.editPolicy in lib/types.ts.
@@ -350,7 +350,7 @@ export function PostCreator({
     setSelectedCommunityId("");
     setPostType("post");
     setMediaUrls([]);
-    setAttachedBrainId(null);
+    setAttachedMindId(null);
     setSelectedQuestion(null);
     setQuestionSearchQuery("");
     setFilterCommunity("all");
@@ -459,7 +459,7 @@ export function PostCreator({
         communityId: community?.id || undefined,
         communityName: community?.name || undefined,
         mediaUrls: mediaUrls.length > 0 ? mediaUrls : undefined,
-        brainId: attachedBrainId || undefined,
+        mindId: attachedMindId || undefined,
         editPolicy,
         reactions: { upvote: 0, downvote: 0 },
         commentCount: 0,
@@ -501,7 +501,7 @@ export function PostCreator({
         communityId: selectedQuestion?.communityId || undefined,
         communityName: selectedQuestion?.communityName || undefined,
         mediaUrls: mediaUrls.length > 0 ? mediaUrls : undefined,
-        brainId: attachedBrainId || undefined,
+        mindId: attachedMindId || undefined,
         editPolicy,
         reactions: { upvote: 0, downvote: 0 },
         commentCount: 0,
@@ -579,7 +579,7 @@ export function PostCreator({
       communityId: community?.id || undefined,
       communityName: community?.name || undefined,
       mediaUrls: mediaUrls.length > 0 ? mediaUrls : undefined,
-      brainId: attachedBrainId || undefined,
+      mindId: attachedMindId || undefined,
       editPolicy,
       reactions: { upvote: 0, downvote: 0 },
       commentCount: 0,
@@ -597,21 +597,21 @@ export function PostCreator({
     });
   };
 
-  const handleBrainSave = async (data: BrainData) => {
+  const handleMindsave = async (data: MindData) => {
     try {
-      await idb.put("brains", data.brain);
+      await idb.put("minds", data.mind);
       for (const node of data.nodes) {
         await idb.put("nodes", node);
       }
-      setAttachedBrainId(data.brain.id);
+      setAttachedMindId(data.mind.id);
       setIsWizardOpen(false);
       toast({
-        title: "Brain Attached",
-        description: `"${data.brain.title}" is now attached to your submission.`,
+        title: "Mind Attached",
+        description: `"${data.mind.title}" is now attached to your submission.`,
       });
     } catch (error) {
       toast({
-        title: "Couldn't attach brain",
+        title: "Couldn't attach mind",
         description: error instanceof Error ? error.message : "Please try again.",
         variant: "destructive",
       });
@@ -879,12 +879,12 @@ export function PostCreator({
                       variant="outline"
                       size="sm"
                       className={`rounded-full text-xs h-8 border-border/60 gap-1.5 ${
-                        attachedBrainId ? "bg-primary/15 text-primary border-primary/30" : "hover:bg-primary/10 hover:text-primary"
+                        attachedMindId ? "bg-primary/15 text-primary border-primary/30" : "hover:bg-primary/10 hover:text-primary"
                       }`}
                       onClick={() => setIsWizardOpen(true)}
                     >
                       <BrainCircuit className="w-3.5 h-3.5" />
-                      {attachedBrainId ? "Brain Attached" : "Attach Decision Brain"}
+                      {attachedMindId ? "Mind Attached" : "Attach Decision Mind"}
                     </Button>
                     {/* Edit-policy selector — who can edit this post after publish.
                         Defaults to "me-only" (safest). The author can always edit
@@ -956,15 +956,15 @@ export function PostCreator({
                   )}
                 </div>
 
-                {/* Preview attached media or brain */}
-                {attachedBrainId && (
+                {/* Preview attached media or mind */}
+                {attachedMindId && (
                   <div className="p-3 rounded-xl border border-primary/30 bg-primary/5 flex items-center justify-between">
                     <div className="flex items-center gap-2.5">
                       <div className="w-7 h-7 rounded-lg bg-primary/15 flex items-center justify-center text-primary">
                         <BrainCircuit className="w-4 h-4" />
                       </div>
                       <div>
-                        <p className="text-xs font-semibold text-foreground">Interactive Decision Brain Attached</p>
+                        <p className="text-xs font-semibold text-foreground">Interactive Decision Mind Attached</p>
                         <p className="text-[11px] text-muted-foreground">Readers can simulate logic branches.</p>
                       </div>
                     </div>
@@ -972,7 +972,7 @@ export function PostCreator({
                       variant="ghost"
                       size="icon" aria-label="Upload image"
                       className="h-6 w-6 text-muted-foreground hover:text-destructive"
-                      onClick={() => setAttachedBrainId(null)}
+                      onClick={() => setAttachedMindId(null)}
                     >
                       <X className="w-3.5 h-3.5" />
                     </Button>
@@ -1207,24 +1207,24 @@ export function PostCreator({
                           variant="outline"
                           size="sm"
                           className={`rounded-full text-xs h-8 border-border/60 gap-1.5 ${
-                            attachedBrainId ? "bg-primary/15 text-primary border-primary/30" : "hover:bg-primary/10 hover:text-primary"
+                            attachedMindId ? "bg-primary/15 text-primary border-primary/30" : "hover:bg-primary/10 hover:text-primary"
                           }`}
                           onClick={() => setIsWizardOpen(true)}
                         >
                           <BrainCircuit className="w-3.5 h-3.5" />
-                          {attachedBrainId ? "Brain Attached" : "Attach Decision Brain"}
+                          {attachedMindId ? "Mind Attached" : "Attach Decision Mind"}
                         </Button>
                       </div>
                     </div>
 
-                    {attachedBrainId && (
+                    {attachedMindId && (
                       <div className="p-3 rounded-xl border border-primary/30 bg-primary/5 flex items-center justify-between">
                         <div className="flex items-center gap-2.5">
                           <div className="w-7 h-7 rounded-lg bg-primary/15 flex items-center justify-center text-primary">
                             <BrainCircuit className="w-4 h-4" />
                           </div>
                           <div>
-                            <p className="text-xs font-semibold text-foreground">Interactive Decision Brain Attached</p>
+                            <p className="text-xs font-semibold text-foreground">Interactive Decision Mind Attached</p>
                             <p className="text-[11px] text-muted-foreground">Supports your answer with interactive decision pathways.</p>
                           </div>
                         </div>
@@ -1232,7 +1232,7 @@ export function PostCreator({
                           variant="ghost"
                           size="icon" aria-label="Remove tag"
                           className="h-6 w-6 text-muted-foreground hover:text-destructive"
-                          onClick={() => setAttachedBrainId(null)}
+                          onClick={() => setAttachedMindId(null)}
                         >
                           <X className="w-3.5 h-3.5" />
                         </Button>
@@ -1516,7 +1516,7 @@ export function PostCreator({
                           id="event-title-input"
                           value={eventTitle}
                           onChange={(e) => setEventTitle(e.target.value)}
-                          placeholder="e.g. Brainstorming Workshop"
+                          placeholder="e.g. Mindstorming Workshop"
                           className="h-8 text-xs bg-background"
                         />
                       </div>
@@ -1572,12 +1572,12 @@ export function PostCreator({
                       variant="outline"
                       size="sm"
                       className={`rounded-full text-xs h-8 border-border/60 gap-1.5 ${
-                        attachedBrainId ? "bg-primary/15 text-primary border-primary/30" : "hover:bg-muted/40"
+                        attachedMindId ? "bg-primary/15 text-primary border-primary/30" : "hover:bg-muted/40"
                       }`}
                       onClick={() => setIsWizardOpen(true)}
                     >
                       <BrainCircuit className="w-3.5 h-3.5 text-primary" />
-                      {attachedBrainId ? "Brain Attached" : "Attach Brain"}
+                      {attachedMindId ? "Mind Attached" : "Attach Mind"}
                     </Button>
                     <Button
                       type="button"
@@ -1592,14 +1592,14 @@ export function PostCreator({
                   </div>
                 </div>
 
-                {attachedBrainId && (
+                {attachedMindId && (
                   <div className="p-3 rounded-xl border border-primary/30 bg-primary/5 flex items-center justify-between">
                     <div className="flex items-center gap-2.5">
                       <div className="w-7 h-7 rounded-lg bg-primary/15 flex items-center justify-center text-primary">
                         <BrainCircuit className="w-4 h-4" />
                       </div>
                       <div>
-                        <p className="text-xs font-semibold text-foreground">Interactive Decision Brain Attached</p>
+                        <p className="text-xs font-semibold text-foreground">Interactive Decision Mind Attached</p>
                         <p className="text-[11px] text-muted-foreground">Connected decision engine module.</p>
                       </div>
                     </div>
@@ -1607,7 +1607,7 @@ export function PostCreator({
                       variant="ghost"
                       size="icon" aria-label="Close"
                       className="h-6 w-6 text-muted-foreground hover:text-destructive"
-                      onClick={() => setAttachedBrainId(null)}
+                      onClick={() => setAttachedMindId(null)}
                     >
                       <X className="w-3.5 h-3.5" />
                     </Button>
@@ -1715,7 +1715,7 @@ export function PostCreator({
           <WizardModal
             isOpen={isWizardOpen}
             onClose={() => setIsWizardOpen(false)}
-            onSave={handleBrainSave}
+            onSave={handleMindsave}
           />
         </Suspense>
       )}

@@ -38,7 +38,7 @@ No frontend caller exists today. Three groups:
 **c) Future/contract surface (lean: keep, clearly separated):**
 - `GET /api/v1/datasets`, `GET /api/v1/search` — "AI labs data contract" (datasets returns real data, search returns empty placeholder)
 - `GET /api/v1/skills` + `/skills/:id` + `DELETE /skills/:id`, `GET /api/v1/habits` + `/:id` + `DELETE /:id` — read/delete halves exist, frontend only uses PUT + search
-- `GET /api/recommendations/brains` — server-side recommendations, frontend does it locally
+- `GET /api/recommendations/minds` — server-side recommendations, frontend does it locally
 
 ---
 

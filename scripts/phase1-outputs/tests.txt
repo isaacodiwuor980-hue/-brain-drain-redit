@@ -1,29 +1,29 @@
 
- RUN  v4.1.12 /home/z/my-project/BRAIN-DRAIN-latest-
+ RUN  v4.1.12 /home/z/my-project/MindSpool-latest-
 
  ✓ lib/db.storage-blocked.test.ts (7 tests) 64ms
  ✓ lib/sw-cleanup.storage-blocked.test.ts (5 tests) 45ms
  ✓ lib/hook-order-guard.test.ts (1 test) 44ms
 DOMException [NotSupportedError]: Failed to load iframe page "https://evil/". Iframe page loading is disabled.
-    at #loadPage (file:///home/z/my-project/BRAIN-DRAIN-latest-/node_modules/happy-dom/lib/nodes/html-iframe-element/HTMLIFrameElement.js:334:27)
-    at [connectedToDocument] (file:///home/z/my-project/BRAIN-DRAIN-latest-/node_modules/happy-dom/lib/nodes/html-iframe-element/HTMLIFrameElement.js:230:23)
-    at [connectedToNode] (file:///home/z/my-project/BRAIN-DRAIN-latest-/node_modules/happy-dom/lib/nodes/node/Node.js:801:53)
-    at [appendChild] (file:///home/z/my-project/BRAIN-DRAIN-latest-/node_modules/happy-dom/lib/nodes/node/Node.js:421:45)
-    at [appendChild] (file:///home/z/my-project/BRAIN-DRAIN-latest-/node_modules/happy-dom/lib/nodes/element/Element.js:1102:62)
-    at HTMLParser.parseEndOfStartTag (file:///home/z/my-project/BRAIN-DRAIN-latest-/node_modules/happy-dom/lib/html-parser/HTMLParser.js:489:53)
-    at HTMLParser.parse (file:///home/z/my-project/BRAIN-DRAIN-latest-/node_modules/happy-dom/lib/html-parser/HTMLParser.js:213:34)
-    at DOMParser.parseFromString (file:///home/z/my-project/BRAIN-DRAIN-latest-/node_modules/happy-dom/lib/dom-parser/DOMParser.js:27:68)
-    at sanitizeHtml (/home/z/my-project/BRAIN-DRAIN-latest-/lib/sanitize-html.ts:123:31)
-    at /home/z/my-project/BRAIN-DRAIN-latest-/lib/sanitize-html.test.ts:35:17
+    at #loadPage (file:///home/z/my-project/MindSpool-latest-/node_modules/happy-dom/lib/nodes/html-iframe-element/HTMLIFrameElement.js:334:27)
+    at [connectedToDocument] (file:///home/z/my-project/MindSpool-latest-/node_modules/happy-dom/lib/nodes/html-iframe-element/HTMLIFrameElement.js:230:23)
+    at [connectedToNode] (file:///home/z/my-project/MindSpool-latest-/node_modules/happy-dom/lib/nodes/node/Node.js:801:53)
+    at [appendChild] (file:///home/z/my-project/MindSpool-latest-/node_modules/happy-dom/lib/nodes/node/Node.js:421:45)
+    at [appendChild] (file:///home/z/my-project/MindSpool-latest-/node_modules/happy-dom/lib/nodes/element/Element.js:1102:62)
+    at HTMLParser.parseEndOfStartTag (file:///home/z/my-project/MindSpool-latest-/node_modules/happy-dom/lib/html-parser/HTMLParser.js:489:53)
+    at HTMLParser.parse (file:///home/z/my-project/MindSpool-latest-/node_modules/happy-dom/lib/html-parser/HTMLParser.js:213:34)
+    at DOMParser.parseFromString (file:///home/z/my-project/MindSpool-latest-/node_modules/happy-dom/lib/dom-parser/DOMParser.js:27:68)
+    at sanitizeHtml (/home/z/my-project/MindSpool-latest-/lib/sanitize-html.ts:123:31)
+    at /home/z/my-project/MindSpool-latest-/lib/sanitize-html.test.ts:35:17
  ✓ lib/sanitize-html.test.ts (11 tests) 21ms
  ✓ lib/mission-stats.test.ts (9 tests) 12ms
- ✓ lib/sample-brains.test.ts (5 tests) 12ms
- ✓ lib/brain-validator.test.ts (8 tests) 5ms
+ ✓ lib/sample-minds.test.ts (5 tests) 12ms
+ ✓ lib/mind-validator.test.ts (8 tests) 5ms
  ✓ lib/recommendations.test.ts (6 tests) 6ms
  ✓ hooks/use-social.test.ts (10 tests) 5ms
  ✓ lib/post-votes.test.ts (4 tests) 5ms
  ✓ lib/cloud-sync.test.ts (4 tests) 23ms
- ✓ lib/brains-sync.test.ts (4 tests) 5ms
+ ✓ lib/minds-sync.test.ts (4 tests) 5ms
  ✓ lib/admin-gate.test.ts (3 tests) 3ms
 
  Test Files  13 passed (13)

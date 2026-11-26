@@ -35,7 +35,7 @@ export type AnalyticsEventType =
   | "feed_sort_selected"
   | "notification_opened"
   | "mission_reminder"
-  | "brain_launch"
+  | "mind_launch"
   | "puzzle_score_copied"
   | "puzzle_score_shared"
   | "pathway_scenario_posted"
@@ -43,8 +43,8 @@ export type AnalyticsEventType =
   | "live_session_started"
   | "live_session_joined"
   | "live_session_mic_granted"
-  | "brain_branch_proposed"
-  | "brain_branch_merged"
+  | "mind_branch_proposed"
+  | "mind_branch_merged"
   | "vote_reward";
 
 export interface AnalyticsEvent {
@@ -56,7 +56,7 @@ export interface AnalyticsEvent {
   payload?: Record<string, unknown>;
 }
 
-const SESSION_KEY = "brain-builder-analytics-session";
+const SESSION_KEY = "mind-builder-analytics-session";
 const STORE = "analytics_events";
 const MAX_BACKEND_BATCH_SIZE = 20;
 const BACKEND_FLUSH_DELAY_MS = 1_500;

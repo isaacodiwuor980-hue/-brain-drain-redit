@@ -1,5 +1,5 @@
 import { useMemo, useState, useRef, useEffect } from "react";
-import { Brain, Node, NodeSkillReference, SkillEntry, HabitNote } from "@/lib/types";
+import { Mind, Node, NodeSkillReference, SkillEntry, HabitNote } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Plus, Trash2, ArrowRight, Image as ImageIcon, FileCode2, FileText, X, ShieldCheck, AlertTriangle, Undo2, CheckCircle2, Sparkles, RefreshCw, Target } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
-import { BrainIssue, validateBrain } from "@/lib/brain-validator";
+import { MindIssue, validateMind } from "@/lib/mind-validator";
 import { useSkills } from "@/hooks/use-skills";
 import { useHabits } from "@/hooks/use-habits";
 import { idb } from "@/lib/db";
@@ -22,11 +22,11 @@ interface NodeEditorProps {
   setNodes: React.Dispatch<React.SetStateAction<Node[]>>;
   rootNodeId: string | null;
   setRootNodeId: React.Dispatch<React.SetStateAction<string | null>>;
-  brainId: string;
-  brainTitle?: string;
+  mindId: string;
+  mindTitle?: string;
 }
 
-export function NodeEditor({ nodes, setNodes, rootNodeId, setRootNodeId, brainId, brainTitle = "" }: NodeEditorProps) {
+export function NodeEditor({ nodes, setNodes, rootNodeId, setRootNodeId, mindId, mindTitle = "" }: NodeEditorProps) {
   const { toast } = useToast();
   const [activeNodeId, setActiveNodeId] = useState<string | null>(
     nodes.length > 0 ? nodes[0].id : null
@@ -51,12 +51,12 @@ export function NodeEditor({ nodes, setNodes, rootNodeId, setRootNodeId, brainId
   const { habits, habitsByTopic } = useHabits();
   const [habitPickerOpen, setHabitPickerOpen] = useState(false);
   const habitPickerRef = useRef<HTMLDivElement>(null);
-  // The brain's topic = its title. @habit scans this for matching habits.
-  const brainTopic = brainTitle || "";
+  // The mind's topic = its title. @habit scans this for matching habits.
+  const mindTopic = mindTitle || "";
   const matchingHabits = useMemo(() => {
-    if (!brainTopic) return habits;
-    return habitsByTopic(brainTopic);
-  }, [habits, habitsByTopic, brainTopic]);
+    if (!mindTopic) return habits;
+    return habitsByTopic(mindTopic);
+  }, [habits, habitsByTopic, mindTopic]);
 
   // Task 7: context-aware filtering. Skills are filtered by what's already
   // in the node's question_text + the typed query.
@@ -125,7 +125,7 @@ export function NodeEditor({ nodes, setNodes, rootNodeId, setRootNodeId, brainId
 
   // Task 4: insert a habit reference. Stores ONLY a lightweight HabitNote on
   // the node (read-only summary). The real habit record lives in IDB, attached
-  // to a Milestone — never inside the node (so brain edits can't overwrite it).
+  // to a Milestone — never inside the node (so mind edits can't overwrite it).
   const handleInsertHabit = (habit: { id: string; newRoutine: string; anchorHabit: string; timing: "before" | "after"; reward: string; }) => {
     if (!activeNode) return;
     const summary = `I always ${habit.newRoutine} ${habit.timing} ${habit.anchorHabit}, then ${habit.reward}`;
@@ -148,7 +148,7 @@ export function NodeEditor({ nodes, setNodes, rootNodeId, setRootNodeId, brainId
       anchorHabit: habitTemplate.anchorHabit.trim(),
       timing: habitTemplate.timing,
       reward: habitTemplate.reward.trim(),
-      topic: brainTopic,
+      topic: mindTopic,
       completionLog: [],
       targetStreak: 7,
       // eslint-disable-next-line react-hooks/purity -- Date.now() inside an event handler (handleCreateHabitFromTemplate); fires only on user click, never during render.
@@ -204,19 +204,19 @@ export function NodeEditor({ nodes, setNodes, rootNodeId, setRootNodeId, brainId
   };
 
   // Run topology validation live so creators see problems before running.
-  const issues: BrainIssue[] = useMemo(
-    () => validateBrain(
-      { id: brainId, title: brainTitle, category: "", description: "", root_node_id: rootNodeId, created_at: 0 } as Brain,
+  const issues: MindIssue[] = useMemo(
+    () => validateMind(
+      { id: mindId, title: mindTitle, category: "", description: "", root_node_id: rootNodeId, created_at: 0 } as Mind,
       nodes,
     ),
-    [brainId, brainTitle, rootNodeId, nodes],
+    [mindId, mindTitle, rootNodeId, nodes],
   );
   const errorCount = issues.filter(i => i.level === "error").length;
   const warningCount = issues.filter(i => i.level === "warning").length;
 
   const makeNewNode = (type: "question" | "outcome"): Node => ({
     id: crypto.randomUUID(),
-    brain_id: brainId,
+    mind_id: mindId,
     node_type: type,
     question_text: type === "question" ? "" : undefined,
     if_true_node_id: null,
@@ -481,7 +481,7 @@ export function NodeEditor({ nodes, setNodes, rootNodeId, setRootNodeId, brainId
         {showIssues && (
           <div className="max-h-36 overflow-y-auto border-b border-border/50 bg-background/60 px-3 py-2 space-y-1 shrink-0">
             {issues.length === 0 ? (
-              <p className="text-xs text-muted-foreground">This brain is ready to run. Every question leads to an outcome.</p>
+              <p className="text-xs text-muted-foreground">This mind is ready to run. Every question leads to an outcome.</p>
             ) : (
               issues.map((issue, i) => (
                 <button
@@ -597,7 +597,7 @@ export function NodeEditor({ nodes, setNodes, rootNodeId, setRootNodeId, brainId
                           <Sparkles className="w-4 h-4 text-primary shrink-0" />
                           <div className="min-w-0">
                             <p className="text-xs font-semibold text-primary">Built with Skill: {activeNode.skillRef.title} ({activeNode.skillRef.version})</p>
-                            <p className="text-[10px] text-muted-foreground">Snapshot copied — brain works standalone.</p>
+                            <p className="text-[10px] text-muted-foreground">Snapshot copied — mind works standalone.</p>
                           </div>
                         </div>
                         <Button type="button" variant="ghost" size="sm" className="shrink-0 text-xs" onClick={() => void handleUpdateSkill()}>
@@ -625,7 +625,7 @@ export function NodeEditor({ nodes, setNodes, rootNodeId, setRootNodeId, brainId
                         {/* Existing matching habits (click to insert) */}
                         {matchingHabits.length > 0 && (
                           <div className="space-y-1">
-                            <p className="text-[10px] text-muted-foreground">Existing habits matching "{brainTopic}":</p>
+                            <p className="text-[10px] text-muted-foreground">Existing habits matching "{mindTopic}":</p>
                             {matchingHabits.slice(0, 5).map((h) => (
                               <button
                                 key={h.id}

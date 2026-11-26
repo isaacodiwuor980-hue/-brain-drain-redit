@@ -1,5 +1,5 @@
 # ═══════════════════════════════════════════════════════════════════════════
-# Brain Drain — CI/CD Pipeline
+# MindSpool — CI/CD Pipeline
 # ═══════════════════════════════════════════════════════════════════════════
 # On every push/PR: install → lint → typecheck → test → audit → build.
 # On push to main: also build + push Docker image, then deploy (if secrets set).
@@ -79,7 +79,7 @@ jobs:
           context: .
           file: ./Dockerfile
           push: false
-          tags: brain-drain:ci-${{ github.sha }}
+          tags: MindSpool:ci-${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
           load: true
@@ -88,7 +88,7 @@ jobs:
         run: |
           docker run -d --name smoke -p 3000:3000 \
             -e NODE_ENV=production -e PORT=3000 \
-            brain-drain:ci-${{ github.sha }}
+            MindSpool:ci-${{ github.sha }}
           sleep 5
           curl -sf http://localhost:3000/api/healthz | jq -e '.status == "ok"'
           docker stop smoke || true
@@ -116,8 +116,8 @@ jobs:
         run: |
           if [ -z "$RENDER_DEPLOY_HOOK_URL" ]; then
             echo "RENDER_DEPLOY_HOOK_URL not set — skipping deploy."
-            echo "url=https://staging.braindrain.app" >> $GITHUB_OUTPUT
+            echo "url=https://staging.MindSpool.app" >> $GITHUB_OUTPUT
             exit 0
           fi
           curl -X POST "$RENDER_DEPLOY_HOOK_URL"
-          echo "url=https://staging.braindrain.app" >> $GITHUB_OUTPUT
+          echo "url=https://staging.MindSpool.app" >> $GITHUB_OUTPUT

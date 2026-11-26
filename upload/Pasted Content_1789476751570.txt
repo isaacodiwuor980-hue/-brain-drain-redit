@@ -1,8 +1,8 @@
-# BRAIN DRAIN — PRECISION FEATURE ENHANCEMENT, ACCURACY & SAFE EVOLUTION MASTER INSTRUCTION
+# MindSpool — PRECISION FEATURE ENHANCEMENT, ACCURACY & SAFE EVOLUTION MASTER INSTRUCTION
 
 ## ROLE
 
-You are a Principal Product Engineer, Full-Stack Engineer, UX Architect, Systems Designer, and QA Engineer working on the EXISTING Brain Drain application.
+You are a Principal Product Engineer, Full-Stack Engineer, UX Architect, Systems Designer, and QA Engineer working on the EXISTING MindSpool application.
 
 Your responsibility is to inspect, understand, test, and improve the CURRENT application before making changes.
 
@@ -25,11 +25,11 @@ Every requested change must integrate into the existing application architecture
 Before editing anything:
 
 1. Inspect the complete existing codebase.
-2. Identify the current architecture, routes, components, state management, database models, APIs, authentication, Brain system, social system, sharing system, notification system, and existing feature dependencies.
-3. Locate the existing Brain/GitHub-style control system and understand how:
+2. Identify the current architecture, routes, components, state management, database models, APIs, authentication, Mind system, social system, sharing system, notification system, and existing feature dependencies.
+3. Locate the existing Mind/GitHub-style control system and understand how:
 
-   * brains are created
-   * brains are edited
+   * minds are created
+   * minds are edited
    * versions are stored
    * branches are created
    * branches are merged
@@ -52,7 +52,7 @@ DO NOT:
 * delete existing user data
 * change authentication
 * break existing routes
-* replace existing Brain functionality
+* replace existing Mind functionality
 * replace existing social functionality unless explicitly instructed below
 * introduce unnecessary dependencies
 * create mock functionality where real functionality already exists
@@ -84,7 +84,7 @@ Create an understanding of:
 * notification mechanisms
 * existing AI functionality
 * existing social graph
-* existing Brain system
+* existing Mind system
 
 ### Feature map
 
@@ -92,11 +92,11 @@ Locate and understand:
 
 * Home
 * Ask the Community
-* Brain creation
-* Brain attachment
-* Brain editing
-* Brain branches
-* Brain merging
+* Mind creation
+* Mind attachment
+* Mind editing
+* Mind branches
+* Mind merging
 * Posts
 * Share
 * Circles
@@ -155,7 +155,7 @@ Do not globally delete engineering/domain categories from the application.
 
 ---
 
-# 4. ASK THE COMMUNITY → ATTACH BRAIN DECISION
+# 4. ASK THE COMMUNITY → ATTACH MIND DECISION
 
 There is an existing feature in:
 
@@ -163,19 +163,19 @@ There is an existing feature in:
 
 with an option similar to:
 
-> Attach Brain Decision
+> Attach Mind Decision
 
-This feature must become significantly more powerful without interfering with the existing Brain system.
+This feature must become significantly more powerful without interfering with the existing Mind system.
 
-The attached Brain should become a **collaborative problem-solving workspace embedded inside the question**.
+The attached Mind should become a **collaborative problem-solving workspace embedded inside the question**.
 
 ---
 
-# 5. ATTACHED BRAIN — CORE CONCEPT
+# 5. ATTACHED MIND — CORE CONCEPT
 
-A user asking a question should be able to attach a Brain representing the problem they are trying to solve.
+A user asking a question should be able to attach a Mind representing the problem they are trying to solve.
 
-The Brain may be:
+The Mind may be:
 
 * complete
 * partially complete
@@ -208,17 +208,17 @@ Outcome
 
 Some nodes/sections may intentionally remain empty or unresolved.
 
-Do NOT force the asker to complete the Brain before publishing the question.
+Do NOT force the asker to complete the Mind before publishing the question.
 
 ---
 
-# 6. ANSWERING THROUGH THE ATTACHED BRAIN
+# 6. ANSWERING THROUGH THE ATTACHED MIND
 
-When another user opens a question containing an attached Brain, they should be able to interact with the Brain directly.
+When another user opens a question containing an attached Mind, they should be able to interact with the Mind directly.
 
 The responder should be able to:
 
-* inspect the Brain
+* inspect the Mind
 * identify incomplete sections
 * add missing information
 * propose alternatives
@@ -229,28 +229,28 @@ The responder should be able to:
 * propose a solution
 * create a branch
 * compare their approach against other approaches
-* submit their contribution back to the Brain workflow
+* submit their contribution back to the Mind workflow
 
-The responder should NOT automatically overwrite the questioner's main Brain.
+The responder should NOT automatically overwrite the questioner's main Mind.
 
 ---
 
-# 7. GITHUB-STYLE BRAIN COLLABORATION
+# 7. GITHUB-STYLE MIND COLLABORATION
 
 IMPORTANT:
 
-The existing application ALREADY contains a Brain control system inspired by GitHub.
+The existing application ALREADY contains a Mind control system inspired by GitHub.
 
 You MUST inspect and reuse that implementation.
 
 Do NOT create a second independent branch/merge system.
 
-The attached Brain should use the existing Brain version-control architecture wherever technically appropriate.
+The attached Mind should use the existing Mind version-control architecture wherever technically appropriate.
 
 Conceptually:
 
 ```text
-QUESTIONER'S MAIN BRAIN
+QUESTIONER'S MAIN MIND
         │
         ├── Branch A — User 1 solution
         │
@@ -265,19 +265,19 @@ Each contributor should be able to work on a branch rather than destroying the m
 
 ---
 
-# 8. BRAIN BRANCH CONTRIBUTION WORKFLOW
+# 8. MIND BRANCH CONTRIBUTION WORKFLOW
 
 Recommended workflow:
 
 ```text
 Question created
        ↓
-Brain attached
+Mind attached
        ↓
-Community opens Brain
+Community opens Mind
        ↓
 Contributor selects:
-"Contribute to Brain"
+"Contribute to Mind"
        ↓
 Create/continue branch
        ↓
@@ -289,22 +289,22 @@ Submit contribution
        ↓
 Question owner reviews
        ↓
-Compare with main Brain
+Compare with main Mind
        ↓
 Accept / partially accept / reject
        ↓
 Merge accepted contribution
        ↓
-Main Brain becomes stronger
+Main Mind becomes stronger
 ```
 
-The exact implementation MUST follow the existing Brain control system after codebase inspection.
+The exact implementation MUST follow the existing Mind control system after codebase inspection.
 
 ---
 
 # 9. MERGE SYSTEM
 
-The person who originally asked the question owns the decision regarding the main Brain unless existing permissions define a different authority model.
+The person who originally asked the question owns the decision regarding the main Mind unless existing permissions define a different authority model.
 
 Provide a clear review experience.
 
@@ -331,13 +331,13 @@ The owner should be able to see:
 * Reject
 * Continue discussion
 
-Never silently merge external changes into the main Brain.
+Never silently merge external changes into the main Mind.
 
 ---
 
-# 10. PARTIAL BRAIN SUPPORT
+# 10. PARTIAL MIND SUPPORT
 
-The Brain engine must support incomplete structures.
+The Mind engine must support incomplete structures.
 
 For example:
 
@@ -362,15 +362,15 @@ Use clear visual states such as:
 * Conflicting
 * Unresolved
 
-Do not treat incomplete Brain sections as errors.
+Do not treat incomplete Mind sections as errors.
 
-An incomplete Brain is a valid state because the purpose of community collaboration is to help complete it.
+An incomplete Mind is a valid state because the purpose of community collaboration is to help complete it.
 
 ---
 
 # 11. QUESTION SOLUTION STATE
 
-When the main Brain reaches a sufficiently complete state, the question should be able to communicate that progress.
+When the main Mind reaches a sufficiently complete state, the question should be able to communicate that progress.
 
 Possible states:
 
@@ -390,29 +390,29 @@ A question should only become "Solved" according to explicit system/user criteri
 
 ---
 
-# 12. PRESERVE THE EXISTING BRAIN SYSTEM
+# 12. PRESERVE THE EXISTING MIND SYSTEM
 
 This section is extremely important.
 
-The attached Brain feature must NOT:
+The attached Mind feature must NOT:
 
-* replace Brain Studio
-* replace existing Brain collections
-* replace existing Brain editing
-* replace existing Brain version control
+* replace Mind Studio
+* replace existing Mind collections
+* replace existing Mind editing
+* replace existing Mind version control
 * replace existing branch management
 * replace existing merge functionality
-* duplicate Brain storage
-* create an incompatible Brain schema
+* duplicate Mind storage
+* create an incompatible Mind schema
 
 Instead, create a safe integration layer between:
 
 ```text
 Ask the Community
         ↕
-Attached Brain
+Attached Mind
         ↕
-Existing Brain Engine
+Existing Mind Engine
         ↕
 Existing Branch / Version Control
 ```
@@ -504,7 +504,7 @@ Never allow:
 ```text
 Private Post → Public Repost
 Private Circle Post → Public Feed
-Restricted Brain → Unauthorized User
+Restricted Mind → Unauthorized User
 ```
 
 unless the owner explicitly has permission to change visibility.
@@ -533,7 +533,7 @@ Example:
 Saved
 ├── AI Ideas
 ├── Kenya Education
-├── Brain Research
+├── Mind Research
 ├── Business Ideas
 └── Build Later
 ```
@@ -663,7 +663,7 @@ Example:
 Show links to:
 
 * posts
-* Brain collections
+* Mind collections
 * projects
 * Knowledge Artifacts
 * external work
@@ -831,7 +831,7 @@ Existing posts should continue working.
 
 # 27. DECISION TRAILS
 
-For significant Brain/problem-solving activity, support:
+For significant Mind/problem-solving activity, support:
 
 ```text
 Problem
@@ -849,7 +849,7 @@ Implementation
 Outcome
 ```
 
-Where data exists, connect relevant Knowledge Artifacts and Brain branches to the Decision Trail.
+Where data exists, connect relevant Knowledge Artifacts and Mind branches to the Decision Trail.
 
 Do not fabricate missing outcomes.
 
@@ -996,7 +996,7 @@ The recommendation engine should identify potentially valuable connections using
 
 ### 1. Complementary Expertise
 
-Find people whose expertise fills gaps in the user's active Brain collections.
+Find people whose expertise fills gaps in the user's active Mind collections.
 
 ### 2. Conceptual Overlap
 
@@ -1012,7 +1012,7 @@ Use terminology such as:
 
 or:
 
-> Sync Brain Collections
+> Sync Mind Collections
 
 where this terminology already fits the application's UX.
 
@@ -1039,7 +1039,7 @@ Example:
 ```text
 Why this connection?
 
-Your active Brain is focused on:
+Your active Mind is focused on:
 Education + AI
 
 This contributor has:
@@ -1207,8 +1207,8 @@ Test:
 * new accounts
 * old posts
 * new posts
-* old Brains
-* new Brains
+* old Minds
+* new Minds
 * old Circles
 * existing bookmarks
 * existing shares
@@ -1227,8 +1227,8 @@ Specifically test:
 ### Ask Community
 
 * Create question
-* Attach Brain
-* Open Brain
+* Attach Mind
+* Open Mind
 * Edit permitted section
 * Create branch
 * Submit contribution
@@ -1308,7 +1308,7 @@ Every modified feature must work on:
 
 Especially:
 
-* Brain branch review
+* Mind branch review
 * merge comparison
 * Share menu
 * bookmark collections
@@ -1328,8 +1328,8 @@ Examples:
 
 A user cannot:
 
-* merge into another person's main Brain without permission
-* edit private Brains
+* merge into another person's main Mind without permission
+* edit private Minds
 * view private bookmark collections
 * modify another person's collection without permission
 * send content to unauthorized recipients
@@ -1346,8 +1346,8 @@ Integrate notifications with the existing notification engine.
 Relevant events include:
 
 ```text
-Someone contributed to your Brain
-Someone created a Brain branch
+Someone contributed to your Mind
+Someone created a Mind branch
 Someone requested clarification
 Your contribution was merged
 Your contribution was rejected
@@ -1364,7 +1364,7 @@ Do not create a second notification architecture.
 
 Where the application has search, make newly structured entities discoverable where appropriate:
 
-* Brains
+* Minds
 * Knowledge Artifacts
 * public bookmark collections
 * capabilities
@@ -1388,7 +1388,7 @@ Any newly introduced user actions should either:
 
 Do not silently lose:
 
-* Brain contributions
+* Mind contributions
 * bookmark actions
 * post shares
 * comments
@@ -1415,8 +1415,8 @@ Never leave the user wondering whether an operation succeeded.
 
 Validate:
 
-* Brain branch IDs
-* Brain ownership
+* Mind branch IDs
+* Mind ownership
 * merge targets
 * collection permissions
 * recipient permissions
@@ -1475,7 +1475,7 @@ Test:
 * messaging
 * notifications
 
-### Brain
+### Mind
 
 * creation
 * editing
@@ -1483,7 +1483,7 @@ Test:
 * branches
 * merging
 * permissions
-* attached Brain
+* attached Mind
 * community contributions
 
 ### Social
@@ -1549,13 +1549,13 @@ Understand current architecture.
 
 Remove only the unnecessary Homepage labels.
 
-## Phase 3 — Attached Brain
+## Phase 3 — Attached Mind
 
-Integrate Ask the Community with the existing Brain control system.
+Integrate Ask the Community with the existing Mind control system.
 
 ## Phase 4 — Branch collaboration
 
-Enable community Brain contributions using the existing GitHub-style branch architecture.
+Enable community Mind contributions using the existing GitHub-style branch architecture.
 
 ## Phase 5 — Share
 
@@ -1603,7 +1603,7 @@ ALWAYS choose Option B when the existing system can safely support the requireme
 
 The application should have:
 
-> ONE Brain engine
+> ONE Mind engine
 > ONE branch/version system
 > ONE merge system
 > ONE notification system
@@ -1623,10 +1623,10 @@ The implementation is successful only when:
 1. Existing features remain functional.
 2. Existing data remains intact.
 3. Homepage unnecessary labels are removed without destroying taxonomy.
-4. Ask Community can attach an incomplete Brain.
-5. Community members can work on Brain branches.
-6. The question owner can review and merge useful branches into the main Brain.
-7. Existing Brain version control remains the source of truth.
+4. Ask Community can attach an incomplete Mind.
+5. Community members can work on Mind branches.
+6. The question owner can review and merge useful branches into the main Mind.
+7. Existing Mind version control remains the source of truth.
 8. Share as Post works.
 9. Share to Circles works.
 10. Send/share to people works.
@@ -1681,15 +1681,15 @@ FIX REGRESSIONS
 VERIFY
 ```
 
-When inspecting the current application, pay SPECIAL ATTENTION to the existing Brain system because it already contains GitHub-like control functionality.
+When inspecting the current application, pay SPECIAL ATTENTION to the existing Mind system because it already contains GitHub-like control functionality.
 
-The new Ask Community → Attach Brain feature must be an integration with that system, not a replacement.
+The new Ask Community → Attach Mind feature must be an integration with that system, not a replacement.
 
 The central product principle is:
 
-> **A question should be able to contain an incomplete Brain, the community should be able to contribute competing solutions through branches, and the question owner should be able to merge the strongest verified contribution into the main Brain.**
+> **A question should be able to contain an incomplete Mind, the community should be able to contribute competing solutions through branches, and the question owner should be able to merge the strongest verified contribution into the main Mind.**
 
-The final result should make Brain Drain feel like a genuine **collaborative knowledge and decision-building network**, while preserving everything that already works.
+The final result should make MindSpool feel like a genuine **collaborative knowledge and decision-building network**, while preserving everything that already works.
 
 Do not remove features merely because they are unconventional.
 

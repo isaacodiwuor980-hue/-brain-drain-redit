@@ -1,4 +1,4 @@
-# Brain Drain — End-to-End Debug & Launch Report
+# MindSpool — End-to-End Debug & Launch Report
 **Date: 2026-11-15 · Commit: `e704d4e` · All gates green**
 
 ---
@@ -15,7 +15,7 @@
 | B6 | `pages/CommunityPage.tsx:537,540,910,913` | Leave/cancel-join failures = unhandled rejections, no feedback | `.then()` without `.catch` | MED | **Fixed ×4** |
 | B7 | `pages/PersonalityTestPage.tsx:108-114` | 250ms auto-advance timer not cleaned on unmount | Bare `setTimeout` outside effect scope | LOW | **Fixed** |
 | B8 | `pages/HomeFeed.tsx:215-233` | IntersectionObserver leaked per ref change | Cleanup used `unobserve`, never `disconnect()` | MED(LOW) | **Fixed** |
-| B9 | `pages/LibraryPage.tsx:29,52,59-60` | Brain cards dead clicks; ShareModal unreachable (selectedBrain locked `null`) | `onClick={() => {}}`; setter never called | MED | **Fixed** |
+| B9 | `pages/LibraryPage.tsx:29,52,59-60` | Mind cards dead clicks; ShareModal unreachable (selectedMind locked `null`) | `onClick={() => {}}`; setter never called | MED | **Fixed** |
 | B10 | `hooks/use-social.ts:90` | Mode/topic switches didn't cancel in-flight requests; aborts misread as outages | React Query `signal` not forwarded; abort → `ApiError(0)` misclassified | MED | **Fixed** |
 | B11 | `package.json` | 28 client-runtime deps in `devDependencies` (breaks `--production` installs / future SSR) | Metadata placement | LOW | **Fixed** |
 | B12 | `api-server/src/routes/auth-otp.ts:238-240` | OTP returns a mock token; **no UI calls it** | Firebase custom-token issuance not built | MED | **Documented, not fixed** (unused; needs firebase-admin — post-launch) |
@@ -46,7 +46,7 @@
 | `pages/NotificationsPage.tsx` | Click-guard: verifies the post exists in IDB before deep-linking; graceful toast + home otherwise (B5). |
 | `pages/CommunityPage.tsx` | `.catch` → toast on leave/cancel (×4) (B6). |
 | `pages/PersonalityTestPage.tsx` | Timer ref + unmount cleanup (B7). |
-| `pages/LibraryPage.tsx` | Brain cards open a detail dialog; published brains surface the existing ShareModal (B9). |
+| `pages/LibraryPage.tsx` | Mind cards open a detail dialog; published minds surface the existing ShareModal (B9). |
 | `package.json` + lockfile | 28 client deps → `dependencies` (B11); `happy-dom` added for DOM tests. |
 | `.env.example` | (from yesterday's fix) NODE_ENV documentation. |
 
@@ -63,7 +63,7 @@
 | Live: Following tab | dead | ✅ honest empty state + server filter |
 | Live: notification deep-links | broken | ✅ working |
 | Live: mobile 375×812 | — | ✅ 0 horizontal overflow, reloads survive |
-| Live: Library brain dialog (B9) | typecheck only | ✅ **live-verified**: card→detail dialog→ShareModal (private + published) |
+| Live: Library mind dialog (B9) | typecheck only | ✅ **live-verified**: card→detail dialog→ShareModal (private + published) |
 | Live: console (fresh session) | spam/429s | ✅ **0 errors, 0 429s, 0 401s** |
 | Live: preview after restart | — | ✅ healthz 200, feed renders, 0 overflow, 0 console errors |
 | Live: Chrome/Opera Mini feed load | failed (HTTP non-secure context) | ✅ **crypto.randomUUID polyfill** — proven via broken-state simulation (1000/1000 unique v4 UUIDs) |
@@ -78,7 +78,7 @@
 4. **B13/B14**: demo content (mock sessions, demo DMs, fabricated engagement counts) and 4 empty Library tabs are **deliberate seed/placeholder design** — kept per your no-removal rule. Decide post-launch whether to keep or replace.
 5. **Could not verify signed-in flows end-to-end** (Firebase sign-in requires real credentials in the sandbox). The auth-attach fix is verified by code-trace + typecheck + the exact header pattern already proven by `lib/api/feed.ts`. **Re-test onboarding/personality with a real account** (checklist below).
 6. **Following feed with real follows**: server filter verified by code + typecheck; needs a signed-in user who follows someone to verify live (checklist).
-7. ~~Library detail dialog unverified~~ → **RESOLVED**: live-verified by creating a brain (UI wizard + IDB), clicking the card → detail dialog opens with title/type/visibility; published brain → Share button → ShareModal with the correct brain name; private brains correctly show no Share button.
+7. ~~Library detail dialog unverified~~ → **RESOLVED**: live-verified by creating a mind (UI wizard + IDB), clicking the card → detail dialog opens with title/type/visibility; published mind → Share button → ShareModal with the correct mind name; private minds correctly show no Share button.
 
 ## 5. Manual re-test checklist (~10 min)
 
@@ -90,5 +90,5 @@
 6. Create a note post with an HTML attachment containing `<script>alert(1)</script>` → saves fine, renders as **inert text**, no alert.
 7. Open a post → comment → **Upvote then Downvote** (Down should unset Up) → **House then Mouth** (Mouth should unset House) → reload → votes persisted.
 8. Notifications → click items → each opens the referenced post (or a graceful "no longer available" toast — never a broken page).
-9. Library → click a brain card → detail dialog opens; Published brain → "Share with the network" → ShareModal.
+9. Library → click a mind card → detail dialog opens; Published mind → "Share with the network" → ShareModal.
 10. Mobile (375px) → no horizontal scroll, bottom nav works, tabs/composer usable; desktop 1280px → same.

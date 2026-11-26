@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
-import { Brain, BrainData } from "@/lib/types";
+import { Mind, MindData } from "@/lib/types";
 import { useDatabase } from "@/hooks/use-database";
 import { useReputation } from "@/hooks/use-reputation";
 import { useToast } from "@/hooks/use-toast";
-import { BrainCard } from "./BrainCard";
-import { BrainDrawer } from "./BrainDrawer";
+import { MindCard } from "./MindCard";
+import { MindDrawer } from "./MindDrawer";
 import { WizardModal } from "./WizardModal";
 import { ImportModal } from "./ImportModal";
 import { RuntimeEngine } from "./RuntimeEngine";
@@ -13,16 +13,16 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Search, Plus, Network, Share, Download, PlayCircle } from "lucide-react";
 import { idb } from "@/lib/db";
-import { SampleBrainLibrary } from "@/components/ui/SampleBrainLibrary";
+import { SampleMindLibrary } from "@/components/ui/SampleMindLibrary";
 
 export function Dashboard() {
-  const { brains, isLoading, saveBrainData, deleteBrain, exportData, getBrainData, refresh } = useDatabase();
+  const { minds, isLoading, saveMindData, deleteMind, exportData, getMindData, refresh } = useDatabase();
   const { addXPEvent } = useReputation();
   const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState("");
   
   // Modals & Drawers state
-  const [selectedBrain, setSelectedBrain] = useState<Brain | null>(null);
+  const [selectedMind, setSelectedMind] = useState<Mind | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [isWizardOpen, setIsWizardOpen] = useState(false);
   const [isImportOpen, setIsImportOpen] = useState(false);
@@ -31,94 +31,94 @@ export function Dashboard() {
   
   // Forking state
   const [isForkOpen, setIsForkOpen] = useState(false);
-  const [brainToFork, setBrainToFork] = useState<Brain | null>(null);
+  const [mindToFork, setMindToFork] = useState<Mind | null>(null);
   const [forkTitle, setForkTitle] = useState("");
   // Fork guard — prevents duplicate forks on rapid double-click.
   const [isForking, setIsForking] = useState(false);
 
-  // Onboarding sets this flag when a new user taps "Try a sample brain".
+  // Onboarding sets this flag when a new user taps "Try a sample mind".
   useEffect(() => {
     try {
-      if (sessionStorage.getItem("brain-drain-open-sample") === "1") {
-        sessionStorage.removeItem("brain-drain-open-sample");
+      if (sessionStorage.getItem("MindSpool-open-sample") === "1") {
+        sessionStorage.removeItem("MindSpool-open-sample");
         // eslint-disable-next-line react-hooks/set-state-in-effect -- legitimate mount-sync of external storage flag → open samples modal; refactoring to derived state would change behavior (one-time deep-link trigger, not a reactive derivation).
         setIsSamplesOpen(true);
       }
     } catch {
       // ignore private-mode storage errors
     }
-    // CreateMenu deep link: /library?create=brain auto-opens the brain
+    // CreateMenu deep link: /library?create=mind auto-opens the mind
     // wizard once (fired by the "+ Create" launcher in the app shell).
     // Two idempotent paths: window event (already on /library — wouter
     // does not re-run effects for search-only changes) + mount-time
     // query check (navigated from another page).
     const openWizardFromMenu = () => {
       setIsWizardOpen(true);
-      if (window.location.search.includes("create=brain")) {
+      if (window.location.search.includes("create=mind")) {
         window.history.replaceState({}, "", window.location.pathname);
       }
     };
-    if (window.location.search.includes("create=brain")) {
+    if (window.location.search.includes("create=mind")) {
       openWizardFromMenu();
     }
-    window.addEventListener("bd:open-brain-wizard", openWizardFromMenu);
-    return () => window.removeEventListener("bd:open-brain-wizard", openWizardFromMenu);
+    window.addEventListener("bd:open-mind-wizard", openWizardFromMenu);
+    return () => window.removeEventListener("bd:open-mind-wizard", openWizardFromMenu);
   }, []);
 
-  const filteredBrains = brains.filter(b => 
+  const filteredMinds = minds.filter(b => 
     (b.title || "").toLowerCase().includes((searchQuery || "").toLowerCase()) || 
     (b.category || "").toLowerCase().includes((searchQuery || "").toLowerCase())
   );
 
-  const handleCardClick = (brain: Brain) => {
-    setSelectedBrain(brain);
+  const handleCardClick = (mind: Mind) => {
+    setSelectedMind(mind);
     setIsDrawerOpen(true);
   };
 
-  const launchEngine = (brain: Brain) => {
-    setSelectedBrain(brain);
+  const launchEngine = (mind: Mind) => {
+    setSelectedMind(mind);
     setIsEngineOpen(true);
     setIsDrawerOpen(false); // Close drawer behind it
   };
 
-  const handleImportSave = async (data: BrainData[]) => {
+  const handleImportSave = async (data: MindData[]) => {
     for (const d of data) {
-      await saveBrainData(d);
+      await saveMindData(d);
     }
   };
 
-  const openForkDialog = (brain: Brain) => {
-    setBrainToFork(brain);
-    setForkTitle(`Fork of ${brain.title}`);
+  const openForkDialog = (mind: Mind) => {
+    setMindToFork(mind);
+    setForkTitle(`Fork of ${mind.title}`);
     setIsForkOpen(true);
   };
 
-  const handleSampleAdded = async (data: BrainData) => {
-    await saveBrainData(data);
-    await addXPEvent("brain_created", 10, "Tried a sample brain");
+  const handleSampleAdded = async (data: MindData) => {
+    await saveMindData(data);
+    await addXPEvent("mind_created", 10, "Tried a sample mind");
     toast({
       title: "Sample added",
-      description: `"${data.brain.title}" is in your library. You can edit or run it anytime.`,
+      description: `"${data.mind.title}" is in your library. You can edit or run it anytime.`,
     });
   };
 
-  const runBrain = (brain: Brain) => launchEngine(brain);
+  const runMind = (mind: Mind) => launchEngine(mind);
 
   const executeFork = async () => {
-    if (!brainToFork || !forkTitle) return;
+    if (!mindToFork || !forkTitle) return;
     if (isForking) return; // guard against rapid double-click
     setIsForking(true);
     try {
-      const data = await getBrainData(brainToFork.id);
+      const data = await getMindData(mindToFork.id);
       if (!data) return;
-      const { brain, nodes } = data;
+      const { mind, nodes } = data;
 
-      const newBrainId = crypto.randomUUID();
-      const newBrain = {
-        ...brain,
-        id: newBrainId,
+      const newMindId = crypto.randomUUID();
+      const newMind = {
+        ...mind,
+        id: newMindId,
         title: forkTitle,
-        description: `${brain.description || ""}\n\n[Forked from: ${brain.title}]`,
+        description: `${mind.description || ""}\n\n[Forked from: ${mind.title}]`,
         created_at: Date.now()
       };
 
@@ -130,28 +130,28 @@ export function Dashboard() {
       const newNodes = nodes.map(n => ({
         ...n,
         id: idMap.get(n.id)!,
-        brain_id: newBrainId,
+        mind_id: newMindId,
         if_true_node_id: n.if_true_node_id ? idMap.get(n.if_true_node_id) || n.if_true_node_id : n.if_true_node_id,
         if_false_node_id: n.if_false_node_id ? idMap.get(n.if_false_node_id) || n.if_false_node_id : n.if_false_node_id
       }));
 
-      if (newBrain.root_node_id && idMap.has(newBrain.root_node_id)) {
-        newBrain.root_node_id = idMap.get(newBrain.root_node_id)!;
+      if (newMind.root_node_id && idMap.has(newMind.root_node_id)) {
+        newMind.root_node_id = idMap.get(newMind.root_node_id)!;
       } else {
         // BUG FIX: the original root_node_id pointed to a node that doesn't
-        // exist in this brain (deleted, or corrupted). Fall back to the first
-        // question node, then the first node of any type, so the forked brain
+        // exist in this mind (deleted, or corrupted). Fall back to the first
+        // question node, then the first node of any type, so the forked mind
         // is still runnable.
-        newBrain.root_node_id =
+        newMind.root_node_id =
           newNodes.find(n => n.node_type === "question")?.id ?? newNodes[0]?.id ?? null;
       }
 
-      await saveBrainData({ brain: newBrain, nodes: newNodes });
-      await addXPEvent("brain_created", 30, "Forked a brain");
+      await saveMindData({ mind: newMind, nodes: newNodes });
+      await addXPEvent("mind_created", 30, "Forked a mind");
 
-      toast({ title: "Brain forked", description: "Brain forked and saved to your library." });
+      toast({ title: "Mind forked", description: "Mind forked and saved to your library." });
       setIsForkOpen(false);
-      setBrainToFork(null);
+      setMindToFork(null);
     } catch (error) {
       toast({
         title: "Fork failed",
@@ -171,22 +171,22 @@ export function Dashboard() {
           <Input 
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search brains..." 
+            placeholder="Search minds..." 
             className="pl-9 h-9"
           />
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="sm" onClick={() => void exportData().catch((error) => toast({ title: "Export failed", description: error instanceof Error ? error.message : "Could not export data.", variant: "destructive" }))} title="Export" aria-label="Export brains">
+          <Button variant="ghost" size="sm" onClick={() => void exportData().catch((error) => toast({ title: "Export failed", description: error instanceof Error ? error.message : "Could not export data.", variant: "destructive" }))} title="Export" aria-label="Export minds">
             <Share className="w-4 h-4" />
           </Button>
-          <Button variant="ghost" size="sm" onClick={() => setIsImportOpen(true)} title="Import" aria-label="Import brains">
+          <Button variant="ghost" size="sm" onClick={() => setIsImportOpen(true)} title="Import" aria-label="Import minds">
             <Download className="w-4 h-4" />
           </Button>
           <Button variant="outline" size="sm" onClick={() => setIsSamplesOpen(true)} className="gap-2">
             <PlayCircle className="w-4 h-4" /> Samples
           </Button>
           <Button size="sm" onClick={() => setIsWizardOpen(true)}>
-            <Plus className="w-4 h-4 mr-2" /> New Brain
+            <Plus className="w-4 h-4 mr-2" /> New Mind
           </Button>
         </div>
       </div>
@@ -198,19 +198,19 @@ export function Dashboard() {
           </div>
         ) : (
           <>
-            {filteredBrains.length === 0 ? (
+            {filteredMinds.length === 0 ? (
               <div className="text-center py-20 border border-dashed border-border/50 rounded-[16px] bg-card/30">
                 <Network className="w-12 h-12 text-muted-foreground/50 mx-auto mb-4" />
                 {searchQuery ? (
                   <>
-                    <h3 className="text-lg font-medium mb-1">No brains found</h3>
+                    <h3 className="text-lg font-medium mb-1">No minds found</h3>
                     <p className="text-muted-foreground">Adjust your search or create a new expert system.</p>
                   </>
                 ) : (
                   <>
                     <h3 className="text-lg font-medium mb-1">Start with a sample</h3>
                     <p className="text-muted-foreground max-w-sm mx-auto mb-6">
-                      Try a ready-made decision brain to see how it works, then fork and edit it into your own.
+                      Try a ready-made decision mind to see how it works, then fork and edit it into your own.
                     </p>
                     <div className="flex items-center justify-center gap-3">
                       <Button onClick={() => setIsSamplesOpen(true)} className="gap-2">
@@ -233,19 +233,19 @@ export function Dashboard() {
               <div
                 className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"
               >
-                {filteredBrains.map((brain, i) => (
+                {filteredMinds.map((mind, i) => (
                   <div
-                    key={brain.id}
+                    key={mind.id}
                     style={{
                       contentVisibility: 'auto',
                       containIntrinsicSize: '200px',
-                      animation: 'brain-card-in 240ms cubic-bezier(0.2, 0.9, 0.3, 1) both',
+                      animation: 'mind-card-in 240ms cubic-bezier(0.2, 0.9, 0.3, 1) both',
                       animationDelay: `${Math.min(i, 12) * 40}ms`,
                     }}
                   >
-                    <BrainCard
-                      brain={brain}
-                      onClick={() => handleCardClick(brain)}
+                    <MindCard
+                      mind={mind}
+                      onClick={() => handleCardClick(mind)}
                       onFork={openForkDialog}
                       onUpdated={refresh}
                     />
@@ -257,27 +257,27 @@ export function Dashboard() {
         )}
       </div>
 
-      <BrainDrawer 
-        brain={selectedBrain}
+      <MindDrawer 
+        mind={selectedMind}
         isOpen={isDrawerOpen}
         onClose={() => setIsDrawerOpen(false)}
         onLaunch={launchEngine}
-        onDelete={deleteBrain}
+        onDelete={deleteMind}
         onUpdated={refresh}
         onFork={(b) => { setIsDrawerOpen(false); openForkDialog(b); }}
         onExport={(b) => {
           // Simple single export
-          idb.getAllByIndex("nodes", "brain_id", b.id).then(nodes => {
-            const exportObj = { brains: [b], nodes };
+          idb.getAllByIndex("nodes", "mind_id", b.id).then(nodes => {
+            const exportObj = { minds: [b], nodes };
             const blob = new Blob([JSON.stringify(exportObj, null, 2)], { type: "application/json" });
             const url = URL.createObjectURL(blob);
             const a = document.createElement("a");
             a.href = url;
-            a.download = `${(b.title || "brain").replace(/\s+/g, '-').toLowerCase()}-export.json`;
+            a.download = `${(b.title || "mind").replace(/\s+/g, '-').toLowerCase()}-export.json`;
             a.click();
             URL.revokeObjectURL(url);
           }).catch(() => {
-            toast({ title: "Export failed", description: "Could not read brain data.", variant: "destructive" });
+            toast({ title: "Export failed", description: "Could not read mind data.", variant: "destructive" });
           });
         }}
       />
@@ -285,7 +285,7 @@ export function Dashboard() {
       <WizardModal 
         isOpen={isWizardOpen}
         onClose={() => setIsWizardOpen(false)}
-        onSave={saveBrainData}
+        onSave={saveMindData}
       />
 
       <ImportModal
@@ -294,15 +294,15 @@ export function Dashboard() {
         onImport={handleImportSave}
       />
 
-      <SampleBrainLibrary
+      <SampleMindLibrary
         open={isSamplesOpen}
         onOpenChange={setIsSamplesOpen}
         onSampleAdded={handleSampleAdded}
-        onRunBrain={runBrain}
+        onRunMind={runMind}
       />
 
       <RuntimeEngine
-        brain={selectedBrain}
+        mind={selectedMind}
         isOpen={isEngineOpen}
         onClose={() => setIsEngineOpen(false)}
       />
@@ -310,9 +310,9 @@ export function Dashboard() {
       <Dialog open={isForkOpen} onOpenChange={setIsForkOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Fork Brain</DialogTitle>
+            <DialogTitle>Fork Mind</DialogTitle>
             <DialogDescription>
-              Create a copy of this brain in your library to modify.
+              Create a copy of this mind in your library to modify.
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
@@ -324,7 +324,7 @@ export function Dashboard() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsForkOpen(false)}>Cancel</Button>
             <Button onClick={executeFork} disabled={isForking || !forkTitle}>
-              {isForking ? "Forking…" : "Fork Brain"}
+              {isForking ? "Forking…" : "Fork Mind"}
             </Button>
           </DialogFooter>
         </DialogContent>

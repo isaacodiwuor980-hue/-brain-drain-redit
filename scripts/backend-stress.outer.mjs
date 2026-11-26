@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * backend-stress.mjs — Brain Drain backend simulation + stress test.
+ * backend-stress.mjs — MindSpool backend simulation + stress test.
  *
  * Hits every API route with: happy-path, edge-case (empty / huge / weird-types),
  * no-auth, bad-auth, malformed-JSON, and concurrent-burst inputs. Reports any
@@ -123,12 +123,12 @@ console.log("\n=== B. Public reads (no auth) ===");
   expectStatus("GET /api/topics", r, 200);
   if (Array.isArray(r.body) && r.body.length === 0) line("WARN", `/api/topics returned empty array`);
 
-  r = await hit("GET", "/api/brains");
-  expectStatus("GET /api/brains (no auth)", r, 200);
+  r = await hit("GET", "/api/minds");
+  expectStatus("GET /api/minds (no auth)", r, 200);
 
-  r = await hit("GET", "/api/brains/nonexistent-id-12345");
-  if (r.status === 200 || r.status === 404) line("PASS", `GET /api/brains/:id (nonexistent) — ${r.status}`);
-  else expectStatus("GET /api/brains/:id (nonexistent)", r, 200);
+  r = await hit("GET", "/api/minds/nonexistent-id-12345");
+  if (r.status === 200 || r.status === 404) line("PASS", `GET /api/minds/:id (nonexistent) — ${r.status}`);
+  else expectStatus("GET /api/minds/:id (nonexistent)", r, 200);
 
   r = await hit("GET", "/api/v1/skills");
   expectStatus("GET /api/v1/skills", r, 200);
@@ -159,8 +159,8 @@ console.log("\n=== B. Public reads (no auth) ===");
   r = await hit("GET", "/api/intelligence/summary");
   expectStatus("GET /api/intelligence/summary", r, 200);
 
-  r = await hit("GET", "/api/recommendations/brains");
-  expectStatus("GET /api/recommendations/brains", r, 200);
+  r = await hit("GET", "/api/recommendations/minds");
+  expectStatus("GET /api/recommendations/minds", r, 200);
 
   r = await hit("GET", "/api/v1/verify/test-user-id");
   if (r.status === 200 || r.status === 404 || r.status === 501) line("PASS", `GET /api/v1/verify/:userId — ${r.status}`);
@@ -194,15 +194,15 @@ console.log("\n=== C. Auth-protected writes WITHOUT auth (should 401) ===");
   else if (r.status >= 500) { bugs.push({ label: "POST /api/topics/follow no-auth", kind: "5XX", status: r.status }); line("FAIL", `POST /api/topics/follow (no auth) — ${r.status}`); }
   else line("WARN", `POST /api/topics/follow (no auth) — got ${r.status}`);
 
-  r = await hit("POST", "/api/brains", { body: { title: "test" } });
-  if (r.status === 401 || r.status === 403) line("PASS", `POST /api/brains (no auth) — ${r.status}`);
-  else if (r.status >= 500) { bugs.push({ label: "POST /api/brains no-auth", kind: "5XX", status: r.status }); line("FAIL", `POST /api/brains (no auth) — ${r.status}`); }
-  else line("WARN", `POST /api/brains (no auth) — got ${r.status}`);
+  r = await hit("POST", "/api/minds", { body: { title: "test" } });
+  if (r.status === 401 || r.status === 403) line("PASS", `POST /api/minds (no auth) — ${r.status}`);
+  else if (r.status >= 500) { bugs.push({ label: "POST /api/minds no-auth", kind: "5XX", status: r.status }); line("FAIL", `POST /api/minds (no auth) — ${r.status}`); }
+  else line("WARN", `POST /api/minds (no auth) — got ${r.status}`);
 
-  r = await hit("DELETE", "/api/brains/fake-id");
-  if (r.status === 401 || r.status === 403) line("PASS", `DELETE /api/brains/:id (no auth) — ${r.status}`);
-  else if (r.status >= 500) { bugs.push({ label: "DELETE /api/brains no-auth", kind: "5XX", status: r.status }); line("FAIL", `DELETE /api/brains/:id (no auth) — ${r.status}`); }
-  else line("WARN", `DELETE /api/brains/:id (no auth) — got ${r.status}`);
+  r = await hit("DELETE", "/api/minds/fake-id");
+  if (r.status === 401 || r.status === 403) line("PASS", `DELETE /api/minds/:id (no auth) — ${r.status}`);
+  else if (r.status >= 500) { bugs.push({ label: "DELETE /api/minds no-auth", kind: "5XX", status: r.status }); line("FAIL", `DELETE /api/minds/:id (no auth) — ${r.status}`); }
+  else line("WARN", `DELETE /api/minds/:id (no auth) — got ${r.status}`);
 
   r = await hit("PUT", "/api/v1/skills", { body: { id: "x", title: "y" } });
   if (r.status === 401 || r.status === 403) line("PASS", `PUT /api/v1/skills (no auth) — ${r.status}`);
@@ -334,8 +334,8 @@ console.log("\n=== F. Edge-case query strings ===");
     "/api/v1/search/skills?q=" + encodeURIComponent("<script>alert(1)</script>"),
     "/api/v1/search/skills?q=" + encodeURIComponent("a".repeat(10000)),
     "/api/v1/habits/search?q=" + encodeURIComponent("'OR'1'='1"),
-    "/api/recommendations/brains?limit=0",
-    "/api/recommendations/brains?topic=" + encodeURIComponent("nonexistent"),
+    "/api/recommendations/minds?limit=0",
+    "/api/recommendations/minds?topic=" + encodeURIComponent("nonexistent"),
     "/api/v1/datasets?cursor=invalid",
   ];
   for (const p of paths) {
@@ -376,15 +376,15 @@ console.log("\n=== H. Mixed burst (different endpoints in parallel) ===");
     "GET /api/ready",
     "GET /api/feed",
     "GET /api/topics",
-    "GET /api/brains",
+    "GET /api/minds",
     "GET /api/v1/skills",
     "GET /api/v1/habits",
     "GET /api/intelligence/summary",
-    "GET /api/recommendations/brains",
+    "GET /api/recommendations/minds",
     "GET /api/v1/datasets",
     "GET /api/events/summary",
     "GET /api/v1/search/skills?q=math",
-    "GET /api/v1/search?q=brain",
+    "GET /api/v1/search?q=mind",
     "POST /api/client-errors",
     "POST /api/events",
   ];

@@ -29,7 +29,7 @@ import { requireAuth } from "../middleware/auth";
 const router: IRouter = Router();
 
 const RecordSchema = z.object({
-  brainId: z.string().uuid().optional(),
+  mindId: z.string().uuid().optional(),
   topicId: z.string().max(80).optional(),
   quality: z.number().int().min(0).max(5),
   // Optional: previous SM-2 state. If omitted, defaults are used (rep=0, int=0, ef=2.5).
@@ -112,7 +112,7 @@ router.post("/recall", requireAuth, async (req, res) => {
   try {
     await supabase.insert("recall_events", {
       user_id: req.auth!.uid,
-      brain_id: parsed.data.brainId || null,
+      mind_id: parsed.data.mindId || null,
       topic_id: parsed.data.topicId || null,
       quality: parsed.data.quality,
       sm2_state_before: prev,
@@ -152,11 +152,11 @@ router.get("/recall/due", requireAuth, async (req, res) => {
     const nowIso = new Date().toISOString();
     const rows = await supabase.get<{
       id: string;
-      brain_id: string | null;
+      mind_id: string | null;
       topic_id: string | null;
       next_recall_at: string;
     }>("recall_events", {
-      select: "id,brain_id,topic_id,next_recall_at",
+      select: "id,mind_id,topic_id,next_recall_at",
       filters: {
         user_id: `eq.${req.auth!.uid}`,
         next_recall_at: `lte.${nowIso}`,
@@ -168,7 +168,7 @@ router.get("/recall/due", requireAuth, async (req, res) => {
     res.json({
       due: rows.map((r) => ({
         id: r.id,
-        brainId: r.brain_id,
+        mindId: r.mind_id,
         topicId: r.topic_id,
         nextRecallAt: r.next_recall_at,
       })),
@@ -198,14 +198,14 @@ router.get("/recall/history", requireAuth, async (req, res) => {
   try {
     const rows = await supabase.get<{
       id: string;
-      brain_id: string | null;
+      mind_id: string | null;
       topic_id: string | null;
       quality: number;
       sm2_state_after: Sm2State;
       next_recall_at: string;
       recalled_at: string;
     }>("recall_events", {
-      select: "id,brain_id,topic_id,quality,sm2_state_after,next_recall_at,recalled_at",
+      select: "id,mind_id,topic_id,quality,sm2_state_after,next_recall_at,recalled_at",
       filters: { user_id: `eq.${req.auth!.uid}` },
       order: { column: "recalled_at", ascending: false },
       limit,
@@ -214,7 +214,7 @@ router.get("/recall/history", requireAuth, async (req, res) => {
     res.json({
       history: rows.map((r) => ({
         id: r.id,
-        brainId: r.brain_id,
+        mindId: r.mind_id,
         topicId: r.topic_id,
         quality: r.quality,
         sm2State: r.sm2_state_after,

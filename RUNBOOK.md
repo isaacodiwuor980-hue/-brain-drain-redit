@@ -1,4 +1,4 @@
-# Runbook — Brain Drain
+# Runbook — MindSpool
 
 ## On-call rotation
 

@@ -1,10 +1,10 @@
 # ═══════════════════════════════════════════════════════════════════════════
-# Brain Drain — Multi-stage production Dockerfile
+# MindSpool — Multi-stage production Dockerfile
 # ═══════════════════════════════════════════════════════════════════════════
 # Build:
-#   docker build -t brain-drain:latest .
+#   docker build -t MindSpool:latest .
 # Run:
-#   docker run -p 3000:3000 --env-file .env brain-drain:latest
+#   docker run -p 3000:3000 --env-file .env MindSpool:latest
 #
 # Image size: ~180MB (node:22-alpine base + dist/ + node_modules)
 # Runs as non-root user. No secrets baked into the image.

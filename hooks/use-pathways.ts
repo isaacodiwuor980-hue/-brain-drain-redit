@@ -108,10 +108,10 @@ export function usePathways() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["pathways"] }),
   });
 
-  const attachBrainToMilestoneMutation = useMutation({
-    mutationFn: async ({ pathwayId, milestoneId, brainId }: { pathwayId: string; milestoneId: string; brainId: string | undefined }) => {
+  const attachMindToMilestoneMutation = useMutation({
+    mutationFn: async ({ pathwayId, milestoneId, mindId }: { pathwayId: string; milestoneId: string; mindId: string | undefined }) => {
       return updatePathwayMilestones(pathwayId, (milestones) =>
-        milestones.map(m => m.id === milestoneId ? { ...m, linkedBrainId: brainId, updatedAt: Date.now() } : m),
+        milestones.map(m => m.id === milestoneId ? { ...m, linkedMindId: mindId, updatedAt: Date.now() } : m),
       );
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["pathways"] }),
@@ -172,7 +172,7 @@ export function usePathways() {
    *
    * The post body is the scenario text, prefixed with a header line so
    * the feed can render it distinctly. The post links back to the
-   * pathway + milestone via brainId (reusing the existing field) so the
+   * pathway + milestone via mindId (reusing the existing field) so the
    * feed can show a "from pathway X · milestone Y" badge.
    *
    * Returns the created Post.
@@ -194,7 +194,7 @@ export function usePathways() {
         title: `Daily cognitive scenario: ${milestone.title}`,
         content: milestone.cognitiveScenario.trim(),
         postType: "post",
-        brainId: milestone.linkedBrainId,
+        mindId: milestone.linkedMindId,
         reactions: { upvote: 0, downvote: 0 },
         commentCount: 0,
         createdAt: Date.now(),
@@ -219,7 +219,7 @@ export function usePathways() {
     // Milestone operations — all return the updated Pathway.
     addMilestone: (pathwayId: string, title: string) => addMilestoneMutation.mutateAsync({ pathwayId, title }),
     renameMilestone: (pathwayId: string, milestoneId: string, title: string) => renameMilestoneMutation.mutateAsync({ pathwayId, milestoneId, title }),
-    attachBrainToMilestone: (pathwayId: string, milestoneId: string, brainId: string | undefined) => attachBrainToMilestoneMutation.mutateAsync({ pathwayId, milestoneId, brainId }),
+    attachMindToMilestone: (pathwayId: string, milestoneId: string, mindId: string | undefined) => attachMindToMilestoneMutation.mutateAsync({ pathwayId, milestoneId, mindId }),
     setCognitiveScenario: (pathwayId: string, milestoneId: string, scenario: string) => setCognitiveScenarioMutation.mutateAsync({ pathwayId, milestoneId, scenario }),
     completeMilestone: (pathwayId: string, milestoneId: string, completionNotes?: string) => completeMilestoneMutation.mutateAsync({ pathwayId, milestoneId, completionNotes }),
     uncompleteMilestone: (pathwayId: string, milestoneId: string) => uncompleteMilestoneMutation.mutateAsync({ pathwayId, milestoneId }),

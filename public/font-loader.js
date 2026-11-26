@@ -1,5 +1,5 @@
 /**
- * Brain Drain — font loader (external, CSP-compliant).
+ * MindSpool — font loader (external, CSP-compliant).
  *
  * Why an external file: index.html previously used the classic
  * `<link media="print" onload="this.media='all'">` async-CSS trick, but the

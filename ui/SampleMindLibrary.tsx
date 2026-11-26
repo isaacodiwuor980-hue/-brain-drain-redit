@@ -10,29 +10,29 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { PlayCircle, Plus, Check, Search as SearchIcon } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { SAMPLE_BRAINS, instantiateSample, type SampleBrain } from "@/lib/sample-brains";
-import type { Brain, Node } from "@/lib/types";
+import { SAMPLE_MINDS, instantiateSample, type SampleMind } from "@/lib/sample-minds";
+import type { Mind, Node } from "@/lib/types";
 
-interface SampleBrainLibraryProps {
+interface SampleMindLibraryProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   /** Called after a sample is added to the library. */
-  onSampleAdded: (data: { brain: Brain; nodes: Node[] }) => void | Promise<void>;
-  /** If provided, called to immediately run the brain instead of only adding it. */
-  onRunBrain?: (brain: Brain) => void;
+  onSampleAdded: (data: { mind: Mind; nodes: Node[] }) => void | Promise<void>;
+  /** If provided, called to immediately run the mind instead of only adding it. */
+  onRunMind?: (mind: Mind) => void;
 }
 
-export function SampleBrainLibrary({
+export function SampleMindLibrary({
   open,
   onOpenChange,
   onSampleAdded,
-  onRunBrain,
-}: SampleBrainLibraryProps) {
+  onRunMind,
+}: SampleMindLibraryProps) {
   const [query, setQuery] = useState("");
   const [addingId, setAddingId] = useState<string | null>(null);
   const [addedIds, setAddedIds] = useState<Set<string>>(new Set());
 
-  const filtered = SAMPLE_BRAINS.filter((s) => {
+  const filtered = SAMPLE_MINDS.filter((s) => {
     const q = query.trim().toLowerCase();
     if (!q) return true;
     return (
@@ -42,14 +42,14 @@ export function SampleBrainLibrary({
     );
   });
 
-  const handleAdd = async (sample: SampleBrain, run = false) => {
+  const handleAdd = async (sample: SampleMind, run = false) => {
     setAddingId(sample.id);
     try {
       const data = instantiateSample(sample);
       await onSampleAdded(data);
       setAddedIds((prev) => new Set(prev).add(sample.id));
-      if (run && onRunBrain) {
-        onRunBrain(data.brain);
+      if (run && onRunMind) {
+        onRunMind(data.mind);
         onOpenChange(false);
       }
     } finally {
@@ -63,7 +63,7 @@ export function SampleBrainLibrary({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-xl">
             <PlayCircle className="w-5 h-5 text-primary" />
-            Try a sample brain
+            Try a sample mind
           </DialogTitle>
           <DialogDescription>
             Ready-made decision guides. Tap{" "}
@@ -79,7 +79,7 @@ export function SampleBrainLibrary({
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search samples…"
             className="pl-9"
-            aria-label="Search sample brains"
+            aria-label="Search sample minds"
           />
         </div>
 

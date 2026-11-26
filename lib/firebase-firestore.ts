@@ -2,7 +2,7 @@ import { getFirestore, initializeFirestore, memoryLocalCache } from "firebase/fi
 import { firebaseApp, firebaseConfig } from "./firebase-app";
 
 /**
- * Firestore instance for the Brain Drain app.
+ * Firestore instance for the MindSpool app.
  *
  * CRITICAL: We initialize Firestore with MEMORY-ONLY persistence (no
  * IndexedDB cache). This is intentional because:

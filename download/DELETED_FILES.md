@@ -25,7 +25,7 @@ Every item below was **proven unused** before deletion: BFS import-graph resolut
 
 ## Dead library tab components (2 files)
 
-`library/BrainDNA.tsx`, `library/ReadTab.tsx` — zero importers; `lib/types.ts` defines its own `BrainDNA` interface (independent of the component); the smoke-test only asserts their absence.
+`library/MindDNA.tsx`, `library/ReadTab.tsx` — zero importers; `lib/types.ts` defines its own `MindDNA` interface (independent of the component); the smoke-test only asserts their absence.
 
 ## Backend (1 file)
 

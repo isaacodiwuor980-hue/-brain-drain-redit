@@ -1,4 +1,4 @@
-@workspace/brain-builder@0.0.0 /home/z/my-project/BRAIN-DRAIN-latest-
+@workspace/mind-builder@0.0.0 /home/z/my-project/MindSpool-latest-
 ├── @eslint/js@10.0.1
 ├── @radix-ui/react-alert-dialog@1.1.23
 ├── @radix-ui/react-avatar@1.2.6

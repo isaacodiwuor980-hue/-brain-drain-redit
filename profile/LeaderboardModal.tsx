@@ -27,7 +27,7 @@ export function LeaderboardModal() {
           </div>
           <div>
             <h3 className="text-base font-bold text-foreground">Cognitive Leaderboard</h3>
-            <p className="text-xs text-muted-foreground">Top reasoning minds and brain architects</p>
+            <p className="text-xs text-muted-foreground">Top reasoning minds and mind architects</p>
           </div>
         </div>
 

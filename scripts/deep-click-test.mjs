@@ -57,7 +57,7 @@ function getRefs() {
 const pages = [
   { name: "Home", url: "/", stay: true },
   { name: "Search", url: "/search", stay: true },
-  { name: "Library (Brains)", url: "/library", stay: true },
+  { name: "Library (Minds)", url: "/library", stay: true },
   { name: "Missions (Pathways)", url: "/missions", stay: true },
   { name: "Topics", url: "/topics", stay: true },
   { name: "Community", url: "/community", stay: true },

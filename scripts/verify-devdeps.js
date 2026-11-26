@@ -3,7 +3,7 @@
 const fs = require("fs");
 const path = require("path");
 
-const ROOT = "/home/z/my-project/BRAIN-DRAIN-latest-";
+const ROOT = "/home/z/my-project/MindSpool-latest-";
 const skip = ["node_modules", ".git", "dist", "mockup-sandbox", ".vite"];
 
 let files = [];

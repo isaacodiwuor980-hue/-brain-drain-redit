@@ -1,4 +1,4 @@
--- Brain Drain Pro — initial production schema
+-- MindSpool Pro — initial production schema
 -- Supabase / Postgres
 --
 -- Design principles:
@@ -51,9 +51,9 @@ create table if not exists public.topic_followers (
 );
 
 -- ---------------------------------------------------------------------------
--- Brains and nodes
+-- Minds and nodes
 -- ---------------------------------------------------------------------------
-create table if not exists public.brains (
+create table if not exists public.minds (
   id text primary key,
   author_id uuid references auth.users(id) on delete set null,
   title text not null,
@@ -68,23 +68,23 @@ create table if not exists public.brains (
   updated_at timestamptz not null default now()
 );
 
-create index if not exists brains_author_idx on public.brains(author_id);
-create index if not exists brains_public_idx on public.brains(is_public) where is_public = true;
+create index if not exists minds_author_idx on public.minds(author_id);
+create index if not exists minds_public_idx on public.minds(is_public) where is_public = true;
 
-create table if not exists public.brain_nodes (
+create table if not exists public.mind_nodes (
   id text primary key,
-  brain_id text not null references public.brains(id) on delete cascade,
+  mind_id text not null references public.minds(id) on delete cascade,
   node_type text not null check (node_type in ('question', 'outcome')),
   question_text text,
   result_text text,
   next_steps text,
-  if_true_node_id text references public.brain_nodes(id) on delete set null,
-  if_false_node_id text references public.brain_nodes(id) on delete set null,
+  if_true_node_id text references public.mind_nodes(id) on delete set null,
+  if_false_node_id text references public.mind_nodes(id) on delete set null,
   attachments jsonb not null default '[]'::jsonb,
   position jsonb
 );
 
-create index if not exists brain_nodes_brain_idx on public.brain_nodes(brain_id);
+create index if not exists mind_nodes_mind_idx on public.mind_nodes(mind_id);
 
 -- ---------------------------------------------------------------------------
 -- Posts, comments, reactions
@@ -97,7 +97,7 @@ create table if not exists public.posts (
   post_type text not null default 'post',
   event jsonb,
   media_urls text[] not null default '{}',
-  brain_id text references public.brains(id) on delete set null,
+  mind_id text references public.minds(id) on delete set null,
   comment_count integer not null default 0,
   repost_count integer not null default 0,
   created_at timestamptz not null default now()
@@ -217,7 +217,7 @@ create table if not exists public.reputation (
   streak integer not null default 0,
   last_active_date date,
   total_missions_completed integer not null default 0,
-  total_brains_created integer not null default 0,
+  total_minds_created integer not null default 0,
   total_check_ins integer not null default 0,
   badges text[] not null default '{}',
   updated_at timestamptz not null default now()
@@ -254,7 +254,7 @@ create table if not exists public.check_ins (
   upvotes integer not null default 0,
   downvotes integer not null default 0,
   replies jsonb not null default '[]'::jsonb,
-  linked_brain_id text,
+  linked_mind_id text,
   created_at timestamptz not null default now()
 );
 
@@ -268,7 +268,7 @@ create table if not exists public.conversations (
   last_message text,
   last_message_at timestamptz,
   unread_count integer not null default 0,
-  is_brain boolean not null default false,
+  is_mind boolean not null default false,
   created_at timestamptz not null default now()
 );
 
@@ -315,7 +315,7 @@ create table if not exists public.pathways (
   title text not null,
   description text not null default '',
   category text not null default '',
-  brain_ids text[] not null default '{}',
+  mind_ids text[] not null default '{}',
   forked_from_id text references public.pathways(id) on delete set null,
   fork_count integer not null default 0,
   created_at timestamptz not null default now()
@@ -359,8 +359,8 @@ create table if not exists public.post_scores (
   updated_at timestamptz not null default now()
 );
 
-create table if not exists public.brain_scores (
-  brain_id text primary key references public.brains(id) on delete cascade,
+create table if not exists public.mind_scores (
+  mind_id text primary key references public.minds(id) on delete cascade,
   launch_count integer not null default 0,
   save_count integer not null default 0,
   share_count integer not null default 0,
@@ -391,8 +391,8 @@ do $$
 declare t text;
 begin
   foreach t in array array[
-    'profiles','brains','missions','reputation','pathways',
-    'user_topic_affinity','post_scores','brain_scores','mission_scores'
+    'profiles','minds','missions','reputation','pathways',
+    'user_topic_affinity','post_scores','mind_scores','mission_scores'
   ] loop
     execute format(
       'drop trigger if exists set_updated_at on public.%I; ' ||
@@ -433,12 +433,12 @@ do $$
 declare t text;
 begin
   foreach t in array array[
-    'profiles','topics','topic_followers','brains','brain_nodes',
+    'profiles','topics','topic_followers','minds','mind_nodes',
     'posts','comments','reactions','missions','milestones',
     'xp_events','reputation','communities','community_members','check_ins',
     'conversations','conversation_participants','messages','notifications',
     'pathways','analytics_events','user_topic_affinity','post_scores',
-    'brain_scores','mission_scores'
+    'mind_scores','mission_scores'
   ] loop
     execute format('alter table public.%I enable row level security;', t);
   end loop;
@@ -463,35 +463,35 @@ create policy "users can unfollow topics"
   on public.topic_followers for delete
   using (auth.uid() = user_id);
 
--- Brains: public brains and own brains are readable; only the author writes.
-create policy "brains readable if public or own"
-  on public.brains for select
+-- Minds: public minds and own minds are readable; only the author writes.
+create policy "minds readable if public or own"
+  on public.minds for select
   using (is_public = true or author_id = auth.uid());
-create policy "authors can insert their own brains"
-  on public.brains for insert
+create policy "authors can insert their own minds"
+  on public.minds for insert
   with check (author_id = auth.uid());
-create policy "authors can update their own brains"
-  on public.brains for update
+create policy "authors can update their own minds"
+  on public.minds for update
   using (author_id = auth.uid());
-create policy "authors can delete their own brains"
-  on public.brains for delete
+create policy "authors can delete their own minds"
+  on public.minds for delete
   using (author_id = auth.uid());
 
-create policy "brain nodes readable for readable brains"
-  on public.brain_nodes for select
+create policy "mind nodes readable for readable minds"
+  on public.mind_nodes for select
   using (
     exists (
-      select 1 from public.brains b
-      where b.id = brain_nodes.brain_id
+      select 1 from public.minds b
+      where b.id = mind_nodes.mind_id
         and (b.is_public = true or b.author_id = auth.uid())
     )
   );
-create policy "authors can write their own brain nodes"
-  on public.brain_nodes for all
+create policy "authors can write their own mind nodes"
+  on public.mind_nodes for all
   using (
     exists (
-      select 1 from public.brains b
-      where b.id = brain_nodes.brain_id and b.author_id = auth.uid()
+      select 1 from public.minds b
+      where b.id = mind_nodes.mind_id and b.author_id = auth.uid()
     )
   );
 

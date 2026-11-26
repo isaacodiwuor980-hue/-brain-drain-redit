@@ -23,7 +23,7 @@ import { ProfileJourneyChart } from "@/profile/ProfileJourneyChart";
 import { LeaderboardModal } from "@/profile/LeaderboardModal";
 import { ProfileNote } from "@/profile/ProfileNote";
 import { idb } from "@/lib/db";
-import { Post, Brain as BrainType, CircleCheckIn, UserProfile } from "@/lib/types";
+import { Post, Mind as MindType, CircleCheckIn, UserProfile } from "@/lib/types";
 
 function getLevelTitle(level: number) {
   if (level <= 5) return "Initiate";
@@ -98,9 +98,9 @@ export function ProfilePage() {
   useEffect(() => {
     async function fetchActivity() {
       try {
-        const [posts, brains, checkins] = await Promise.all([
+        const [posts, minds, checkins] = await Promise.all([
           idb.getAll<Post>("posts"),
-          idb.getAll<BrainType>("brains"),
+          idb.getAll<MindType>("minds"),
           idb.getAll<CircleCheckIn>("checkins")
         ]);
 
@@ -115,7 +115,7 @@ export function ProfilePage() {
           return item.userId === currentUserId || item.userId === LEGACY_USER_ID;
         };
 
-        const countItem = (type: "post" | "brain" | "checkin", item: ActivityItem) => {
+        const countItem = (type: "post" | "mind" | "checkin", item: ActivityItem) => {
           if (!isOwnItem(item)) return; 
           const d = new Date(item.createdAt || Date.now());
           const key = d.toISOString().split("T")[0];
@@ -128,7 +128,7 @@ export function ProfilePage() {
         };
 
         posts.forEach((p) => countItem('post', p));
-        brains.forEach((b) => countItem('brain', b));
+        minds.forEach((b) => countItem('mind', b));
         checkins.forEach((c) => countItem('checkin', c));
 
         const weeks = [];
@@ -178,8 +178,8 @@ export function ProfilePage() {
     if (isCurrentUser) {
       return profile || {
         id: "current-user",
-        username: "@brainarchitect",
-        displayName: "Brain Builder",
+        username: "@mindarchitect",
+        displayName: "Mind Builder",
         bio: "Exploring the limits of logic graphs and social knowledge. Building tools for thought.",
         followerCount: 1042,
         followingCount: 350
@@ -264,7 +264,7 @@ export function ProfilePage() {
 
   const handleExternalShare = async () => {
     const shareData = {
-      title: `${currentProfile.displayName} on Brain Drain`,
+      title: `${currentProfile.displayName} on MindSpool`,
       text: currentProfile.bio,
       url: getProfileShareUrl(),
     };
@@ -295,7 +295,7 @@ export function ProfilePage() {
       Math.floor(Math.random() * 10),
     lastActiveDate: "",
     totalMissionsCompleted: 0,
-    totalBrainsCreated: 0,
+    totalMindsCreated: 0,
     totalCheckIns: 0,
     badges: [] as string[],
   }, [reputation, isCurrentUser]);
@@ -509,7 +509,7 @@ export function ProfilePage() {
                           <SelectTrigger><SelectValue placeholder="Who can see this?" /></SelectTrigger>
                           <SelectContent>
                             <SelectItem value="everyone">Everyone</SelectItem>
-                            <SelectItem value="experts">Brain Experts</SelectItem>
+                            <SelectItem value="experts">Mind Experts</SelectItem>
                             <SelectItem value="private">Private</SelectItem>
                           </SelectContent>
                         </Select>
@@ -614,7 +614,7 @@ export function ProfilePage() {
                     <div key={idx} className="bg-muted/30 border rounded-[16px] p-3 text-sm flex gap-3 items-start">
                       <div className="mt-0.5 opacity-70">
                         {item.type === 'post' && <MessageSquare className="w-4 h-4 text-blue-500" />}
-                        {item.type === 'brain' && <Brain className="w-4 h-4 text-purple-500" />}
+                        {item.type === 'mind' && <Brain className="w-4 h-4 text-purple-500" />}
                         {item.type === 'checkin' && <Target className="w-4 h-4 text-emerald-500" />}
                       </div>
                       <div className="flex-1">
@@ -697,8 +697,8 @@ export function ProfilePage() {
           <TabsTrigger value="missions" className="h-full rounded-none data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:text-foreground data-[state=active]:font-extrabold data-[state=active]:border-b-[3px] data-[state=active]:border-primary px-5 text-[14px] sm:text-[15px] font-semibold text-muted-foreground hover:bg-muted/10 transition-all cursor-pointer">
             Pathways
           </TabsTrigger>
-          <TabsTrigger value="brains" className="h-full rounded-none data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:text-foreground data-[state=active]:font-extrabold data-[state=active]:border-b-[3px] data-[state=active]:border-primary px-5 text-[14px] sm:text-[15px] font-semibold text-muted-foreground hover:bg-muted/10 transition-all cursor-pointer">
-            Brains
+          <TabsTrigger value="minds" className="h-full rounded-none data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:text-foreground data-[state=active]:font-extrabold data-[state=active]:border-b-[3px] data-[state=active]:border-primary px-5 text-[14px] sm:text-[15px] font-semibold text-muted-foreground hover:bg-muted/10 transition-all cursor-pointer">
+            Minds
           </TabsTrigger>
           <TabsTrigger value="activity" className="h-full rounded-none data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:text-foreground data-[state=active]:font-extrabold data-[state=active]:border-b-[3px] data-[state=active]:border-primary px-5 text-[14px] sm:text-[15px] font-semibold text-muted-foreground hover:bg-muted/10 transition-all cursor-pointer">
             Activity
@@ -964,11 +964,11 @@ export function ProfilePage() {
           </div>
         </TabsContent>
 
-        <TabsContent value="brains" className="p-0 m-0">
+        <TabsContent value="minds" className="p-0 m-0">
           <div className="p-12 text-center text-muted-foreground border-b">
             <Network className="w-12 h-12 mx-auto mb-4 opacity-50 text-primary" />
-            <h3 className="text-lg font-medium text-foreground mb-2">Brain Repository</h3>
-            <p className="mb-4">Brains you've created, forked, or contributed to will appear here.</p>
+            <h3 className="text-lg font-medium text-foreground mb-2">Mind Repository</h3>
+            <p className="mb-4">Minds you've created, forked, or contributed to will appear here.</p>
             <Link href="/library">
               <Button variant="outline">Go to Library</Button>
             </Link>
@@ -1010,7 +1010,7 @@ export function ProfilePage() {
                 <Button variant="outline" size="sm" onClick={() => toast({ title: "Removed from favorites" })}>
                   <Star className="w-4 h-4 mr-2 text-yellow-500 fill-yellow-500" /> Unstar
                 </Button>
-                <Button size="sm">Open Brain</Button>
+                <Button size="sm">Open Mind</Button>
               </div>
             </div>
           </div>

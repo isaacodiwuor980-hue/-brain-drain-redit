@@ -26,7 +26,7 @@ export function generateSalt(): string {
 }
 
 export function getOrCreateSalt(): string {
-  const KEY = "brain-drain-contact-salt";
+  const KEY = "MindSpool-contact-salt";
   try {
     const existing = localStorage.getItem(KEY);
     if (existing && existing.length >= 16) return existing;
@@ -122,7 +122,7 @@ export function useContactSync() {
       if (data.length === 0) {
         toast({
           title: "No friends found yet",
-          description: "None of your contacts have joined Brain Drain yet. Invite them!",
+          description: "None of your contacts have joined MindSpool yet. Invite them!",
         });
       } else {
         toast({

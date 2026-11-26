@@ -1,5 +1,5 @@
 /*!
- * Brain Drain — SW-killer (synchronous, external file).
+ * MindSpool — SW-killer (synchronous, external file).
  *
  * Loaded synchronously from index.html <head> BEFORE the main module script.
  * The CSP `script-src 'self'` allows this file (same-origin) but blocks

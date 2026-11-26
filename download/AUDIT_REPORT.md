@@ -1,4 +1,4 @@
-# Brain Drain — Full Code Audit Report (Phase 1)
+# MindSpool — Full Code Audit Report (Phase 1)
 
 **Date:** 2026-11-06 · **Auditor:** Senior staff engineer audit (AI-assisted, evidence-based)
 **Scope:** All 332 git-tracked files + untracked working tree, ~49,857 lines of TS/TSX
@@ -60,7 +60,7 @@ LEGACY / DEAD STACKS COEXISTING
 | # | Feature | Files (main) | Status |
 |---|---|---|---|
 | 1 | Home feed (posts, tabs, live sessions, daily challenges) | pages/HomeFeed, feed/*, hooks/use-social | ✅ working (verified live today) |
-| 2 | Brains library / pathways | pages/LibraryPage, library/PathwaysTab+SavedTopicsTab+ShareModal | ✅ working |
+| 2 | Minds library / pathways | pages/LibraryPage, library/PathwaysTab+SavedTopicsTab+ShareModal | ✅ working |
 | 3 | Topics browse/follow | pages/TopicsPage, TopicDetailPage, hooks/use-topics | ✅ working |
 | 4 | Profile | pages/ProfilePage, profile/* (5) | ✅ working |
 | 5 | Search | pages/SearchPage, api/v1/search + habits/skills search | ✅ working |
@@ -72,9 +72,9 @@ LEGACY / DEAD STACKS COEXISTING
 | 11 | Community (experts/mentors) | pages/CommunityPage, community/*, api experts+mentors | ✅ working (tables pending migration 0004) |
 | 12 | Onboarding flow | onboarding/OnboardingFlow + OnboardingTour | ✅ working |
 | 13 | Auth (Firebase + guest + email OTP stub) | auth/AuthContext, api auth-otp | ⚠️ partial — OTP verify returns mock token (bug C-8.5) |
-| 14 | Brain builder (wizard, node editor, drawer) | WizardModal, NodeEditor, BrainDrawer, RuntimeEngine | ✅ working |
+| 14 | Mind builder (wizard, node editor, drawer) | WizardModal, NodeEditor, MindDrawer, RuntimeEngine | ✅ working |
 | 15 | Create launcher | CreateMenu, ui/CreateExperienceModal | ✅ working |
-| 16 | Share / import / report | ShareBrainModal, ImportModal, ReportBugModal | ✅ working |
+| 16 | Share / import / report | ShareMindModal, ImportModal, ReportBugModal | ✅ working |
 | 17 | Offline cache & sync | lib/db (IDB v19), lib/offline-sync, hooks/use-offline-sync | ✅ working |
 | 18 | Analytics | lib/analytics, api /api/events, api-server/lib/analytics-store | ✅ working |
 | 19 | Admin gate (expert verification) | lib/admin-gate, ui/admin-gate-dialog, api experts verify | ✅ working (ADMIN_EMAILS) |
@@ -106,14 +106,14 @@ LEGACY / DEAD STACKS COEXISTING
 | `ui/` (32 of 58) | accordion, alert, aspect-ratio, breadcrumb, button-group, calendar, carousel, collapsible, command, context-menu, drawer, empty, field, form, hover-card, input-group, input-otp, item, kbd, menubar, navigation-menu, pagination, popover, radio-group, resizable, sidebar, slider, sonner, spinner, table, toggle, toggle-group | Zero exact imports project-wide (verified with precise import-specifier grep, not substring); toggle imported only by dead toggle-group; sidebar is sole importer of dead use-mobile |
 | `hooks/` (4) | use-api-health, use-device-features, use-gamification, use-mobile | Zero importers (use-mobile only by dead ui/sidebar) |
 | `lib/` (3 + test) | firebase.ts, smart-image.tsx, puzzle-share.ts (+ its test) | firebase.ts superseded by firebase-app/auth/firestore; zero exact imports |
-| `library/` (2) | BrainDNA.tsx, ReadTab.tsx | Zero importers; types.ts defines its own `BrainDNA` interface (no import); smoke-test only asserts their ABSENCE |
+| `library/` (2) | MindDNA.tsx, ReadTab.tsx | Zero importers; types.ts defines its own `MindDNA` interface (no import); smoke-test only asserts their ABSENCE |
 
 ### 4c. Dead backend (Phase 2/3 deletes or decision)
 | Item | Evidence |
 |---|---|
 | `api-server/src/index.ts` | Second standalone entry (own http server + shutdown); referenced by no script/Dockerfile/package.json |
 | `functions/` + firebase.json functions block + `/api/**` rewrite | Orphaned Firebase deployment; rewrite targets a function "api" that doesn't exist (deploying Firebase Hosting from this repo would break the API). Collections they serve are never written. **→ NEEDS MY DECISION** (is the Firebase project still running the cleanup cron?) |
-| Uncalled endpoints (17) | events/summary, intelligence/summary, recommendations/brains, v1/health/detailed (dead); skills/habits GET+DELETE, datasets, search/v1, verify + provenance 501 stubs (future/contract surface) **→ NEEDS MY DECISION** on which to keep |
+| Uncalled endpoints (17) | events/summary, intelligence/summary, recommendations/minds, v1/health/detailed (dead); skills/habits GET+DELETE, datasets, search/v1, verify + provenance 501 stubs (future/contract surface) **→ NEEDS MY DECISION** on which to keep |
 
 ---
 
@@ -123,7 +123,7 @@ LEGACY / DEAD STACKS COEXISTING
 |---|---|---|---|
 | B-1 | **zod in devDependencies but bundled into production server** (esbuild `--packages=external`) | package.json | `npm prune --production` / `npm ci --production` → server crashes on `require("zod")` |
 | B-2 | Feed cache repost count: `repost_count ?? 0 + reposts` — precedence + snake_case-vs-camelCase mismatch means base count always dropped on cache hits | api-server/src/routes/feed.ts:96 | Wrong repost counts on cached feed responses |
-| B-3 | `z.coerce.boolean()` — `?mine=false` coerces to `true` | api-server/src/routes/brains.ts:35 | Guests get 401 instead of public list |
+| B-3 | `z.coerce.boolean()` — `?mine=false` coerces to `true` | api-server/src/routes/minds.ts:35 | Guests get 401 instead of public list |
 | B-4 | Maintenance middleware mounted AFTER apiApp | server.ts:70 vs 98 | Maintenance mode never gates API traffic |
 | B-5 | Search double-query: first Supabase query fired then discarded when keyword present | api-server/src/routes/search.ts:76-88 | 2x latency + wasted quota on every search |
 | B-6 | discover/follow swallows insert failure, returns 204 | api-server/src/routes/discover.ts:146-155 | Silent data loss |
@@ -133,7 +133,7 @@ LEGACY / DEAD STACKS COEXISTING
 | B-10 | config.ts throws at import-time when PORT unset → server.ts's documented 3000 fallback unreachable | api-server/src/lib/config.ts:39-46 | Confusing crash without PORT |
 | B-11 | Feed cache is an unbounded Map (no eviction) | api-server/src/routes/feed.ts:72-74 | Memory leak / cheap DoS via offset variation |
 | B-12 | requireAuth collapses JWKS/network errors into 401 | api-server/src/middleware/auth.ts:26-28 | 5xx masked as 401 |
-| B-13 | SSR pages advertise routes that don't exist (/verify/:userId, /brain/:brainId) | server.ts:89, data-api.ts:150 | SEO/LLM surface pointing at 404s |
+| B-13 | SSR pages advertise routes that don't exist (/verify/:userId, /mind/:mindId) | server.ts:89, data-api.ts:150 | SEO/LLM surface pointing at 404s |
 | B-14 | MAINTENANCE_MODE read once at boot — contradicts documented incident usage | server.ts:98 | Requires restart during incidents |
 | B-15 | Recall "anti-tamper" is client-controlled (`sm2StateBefore` supplied by client) | api-server/src/routes/recall.ts:36-41 | Docstring claim false |
 

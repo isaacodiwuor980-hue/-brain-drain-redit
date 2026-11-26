@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Brain, Node, NodeAttachment } from "@/lib/types";
+import { Mind, Node, NodeAttachment } from "@/lib/types";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { idb } from "@/lib/db";
@@ -10,13 +10,13 @@ import { useToast } from "@/hooks/use-toast";
 import { trackEvent } from "@/lib/analytics";
 import { triggerHaptic } from "@/lib/device";
 
-interface BrainChatRuntimeProps {
-  brain: Brain | null;
+interface MindChatRuntimeProps {
+  mind: Mind | null;
   isOpen: boolean;
   onClose: () => void;
 }
 
-export function BrainChatRuntime({ brain, isOpen, onClose }: BrainChatRuntimeProps) {
+export function MindChatRuntime({ mind, isOpen, onClose }: MindChatRuntimeProps) {
   const [nodes, setNodes] = useState<Node[]>([]);
   const [currentNodeId, setCurrentNodeId] = useState<string | null>(null);
   const [path, setPath] = useState<{ node: Node; decision?: boolean }[]>([]);
@@ -24,22 +24,22 @@ export function BrainChatRuntime({ brain, isOpen, onClose }: BrainChatRuntimePro
   const { toast } = useToast();
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  // APEX-OMEGA FIX (R3): session-scoped resume for in-progress brain runs.
+  // APEX-OMEGA FIX (R3): session-scoped resume for in-progress mind runs.
   // Previously, closing the dialog mid-run (X / Escape / backdrop tap)
   // discarded currentNodeId + path → reopening restarted from root.
   // That's a rage-quit moment: user accidentally taps X, loses 5 minutes
-  // of decision-tree progress. Now we persist (brainId, currentNodeId,
+  // of decision-tree progress. Now we persist (mindId, currentNodeId,
   // path-node-ids) to sessionStorage on every state change, and restore
   // on dialog open. sessionStorage (not localStorage) so it clears when
   // the browser closes — cross-session resume is a separate IDB feature.
-  const resumeKey = brain ? `brainRunResume:${brain.id}` : null;
+  const resumeKey = mind ? `mindRunResume:${mind.id}` : null;
 
   useEffect(() => {
-    if (brain && isOpen) {
-      idb.getAllByIndex<Node>("nodes", "brain_id", brain.id).then(loadedNodes => {
+    if (mind && isOpen) {
+      idb.getAllByIndex<Node>("nodes", "mind_id", mind.id).then(loadedNodes => {
         setNodes(loadedNodes);
-        // Try to resume an in-progress session for this brain.
-        let restoredNodeId: string | null = brain.root_node_id;
+        // Try to resume an in-progress session for this mind.
+        let restoredNodeId: string | null = mind.root_node_id;
         let restoredPath: { node: Node; decision?: boolean }[] = [];
         if (resumeKey) {
           try {
@@ -50,12 +50,12 @@ export function BrainChatRuntime({ brain, isOpen, onClose }: BrainChatRuntimePro
                 pathNodeIds: { id: string; decision?: boolean }[];
               };
               // Only restore if the saved currentNodeId still exists in
-              // the brain (the brain may have been edited since the save).
+              // the mind (the mind may have been edited since the save).
               const exists = loadedNodes.some(n => n.id === saved.currentNodeId);
               if (exists) {
                 restoredNodeId = saved.currentNodeId;
                 // Re-hydrate path nodes from IDs. Skip any IDs that no
-                // longer exist (brain edited) — partial restore is better
+                // longer exist (mind edited) — partial restore is better
                 // than no restore.
                 const nodeMap = new Map(loadedNodes.map(n => [n.id, n]));
                 restoredPath = saved.pathNodeIds
@@ -77,7 +77,7 @@ export function BrainChatRuntime({ brain, isOpen, onClose }: BrainChatRuntimePro
         setPath(restoredPath);
       });
     }
-  }, [brain, isOpen, resumeKey]);
+  }, [mind, isOpen, resumeKey]);
 
   // APEX-OMEGA R3: persist current state to sessionStorage on every change.
   // Throttled via rAF so rapid decisions don't hammer sessionStorage.
@@ -127,7 +127,7 @@ export function BrainChatRuntime({ brain, isOpen, onClose }: BrainChatRuntimePro
       if (nextNode?.node_type === "outcome") {
         triggerHaptic("success");
         // APEX-OMEGA R3: clear resume state on outcome — the run is complete.
-        // Don't restore a finished session next time the user opens the brain.
+        // Don't restore a finished session next time the user opens the mind.
         if (resumeKey) {
           try { sessionStorage.removeItem(resumeKey); } catch { /* ignore */ }
         }
@@ -143,7 +143,7 @@ export function BrainChatRuntime({ brain, isOpen, onClose }: BrainChatRuntimePro
 
   const handleRestart = () => {
     triggerHaptic("light");
-    setCurrentNodeId(brain?.root_node_id || null);
+    setCurrentNodeId(mind?.root_node_id || null);
     setPath([]);
     // APEX-OMEGA R3: explicit restart clears resume state too.
     if (resumeKey) {
@@ -167,7 +167,7 @@ export function BrainChatRuntime({ brain, isOpen, onClose }: BrainChatRuntimePro
     return node.attachments.some((a: NodeAttachment) => a.type === "image");
   };
 
-  if (!brain) return null;
+  if (!mind) return null;
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
@@ -182,15 +182,15 @@ export function BrainChatRuntime({ brain, isOpen, onClose }: BrainChatRuntimePro
                 </AvatarFallback>
               </Avatar>
               <div>
-                <h2 className="text-base font-semibold text-foreground leading-none">{brain.title}</h2>
-                <span className="text-[11px] font-medium text-primary">Expert Brain Active</span>
+                <h2 className="text-base font-semibold text-foreground leading-none">{mind.title}</h2>
+                <span className="text-[11px] font-medium text-primary">Expert Mind Active</span>
               </div>
             </div>
             <div className="flex gap-2">
-              <Button variant="ghost" size="icon" aria-label="Restart brain" onClick={handleRestart} className="h-8 w-8 text-muted-foreground hover:text-foreground">
+              <Button variant="ghost" size="icon" aria-label="Restart mind" onClick={handleRestart} className="h-8 w-8 text-muted-foreground hover:text-foreground">
                 <RotateCcw className="w-4 h-4" />
               </Button>
-              <Button variant="ghost" size="icon" aria-label="Close brain chat" onClick={onClose} className="h-8 w-8 text-muted-foreground hover:text-foreground">
+              <Button variant="ghost" size="icon" aria-label="Close mind chat" onClick={onClose} className="h-8 w-8 text-muted-foreground hover:text-foreground">
                 <X className="w-4 h-4" />
               </Button>
             </div>
@@ -350,7 +350,7 @@ export function BrainChatRuntime({ brain, isOpen, onClose }: BrainChatRuntimePro
                 className="flex-1 h-11 text-xs font-semibold rounded-full gap-2 transition-all cursor-pointer"
                 onClick={async () => {
                   triggerHaptic("selection");
-                  const shareText = `🧠 Brain Diagnostic Result: ${brain.title}\n✅ Result: ${currentNode?.result_text || "Complete"}\n📋 Next Steps: ${currentNode?.next_steps || "None"}\n\nRan with Brain Builder: ${window.location.origin}`;
+                  const shareText = `🧠 Mind Diagnostic Result: ${mind.title}\n✅ Result: ${currentNode?.result_text || "Complete"}\n📋 Next Steps: ${currentNode?.next_steps || "None"}\n\nRan with Mind Builder: ${window.location.origin}`;
                   try {
                     if (navigator.clipboard && navigator.clipboard.writeText) {
                       await navigator.clipboard.writeText(shareText);
@@ -361,7 +361,7 @@ export function BrainChatRuntime({ brain, isOpen, onClose }: BrainChatRuntimePro
                       title: "Result Copied to Clipboard! 📋",
                       description: "Your diagnostic conclusion and next steps are copied.",
                     });
-                    void trackEvent("puzzle_score_copied", { type: "diagnostic_chat", brainId: brain.id });
+                    void trackEvent("puzzle_score_copied", { type: "diagnostic_chat", mindId: mind.id });
                   } catch (e) {
                     console.error(e);
                   }
@@ -376,15 +376,15 @@ export function BrainChatRuntime({ brain, isOpen, onClose }: BrainChatRuntimePro
                 className="h-11 px-4 text-xs font-semibold rounded-full gap-2 cursor-pointer border-border/60"
                 onClick={async () => {
                   triggerHaptic("selection");
-                  const shareText = `🧠 Just resolved "${brain.title}" using Brain Builder!\nOutcome: ${currentNode?.result_text}`;
+                  const shareText = `🧠 Just resolved "${mind.title}" using Mind Builder!\nOutcome: ${currentNode?.result_text}`;
                   if (typeof navigator !== "undefined" && navigator.share) {
                     try {
                       await navigator.share({
-                        title: brain.title,
+                        title: mind.title,
                         text: shareText,
                         url: window.location.origin,
                       });
-                      void trackEvent("puzzle_score_shared", { channel: "native_share", brainId: brain.id });
+                      void trackEvent("puzzle_score_shared", { channel: "native_share", mindId: mind.id });
                       return;
                     } catch {}
                   }

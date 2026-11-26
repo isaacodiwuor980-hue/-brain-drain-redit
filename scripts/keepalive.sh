@@ -15,7 +15,7 @@
 # Usage: bash /home/z/my-project/scripts/keepalive.sh
 # ═══════════════════════════════════════════════════════════════════════════
 
-cd /home/z/my-project/BRAIN-DRAIN-latest-
+cd /home/z/my-project/MindSpool-latest-
 
 # Kill any existing instances
 pkill -f "bd-watchdog-inner" 2>/dev/null
@@ -25,7 +25,7 @@ sleep 1
 # Write the inner watchdog script (the actual loop)
 cat > /tmp/bd-watchdog-inner.sh << 'INNEREOF'
 #!/bin/bash
-cd /home/z/my-project/BRAIN-DRAIN-latest-
+cd /home/z/my-project/MindSpool-latest-
 HEALTH_URL="http://localhost:3000/api/healthz"
 LAST_HEALTH_OK=0
 

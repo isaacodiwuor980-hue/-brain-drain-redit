@@ -22,7 +22,7 @@ const AnalyticsEventType = z.enum([
   "feed_mode_selected",
   "notification_opened",
   "mission_reminder",
-  "brain_launch",
+  "mind_launch",
 ]);
 
 const AnalyticsEventSchema = z.object({

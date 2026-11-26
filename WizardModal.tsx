@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Brain, Node, BrainData } from "@/lib/types";
+import { Mind, Node, MindData } from "@/lib/types";
 import { Dialog, DialogContent, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,7 +23,7 @@ import {
 interface WizardModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (data: BrainData) => Promise<void>;
+  onSave: (data: MindData) => Promise<void>;
 }
 
 export function WizardModal({ isOpen, onClose, onSave }: WizardModalProps) {
@@ -33,7 +33,7 @@ export function WizardModal({ isOpen, onClose, onSave }: WizardModalProps) {
   const [title, setTitle] = useState("");
   const [category, setCategory] = useState("");
   const [description, setDescription] = useState("");
-  const [brainType, setBrainType] = useState<"knowledge" | "method" | "project" | "decision">("knowledge");
+  const [mindType, setMindType] = useState<"knowledge" | "method" | "project" | "decision">("knowledge");
   const [summary, setSummary] = useState("");
   const [traits, setTraits] = useState<string[]>([]);
   const [traitInput, setTraitInput] = useState("");
@@ -82,7 +82,7 @@ export function WizardModal({ isOpen, onClose, onSave }: WizardModalProps) {
 
   const handleNext = () => {
     if (step === 1 && !title.trim()) {
-      toast({ title: "Title required", description: "Give your brain a name before continuing.", variant: "destructive" });
+      toast({ title: "Title required", description: "Give your mind a name before continuing.", variant: "destructive" });
       return;
     }
     setStep(s => s + 1);
@@ -106,7 +106,7 @@ export function WizardModal({ isOpen, onClose, onSave }: WizardModalProps) {
 
   const handleSave = async () => {
     if (!title.trim()) {
-      toast({ title: "Validation Error", description: "Brain title is required.", variant: "destructive" });
+      toast({ title: "Validation Error", description: "Mind title is required.", variant: "destructive" });
       setStep(1);
       return;
     }
@@ -117,7 +117,7 @@ export function WizardModal({ isOpen, onClose, onSave }: WizardModalProps) {
 
     setIsSaving(true);
 
-    const brainId = crypto.randomUUID();
+    const mindId = crypto.randomUUID();
     // BUG FIX: ensure the root node actually exists in the nodes array.
     // Previously, if the user deleted the root node but didn't set a new
     // one, rootNodeId could point to a non-existent ID → the engine would
@@ -127,23 +127,23 @@ export function WizardModal({ isOpen, onClose, onSave }: WizardModalProps) {
       rootNodeId && nodes.some(n => n.id === rootNodeId)
         ? rootNodeId
         : nodes.find(n => n.node_type === "question")?.id ?? nodes[0].id;
-    const finalNodes = nodes.map(n => ({ ...n, brain_id: brainId }));
+    const finalNodes = nodes.map(n => ({ ...n, mind_id: mindId }));
 
-    const brain: Brain = {
-      id: brainId,
+    const mind: Mind = {
+      id: mindId,
       title: title.trim(),
       category,
       description,
       created_at: Date.now(),
       root_node_id: effectiveRoot,
-      repo_status: "private", // Local Brain — private by default
-      brain_type: brainType,
+      repo_status: "private", // Local Mind — private by default
+      mind_type: mindType,
       summary: summary.trim() || undefined,
     };
 
     try {
-      await onSave({ brain, nodes: finalNodes });
-      toast({ title: "Brain Saved", description: "Successfully encoded into system memory." });
+      await onSave({ mind, nodes: finalNodes });
+      toast({ title: "Mind Saved", description: "Successfully encoded into system memory." });
       handleClose();
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
@@ -198,10 +198,10 @@ export function WizardModal({ isOpen, onClose, onSave }: WizardModalProps) {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label className="text-sm font-medium text-foreground">
-                    Brain title
+                    Mind title
                   </Label>
                   <Input
-                    data-testid="input-brain-title"
+                    data-testid="input-mind-title"
                     value={title}
                     onChange={e => setTitle(e.target.value)}
                     placeholder="e.g., Which laptop should I buy?"
@@ -213,7 +213,7 @@ export function WizardModal({ isOpen, onClose, onSave }: WizardModalProps) {
                     Tags (comma separated)
                   </Label>
                   <Input
-                    data-testid="input-brain-category"
+                    data-testid="input-mind-category"
                     value={category}
                     onChange={e => setCategory(e.target.value)}
                     placeholder="Shopping, Decisions, Tech"
@@ -223,22 +223,22 @@ export function WizardModal({ isOpen, onClose, onSave }: WizardModalProps) {
               </div>
               <div className="space-y-2">
                 <Label className="text-sm font-medium text-foreground">
-                  What does this brain help decide?
+                  What does this mind help decide?
                 </Label>
                 <Textarea
-                  data-testid="textarea-brain-description"
+                  data-testid="textarea-mind-description"
                   value={description}
                   onChange={e => setDescription(e.target.value)}
-                  placeholder="A short, plain-language summary of the decision this brain helps people make."
+                  placeholder="A short, plain-language summary of the decision this mind helps people make."
                   className="min-h-[120px]"
                 />
               </div>
 
-              {/* Brain type + summary — compact, additive */}
+              {/* Mind type + summary — compact, additive */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label className="text-sm font-medium text-foreground">Brain type</Label>
-                  <Select value={brainType} onValueChange={(v: "knowledge" | "method" | "project" | "decision") => setBrainType(v)}>
+                  <Label className="text-sm font-medium text-foreground">Mind type</Label>
+                  <Select value={mindType} onValueChange={(v: "knowledge" | "method" | "project" | "decision") => setMindType(v)}>
                     <SelectTrigger className="h-11"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="knowledge">Knowledge — concepts, explanations, lessons</SelectItem>
@@ -330,7 +330,7 @@ export function WizardModal({ isOpen, onClose, onSave }: WizardModalProps) {
               setNodes={setNodes}
               rootNodeId={rootNodeId}
               setRootNodeId={setRootNodeId}
-              brainId="temp"
+              mindId="temp"
             />
           )}
         </div>
@@ -357,7 +357,7 @@ export function WizardModal({ isOpen, onClose, onSave }: WizardModalProps) {
                 className="bg-primary text-primary-foreground shadow-primary/20 shadow-lg"
                 data-testid="button-wizard-save"
               >
-                {isSaving ? "⏳ Saving..." : "Digest & Sync Brain to Post"}
+                {isSaving ? "⏳ Saving..." : "Digest & Sync Mind to Post"}
               </Button>
             )}
           </div>
@@ -371,7 +371,7 @@ export function WizardModal({ isOpen, onClose, onSave }: WizardModalProps) {
         <AlertDialogHeader>
           <AlertDialogTitle>Discard Unsaved Changes?</AlertDialogTitle>
           <AlertDialogDescription>
-            You have unsaved edits in this brain creation wizard. Closing now will permanently discard all your configured traits and logic nodes.
+            You have unsaved edits in this mind creation wizard. Closing now will permanently discard all your configured traits and logic nodes.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>

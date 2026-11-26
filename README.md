@@ -1,6 +1,6 @@
-# Brain Drain
+# MindSpool
 
-> A human knowledge engine where experts drain their reasoning into structured decision brains. Local-first PWA (IndexedDB) with optional cloud sync (Supabase + Firebase Auth).
+> A human knowledge engine where experts drain their reasoning into structured decision minds. Local-first PWA (IndexedDB) with optional cloud sync (Supabase + Firebase Auth).
 
 ## Quick Start
 
@@ -75,7 +75,7 @@ See [`.env.example`](.env.example) for the full list with descriptions. Key vari
 │  ├── Security headers (CSP, HSTS, X-Frame-Options)      │
 │  ├── Rate limiting (in-memory, per-IP)                  │
 │  ├── /api/* routes (Zod validation + requireAuth)       │
-│  ├── SSR routes (/verify/:userId, /brain/:brainId)      │
+│  ├── SSR routes (/verify/:userId, /mind/:mindId)      │
 │  └── Static dist/ serving (production)                  │
 └───────┬───────────────────────┬─────────────────────────┘
         │                       │

@@ -3,7 +3,7 @@
 const fs = require("fs");
 const path = require("path");
 
-const ROOT = "/home/z/my-project/BRAIN-DRAIN-latest-";
+const ROOT = "/home/z/my-project/MindSpool-latest-";
 const skip = ["node_modules", ".git", "dist", "mockup-sandbox", ".vite"];
 const srcExts = [".ts", ".tsx", ".js", ".mjs", ".cjs", ".html", ".sh", ".rules"];
 
@@ -60,7 +60,7 @@ const cands = {
   "lib/firebase.ts": ["lib/firebase"],
   "lib/smart-image": ["smart-image"],
   "lib/puzzle-share": ["puzzle-share"],
-  "library/BrainDNA": ["BrainDNA"],
+  "library/MindDNA": ["MindDNA"],
   "library/ReadTab": ["ReadTab"],
   "api-server/src/index.ts": ["api-server/src/index"],
   "public/_redirects": ["_redirects"],

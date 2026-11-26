@@ -10,7 +10,7 @@ export interface DayData {
 }
 
 // A single activity entry rendered in the heatmap's "selected day" list.
-// Spread from Post / Brain / CircleCheckIn records (some fields absent on
+// Spread from Post / Mind / CircleCheckIn records (some fields absent on
 // each shape), so every field is optional here.
 export interface ActivityItem {
   type?: string;

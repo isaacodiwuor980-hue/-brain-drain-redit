@@ -92,7 +92,7 @@ describe("lib/db storage-blocked degradation (preview fix)", () => {
   it("getAllByIndex resolves to [] when indexedDB access throws", async () => {
     await withBlockedIndexedDB(async () => {
       const { idb } = await loadDbModule();
-      const nodes = await idb.getAllByIndex("nodes", "brain_id", "b1");
+      const nodes = await idb.getAllByIndex("nodes", "mind_id", "b1");
       expect(nodes).toEqual([]);
     });
   });

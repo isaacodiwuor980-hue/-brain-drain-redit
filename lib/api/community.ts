@@ -235,7 +235,7 @@ export interface Sm2State {
 }
 
 export interface RecallEventInput {
-  brainId?: string;
+  mindId?: string;
   topicId?: string;
   quality: number; // 0-5
   sm2StateBefore?: Partial<Sm2State>;
@@ -249,14 +249,14 @@ export interface RecallRecordResponse {
 
 export interface RecallDueItem {
   id: string;
-  brainId: string | null;
+  mindId: string | null;
   topicId: string | null;
   nextRecallAt: string;
 }
 
 export interface RecallHistoryItem {
   id: string;
-  brainId: string | null;
+  mindId: string | null;
   topicId: string | null;
   quality: number;
   sm2State: Sm2State;

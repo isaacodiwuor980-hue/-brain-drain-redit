@@ -31,7 +31,7 @@ const SkillRowSchema = z.object({
   author_name: z.string().default("Anonymous"),
   author_years_experience: z.number().int().min(0).max(80).nullable().optional(),
   steps: z.array(z.any()).default([]),
-  source_brain_id: z.string().nullable().optional(),
+  source_mind_id: z.string().nullable().optional(),
   status: z.enum(["private", "in_review", "published"]),
   reviewer_id: z.string().nullable().optional(),
   published_at: z.string().nullable().optional(),
@@ -55,7 +55,7 @@ export interface SkillRow {
   author_name: string;
   author_years_experience: number | null;
   steps: unknown[];
-  source_brain_id: string | null;
+  source_mind_id: string | null;
   author_id: string;
   status: "private" | "in_review" | "published";
   reviewer_id: string | null;
@@ -134,7 +134,7 @@ router.get("/v1/skills", optionalAuth, async (req, res) => {
       filters.domain = `eq.${req.query.domain}`;
     }
     const rows = await supabase.get<SkillRow>("skills", {
-      select: "id,title,domain,make,model,year,part,version,author_name,author_years_experience,status,source_brain_id",
+      select: "id,title,domain,make,model,year,part,version,author_name,author_years_experience,status,source_mind_id",
       filters,
       order: { column: "published_at", ascending: false },
       limit,

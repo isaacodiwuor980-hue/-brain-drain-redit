@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import type { Brain, Notification, Post, Topic } from "./types";
+import type { Mind, Notification, Post, Topic } from "./types";
 import {
-  rankBrainsByLocalSignals,
+  rankMindsByLocalSignals,
   rankHomeFeedPosts,
   rankMissionReminders,
   rankNotificationsByRelevance,
@@ -73,9 +73,9 @@ describe("rankHomeFeedPosts", () => {
   });
 });
 
-describe("rankBrainsByLocalSignals", () => {
-  it("prioritizes a brain that was recently launched", () => {
-    const brains: Brain[] = [
+describe("rankMindsByLocalSignals", () => {
+  it("prioritizes a mind that was recently launched", () => {
+    const minds: Mind[] = [
       {
         id: "b1",
         title: "Solar",
@@ -94,21 +94,21 @@ describe("rankBrainsByLocalSignals", () => {
       },
     ];
     const events: AnalyticsEvent[] = [
-      event({ type: "brain_launch", payload: { brainId: "b1" } }),
+      event({ type: "mind_launch", payload: { mindId: "b1" } }),
     ];
-    const ranked = rankBrainsByLocalSignals(brains, events);
+    const ranked = rankMindsByLocalSignals(minds, events);
     expect(ranked[0].id).toBe("b1");
   });
 
-  it("boosts brains matching search terms", () => {
-    const brains: Brain[] = [
+  it("boosts minds matching search terms", () => {
+    const minds: Mind[] = [
       { id: "b1", title: "Cooking Tips", category: "Food", description: "", created_at: Date.now(), root_node_id: null },
       { id: "b2", title: "React Patterns", category: "Code", description: "", created_at: Date.now(), root_node_id: null },
     ];
     const events: AnalyticsEvent[] = [
       event({ type: "search_submitted", payload: { query: "React" } }),
     ];
-    const ranked = rankBrainsByLocalSignals(brains, events);
+    const ranked = rankMindsByLocalSignals(minds, events);
     expect(ranked[0].id).toBe("b2");
   });
 });

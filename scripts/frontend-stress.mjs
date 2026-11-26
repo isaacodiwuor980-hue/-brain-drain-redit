@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * frontend-stress.mjs — Brain Drain frontend simulation + stress test.
+ * frontend-stress.mjs — MindSpool frontend simulation + stress test.
  *
  * Visits every major page, captures console errors + page errors,
  * exercises modals + forms, and reports any UI defects.
@@ -64,7 +64,7 @@ console.log("\n=== Phase 1: Visit every page, capture console/page errors ===");
 const pages = [
   { name: "Home", url: "/" },
   { name: "Search", url: "/search" },
-  { name: "Brains", url: "/brains" },
+  { name: "Minds", url: "/minds" },
   { name: "Pathways", url: "/pathways" },
   { name: "Topics", url: "/topics" },
   { name: "Community", url: "/community" },
@@ -213,21 +213,21 @@ if (setRealErrs.length === 0 && (setSnap.includes("Settings") || setSnap.include
 }
 ab(`screenshot ${SCREENSHOT_DIR}/settings.png 2>&1 >/dev/null`);
 
-// Test: open Brains page + try to create a brain
-ab(`open ${BASE}/brains 2>&1 >/dev/null`);
+// Test: open Minds page + try to create a mind
+ab(`open ${BASE}/minds 2>&1 >/dev/null`);
 ab("wait --load networkidle 2>&1 >/dev/null");
 ab("wait 1500 2>&1 >/dev/null");
 clearLogs();
-const brainsSnap = snapshot();
-const brainsErrs = getErrors();
-const brainsRealErrs = brainsErrs.split("\n").filter(l => l.trim() && !l.includes("ServiceWorker") && !l.startsWith("[agent-browser]"));
-if (brainsRealErrs.length === 0) {
-  line("PASS", "Brains page loads without errors");
+const mindsSnap = snapshot();
+const mindsErrs = getErrors();
+const mindsRealErrs = mindsErrs.split("\n").filter(l => l.trim() && !l.includes("ServiceWorker") && !l.startsWith("[agent-browser]"));
+if (mindsRealErrs.length === 0) {
+  line("PASS", "Minds page loads without errors");
 } else {
-  bugs.push({ page: "Brains", kind: "PAGE_ERROR", detail: brainsRealErrs.join(";").slice(0,300) });
-  line("FAIL", `Brains page has errors: ${brainsRealErrs[0].slice(0, 150)}`);
+  bugs.push({ page: "Minds", kind: "PAGE_ERROR", detail: mindsRealErrs.join(";").slice(0,300) });
+  line("FAIL", `Minds page has errors: ${mindsRealErrs[0].slice(0, 150)}`);
 }
-ab(`screenshot ${SCREENSHOT_DIR}/brains.png 2>&1 >/dev/null`);
+ab(`screenshot ${SCREENSHOT_DIR}/minds.png 2>&1 >/dev/null`);
 
 // Test: open Community page
 ab(`open ${BASE}/community 2>&1 >/dev/null`);

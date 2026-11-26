@@ -46,7 +46,7 @@ export const COLD_START_POSTS: Post[] = [
     id: "cold-phil-1",
     userId: "cold-phil-marco",
     topicId: "t2",
-    content: "If a decision brain encodes heuristics from multiple experts with conflicting approaches, how should tie-breaking be modeled?",
+    content: "If a decision mind encodes heuristics from multiple experts with conflicting approaches, how should tie-breaking be modeled?",
     postType: "question",
     questionDetails: "Comparing Bayesian updating, weighted epistemic confidence scores, and minimax regret models for automated triage.",
     communityName: "Philosophy",
@@ -59,7 +59,7 @@ export const COLD_START_POSTS: Post[] = [
     id: "cold-phil-2",
     userId: "cold-phil-sarah",
     topicId: "t2",
-    content: "The map is not the territory, but a good map is worth a thousand unstructured observations.\n\nThe value of a decision brain isn't that it captures reality perfectly — it's that it forces the decision-maker to make their assumptions explicit and falsifiable.",
+    content: "The map is not the territory, but a good map is worth a thousand unstructured observations.\n\nThe value of a decision mind isn't that it captures reality perfectly — it's that it forces the decision-maker to make their assumptions explicit and falsifiable.",
     postType: "answer",
     answeredQuestionTitle: "Is structured decision-making actually better than intuition?",
     answeredQuestionAuthor: "Skeptic",
@@ -83,7 +83,7 @@ export const COLD_START_POSTS: Post[] = [
     commentCount: 14,
     reactions: { upvote: 104, downvote: 2 },
     createdAt: now - 1 * HOUR,
-    brainId: "dummy-brain-1",
+    mindId: "dummy-mind-1",
   },
   {
     id: "cold-react-2",
@@ -136,7 +136,7 @@ export const COLD_START_POSTS: Post[] = [
     topicId: "health",
     content: "How should we model the decision boundary between lifestyle intervention and pharmacological treatment for borderline hypertension?",
     postType: "question",
-    questionDetails: "Particularly interested in how decision brains could encode the multi-factorial trade-offs (age, comorbidities, patient preference, cost).",
+    questionDetails: "Particularly interested in how decision minds could encode the multi-factorial trade-offs (age, comorbidities, patient preference, cost).",
     communityName: "Health",
     communityId: "comm-health",
     commentCount: 16,
@@ -147,7 +147,7 @@ export const COLD_START_POSTS: Post[] = [
     id: "cold-health-2",
     userId: "cold-health-dr-marcus",
     topicId: "health",
-    content: "The decision boundary should explicitly encode patient values, not just clinical thresholds. Two patients with identical BP readings may rationally choose different interventions based on their tolerance for daily medication vs. lifestyle change.\n\nThis is exactly the kind of decision where a structured brain outperforms a single clinician's intuition.",
+    content: "The decision boundary should explicitly encode patient values, not just clinical thresholds. Two patients with identical BP readings may rationally choose different interventions based on their tolerance for daily medication vs. lifestyle change.\n\nThis is exactly the kind of decision where a structured mind outperforms a single clinician's intuition.",
     postType: "answer",
     answeredQuestionTitle: "Lifestyle vs. medication for borderline hypertension?",
     answeredQuestionAuthor: "Dr. Priya",
@@ -176,7 +176,7 @@ export const COLD_START_POSTS: Post[] = [
     id: "cold-fin-2",
     userId: "cold-fin-victor",
     topicId: "finance",
-    content: "Concentration risk in market-cap-weighted indices. The top 10 stocks in the S&P 500 now represent over 35% of the index. You're not as diversified as the '500 stocks' marketing suggests.\n\nDecision brain idea: encode a 'true diversification score' that weights by sector exposure, not just market cap.",
+    content: "Concentration risk in market-cap-weighted indices. The top 10 stocks in the S&P 500 now represent over 35% of the index. You're not as diversified as the '500 stocks' marketing suggests.\n\nDecision mind idea: encode a 'true diversification score' that weights by sector exposure, not just market cap.",
     postType: "answer",
     answeredQuestionTitle: "Most underrated risk in index investing?",
     answeredQuestionAuthor: "Tara",
@@ -194,7 +194,7 @@ export const COLD_START_POSTS: Post[] = [
     topicId: "career",
     content: "When should a senior IC take the management track vs. staying technical? What decision framework would actually help here?",
     postType: "question",
-    questionDetails: "Most career advice is generic. Looking for a structured decision brain that weighs leverage, learning rate, compensation ceiling, and personal energy source.",
+    questionDetails: "Most career advice is generic. Looking for a structured decision mind that weighs leverage, learning rate, compensation ceiling, and personal energy source.",
     communityName: "Career",
     communityId: "comm-career",
     commentCount: 27,
@@ -205,7 +205,7 @@ export const COLD_START_POSTS: Post[] = [
     id: "cold-career-2",
     userId: "cold-career-david",
     topicId: "career",
-    content: "The question isn't 'should I be a manager' — it's 'what's my highest-leverage constraint right now'.\n\nIf the constraint is team throughput, management may be the answer. If the constraint is technical depth, staying IC is. If the constraint is compensation, the answer is often 'change companies' rather than change roles.\n\nBuild a brain that surfaces the actual constraint, not the role.",
+    content: "The question isn't 'should I be a manager' — it's 'what's my highest-leverage constraint right now'.\n\nIf the constraint is team throughput, management may be the answer. If the constraint is technical depth, staying IC is. If the constraint is compensation, the answer is often 'change companies' rather than change roles.\n\nBuild a mind that surfaces the actual constraint, not the role.",
     postType: "answer",
     answeredQuestionTitle: "IC vs. management — what's the real decision?",
     answeredQuestionAuthor: "Mira",
@@ -217,7 +217,7 @@ export const COLD_START_POSTS: Post[] = [
   },
 ];
 
-const BANNER_DISMISSAL_KEY = "brain-drain-cold-start-banner-dismissed";
+const BANNER_DISMISSAL_KEY = "MindSpool-cold-start-banner-dismissed";
 
 /** Show the cold-start banner when the user follows <3 topics and hasn't dismissed it. */
 export function shouldShowColdStartBanner(followedTopicCount: number): boolean {

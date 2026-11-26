@@ -6,7 +6,7 @@ const MOCK_SESSIONS: RealtimeSession[] = [
   {
     id: "session-1",
     title: "Diagnostic Walkthrough: Memory Leaks",
-    brainId: "brain-1",
+    mindId: "mind-1",
     hostUserId: "u-101",
     communityId: "comm-react",
     status: "active",

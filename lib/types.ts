@@ -1,6 +1,6 @@
-export interface BrainVersion {
+export interface MindVersion {
   id: string;
-  brain_id: string;
+  mind_id: string;
   branch: string;
   message: string;
   nodes: Node[];
@@ -9,7 +9,7 @@ export interface BrainVersion {
 
 export interface Branch {
   id: string;
-  brain_id: string;
+  mind_id: string;
   name: string;
   isMain: boolean;
   parent_version_id?: string;
@@ -20,7 +20,7 @@ export interface Branch {
 
 export interface PullRequest {
   id: string;
-  brain_id: string;
+  mind_id: string;
   title: string;
   description: string;
   source_branch: string;
@@ -30,10 +30,10 @@ export interface PullRequest {
   /**
    * Phase B-5: GitHub-style answer branching.
    *
-   * When a user answers a question post that has an attached brain, they
-   * can propose an edit to that brain (fill the gaps, fix incomplete
+   * When a user answers a question post that has an attached mind, they
+   * can propose an edit to that mind (fill the gaps, fix incomplete
    * branches, add missing outcomes). The edit lives in a sub-branch and
-   * a PullRequest is opened against the brain's main branch.
+   * a PullRequest is opened against the mind's main branch.
    *
    * `originPostId` links the PR back to the question post so:
    *  - Other users can review the proposed answer in context.
@@ -59,9 +59,9 @@ export interface PullRequest {
   merged_at?: number;
 }
 
-export type BrainType = "knowledge" | "method" | "project" | "decision";
+export type MindType = "knowledge" | "method" | "project" | "decision";
 
-export interface Brain {
+export interface Mind {
   id: string;
   title: string;
   category: string;
@@ -73,21 +73,21 @@ export interface Brain {
   isFavorite?: boolean;
   tags?: string[];
   version?: number;
-  /** Functional brain type — drives presentation + behavior. */
-  brain_type?: BrainType;
+  /** Functional mind type — drives presentation + behavior. */
+  mind_type?: MindType;
   /** Short summary shown in compact view (separate from full description). */
   summary?: string;
-  /** Explicit relationship to other brains (not tag-based — deliberate links). */
-  related_brain_ids?: string[];
-  /** Source references for attribution (URLs, post IDs, brain IDs). */
-  source_refs?: Array<{ type: "post" | "brain" | "url"; id: string; label?: string }>;
-  /** Contributor attribution (who contributed to this brain). */
+  /** Explicit relationship to other minds (not tag-based — deliberate links). */
+  related_mind_ids?: string[];
+  /** Source references for attribution (URLs, post IDs, mind IDs). */
+  source_refs?: Array<{ type: "post" | "mind" | "url"; id: string; label?: string }>;
+  /** Contributor attribution (who contributed to this mind). */
   contributors?: Array<{ name: string; role?: string }>;
 }
 
 export interface Node {
   id: string;
-  brain_id: string;
+  mind_id: string;
   node_type: "question" | "outcome";
   question_text?: string;
   if_true_node_id?: string | null;
@@ -97,7 +97,7 @@ export interface Node {
   attachments?: NodeAttachment[];
   /**
    * Task 11: which branch this node belongs to. When undefined or "main",
-   * the node is on the main branch. Forking a brain copies all main-branch
+   * the node is on the main branch. Forking a mind copies all main-branch
    * nodes into a new branch-scoped set so edits on the fork don't affect
    * the original until a PR merges them back.
    */
@@ -116,7 +116,7 @@ export interface Conversation {
   lastMessage: string;
   lastMessageAt: number;
   unreadCount: number;
-  isBrain?: boolean;
+  isMind?: boolean;
   /**
    * Optional — set when the conversation was started from a shared post
    * (PostCard "Send to followers" / "Share as your post" or Community
@@ -140,7 +140,7 @@ export interface Message {
 
 export interface Notification {
   id: string;
-  type: "reply" | "mention" | "reaction" | "brain_run";
+  type: "reply" | "mention" | "reaction" | "mind_run";
   actorName: string;
   content: string;
   postId?: string;
@@ -235,8 +235,8 @@ export interface NodeAttachment {
   size: number;
 }
 
-export interface BrainData {
-  brain: Brain;
+export interface MindData {
+  mind: Mind;
   nodes: Node[];
 }
 
@@ -286,7 +286,7 @@ export interface Post {
   roomId?: string;
   event?: PostEvent;
   mediaUrls?: string[];
-  brainId?: string; // Optional link to a brain
+  mindId?: string; // Optional link to a mind
   reactions: Record<string, number>; // e.g. { "upvote": 10, "downvote": 1 }
   userReactions?: Record<string, string[]>; // e.g. { "upvote": ["user1"], "downvote": ["user2"] }
   commentCount: number;
@@ -305,12 +305,12 @@ export interface Post {
   /** Task 1 (Part 2): inline-visible attachments for "note" posts. */
   noteAttachments?: NoteAttachment[];
 
-  // ── Brain Question Integration (Phase 2) ────────────────────────
+  // ── Mind Question Integration (Phase 2) ────────────────────────
 
   /**
-   * When a question post has an attached Brain, the question owner can
+   * When a question post has an attached Mind, the question owner can
    * mark it "solved" once they've merged useful answer branches into
-   * the main Brain. The final Brain becomes the structured solution
+   * the main Mind. The final Mind becomes the structured solution
    * record. Branches and contributors are preserved.
    */
   isSolved?: boolean;
@@ -320,8 +320,8 @@ export interface Post {
    */
   solvedAt?: number;
   /**
-   * The ID of the Brain branch that was merged as the final solution
-   * (if a specific branch was selected). The original Brain + all
+   * The ID of the Mind branch that was merged as the final solution
+   * (if a specific branch was selected). The original Mind + all
    * branches are preserved regardless.
    */
   solvedBranchId?: string;
@@ -437,12 +437,12 @@ export interface Topic {
 
 export type MissionCategory = "Financial" | "Health" | "Learning" | "Business" | "Creativity" | "Discipline" | "Relationships" | "Other";
 
-/** Attachment slot on a mission — either a brain or an external link. */
+/** Attachment slot on a mission — either a mind or an external link. */
 export interface MissionAttachment {
-  type: "brain" | "link";
-  /** When type === "brain" */
-  brainId?: string;
-  brainTitle?: string;
+  type: "mind" | "link";
+  /** When type === "mind" */
+  mindId?: string;
+  mindTitle?: string;
   /** When type === "link" */
   url?: string;
   label?: string;
@@ -463,7 +463,7 @@ export interface Mission {
   repeatsDaily?: boolean;
   /** Last date (YYYY-MM-DD) the daily mission was reset/completed. */
   lastDailyReset?: string;
-  /** Optional attached resource — either a brain or an external link. */
+  /** Optional attached resource — either a mind or an external link. */
   attachment?: MissionAttachment;
 }
 export interface Milestone {
@@ -524,13 +524,13 @@ export interface Reputation {
   streak: number; // consecutive active days
   lastActiveDate: string; // ISO date string YYYY-MM-DD
   totalMissionsCompleted: number;
-  totalBrainsCreated: number;
+  totalMindsCreated: number;
   totalCheckIns: number;
   badges: string[];
 }
 export interface XPEvent {
   id: string;
-  type: "mission_created" | "milestone_completed" | "mission_completed" | "brain_created" | "check_in" | "post_created" | "comment" | "brain_shared" | "vote_bonus";
+  type: "mission_created" | "milestone_completed" | "mission_completed" | "mind_created" | "check_in" | "post_created" | "comment" | "mind_shared" | "vote_bonus";
   xpGained: number;
   description: string;
   createdAt: number;
@@ -553,7 +553,7 @@ export interface CircleCheckIn {
   myUpvote?: boolean;
   myDownvote?: boolean;
   replies?: { id: string; userId: string; content: string; createdAt: number }[];
-  linkedBrainId?: string;
+  linkedMindId?: string;
   /**
    * Room migration (Phase 1, additive): Room alias for `circleId`. When
    * set, readers prefer it; `circleId` remains the source of truth for
@@ -567,7 +567,7 @@ export interface Pathway {
   title: string;
   description: string;
   category: string;
-  brainIds: string[]; // ordered list of brain IDs in this pathway
+  mindIds: string[]; // ordered list of mind IDs in this pathway
   forkedFromId?: string;
   authorId: string;
   forkCount: number;
@@ -575,7 +575,7 @@ export interface Pathway {
   /**
    * Milestones for this pathway. Additive — old pathways simply have
    * no milestones and render unchanged. Each milestone can be renamed,
-   * have a brain link or daily cognitive scenario attached, and be
+   * have a mind link or daily cognitive scenario attached, and be
    * marked complete. See PathwayMilestone.
    */
   milestones?: PathwayMilestone[];
@@ -584,7 +584,7 @@ export interface Pathway {
 /**
  * A milestone inside a pathway. The user explicitly asked for:
  *  - rename after naming (title is mutable)
- *  - attach brain link OR daily cognitive scenario (linkedBrainId / cognitiveScenario)
+ *  - attach mind link OR daily cognitive scenario (linkedMindId / cognitiveScenario)
  *  - mark complete after successful completion (completed + completedAt)
  *
  * Stored as part of the parent Pathway record (no separate store) so
@@ -596,8 +596,8 @@ export interface PathwayMilestone {
   description?: string;
   /** Ordered position in the pathway (0-indexed). */
   order: number;
-  /** Optional brain linked to this milestone for structured decision support. */
-  linkedBrainId?: string;
+  /** Optional mind linked to this milestone for structured decision support. */
+  linkedMindId?: string;
   /**
    * Optional "daily cognitive scenario" — a short prompt the user practices
    * daily to internalise the milestone's skill. Free text, max 500 chars.
@@ -723,12 +723,12 @@ export interface Pin {
   createdAt: number;
 }
 
-export interface BrainDNA {
+export interface MindDNA {
   id: string;
-  brainId: string;
-  parentBrainId?: string;
-  childBrainIds: string[];
-  linkedBrainIds: string[];
+  mindId: string;
+  parentMindId?: string;
+  childMindIds: string[];
+  linkedMindIds: string[];
 }
 
 export interface LibraryBook {
@@ -754,7 +754,7 @@ export interface Story {
    * old stories without it are treated as images.
    */
   mediaType?: "image" | "video";
-  brainId?: string;
+  mindId?: string;
   createdAt: number;
   expiresAt: number;
   isViewed?: boolean;
@@ -786,14 +786,14 @@ export interface StoryAttachment {
   createdAt: number;
 }
 
-// ── Phase 2: Brain Question Integration ─────────────────────────
+// ── Phase 2: Mind Question Integration ─────────────────────────
 
 /**
- * The standard structured sections a question Brain can have.
+ * The standard structured sections a question Mind can have.
  * Each section is optional — incomplete sections are shown as "—"
  * and the system NEVER invents missing information.
  */
-export const BRAIN_SECTIONS: Array<{ key: string; label: string }> = [
+export const MIND_SECTIONS: Array<{ key: string; label: string }> = [
   { key: "problem", label: "Problem" },
   { key: "context", label: "Context" },
   { key: "goals", label: "Goals" },
@@ -812,11 +812,11 @@ export const BRAIN_SECTIONS: Array<{ key: string; label: string }> = [
 ];
 
 /**
- * Structured sections of a Brain attached to a question. Each section
+ * Structured sections of a Mind attached to a question. Each section
  * can be complete (has content) or incomplete (shown as "—").
  * The system NEVER invents missing information.
  */
-export interface BrainSection {
+export interface Mindsection {
   key: string;
   label: string;
   content: string | null; // null = incomplete, not yet filled
@@ -825,20 +825,20 @@ export interface BrainSection {
 }
 
 /**
- * A Brain branch created by an answerer. Preserves the relationship
- * to the original question Brain. The existing use-brain-repo hook
+ * A Mind branch created by an answerer. Preserves the relationship
+ * to the original question Mind. The existing use-mind-repo hook
  * already has createBranch/switchBranch/deleteBranch — this type
  * extends the concept with attribution for the question workflow.
  */
-export interface BrainContribution {
+export interface MindContribution {
   id: string;
-  brainId: string;
+  mindId: string;
   branchId: string;
   contributorId: string;
   contributorName: string;
   postId: string; // the question post this contribution belongs to
   createdAt: number;
-  changedSections: string[]; // which BrainSection keys were modified
+  changedSections: string[]; // which Mindsection keys were modified
   summary: string; // brief description of what the branch changes
   status: "proposed" | "reviewing" | "merged" | "rejected";
 }
@@ -888,7 +888,7 @@ export interface KnowledgeArtifact {
   implementationNotes?: string;
   context?: string;
   outcome?: string;
-  relatedBrainId?: string;
+  relatedMindId?: string;
   relatedDecisionTrailId?: string;
   createdAt: number;
   updatedAt: number;
@@ -900,13 +900,13 @@ export interface DecisionTrail {
   problem: string;
   optionsConsidered?: string[];
   evidenceConsulted?: string[];
-  brainBranchesConsidered?: string[];
+  mindBranchesConsidered?: string[];
   knowledgeArtifactIds?: string[];
   finalDecision?: string;
   decisionRationale?: string;
   implementation?: string;
   outcome?: string; // "Outcome not yet recorded" if empty
-  relatedBrainId?: string;
+  relatedMindId?: string;
   relatedPostId?: string;
   createdBy: string;
   createdAt: number;
@@ -931,7 +931,7 @@ export interface ResonanceScore {
   score: number;
   signals: {
     ideasReused: number;
-    brainSolutionsAdapted: number;
+    mindsolutionsAdapted: number;
     artifactsImplemented: number;
     projectsInfluenced: number;
     documentedOutcomes: number;
@@ -1078,13 +1078,13 @@ export interface VerificationBadge {
   explanation: string;
 }
 
-// ── Phase 1.5: Brain Drain Core ──────────────────────────────────
+// ── Phase 1.5: MindSpool Core ──────────────────────────────────
 // The lifelong timeline of captured expertise. A DrainEntry is the atomic
-// unit of "drained brain" — one idea, technique, secret, or mentorship
+// unit of "drained mind" — one idea, technique, secret, or mentorship
 // lesson that an expert poured out of their head and into the platform.
 //
 // Design principle: every field is OPTIONAL on existing records. Old
-// posts/comments/brains continue to render unchanged. A DrainEntry is a
+// posts/comments/minds continue to render unchanged. A DrainEntry is a
 // NEW kind of record that REFERENCES existing entities, never replaces
 // them. This keeps the migration safe.
 
@@ -1110,7 +1110,7 @@ export type SkillTier = "beginner" | "professional" | "expert";
  * `credential-linked` — tied to a CredentialField from Phase 1 (e.g. a
  *                   real MD or PE). Worth 5 points, but only if the
  *                   credential's scope matches the skill.
- * `outcome-proven` — apprentices who drank from this user's brain and
+ * `outcome-proven` — apprentices who drank from this user's mind and
  *                   then achieved professional/expert tier themselves.
  *                   Worth 10 points — the strongest possible signal.
  *                   Tracked in Phase 3 (DrinkLog).
@@ -1136,18 +1136,18 @@ export interface SkillValidation {
 }
 
 /**
- * Legacy status of a brain's owner. Drives the drink permissions.
+ * Legacy status of a mind's owner. Drives the drink permissions.
  *
- * `alive`              — owner is alive. Brain is private unless they
+ * `alive`              — owner is alive. Mind is private unless they
  *                       explicitly license entries. Apprentices drink
  *                       only with permission.
  * `deceased-unverified`— someone reported the owner deceased. We require
  *                       2 independent confirmations (obituary URL +
  *                       verified human proof) before transitioning.
- * `deceased-verified`  — owner confirmed deceased. Brain transitions
- *                       according to their BrainWill (default: private
+ * `deceased-verified`  — owner confirmed deceased. Mind transitions
+ *                       according to their MindWill (default: private
  *                       for 12 months, then licensed-public).
- * `legacy-unlocked`    — brain is now drinkable by anyone, according to
+ * `legacy-unlocked`    — mind is now drinkable by anyone, according to
  *                       the will's license terms. This is the "worth
  *                       more than gold" state — the secrets are now
  *                       available to the next generation.
@@ -1188,8 +1188,8 @@ export interface SkillStep {
 
 /**
  * Task 5/8 (Part 2): a Skill store entry.
- * Generated FROM an already-built brain, stays private, goes through review,
- * gets published to the public skill store. Stays traceable to its source brain.
+ * Generated FROM an already-built mind, stays private, goes through review,
+ * gets published to the public skill store. Stays traceable to its source mind.
  */
 export interface SkillEntry {
   /** Task 5: structured auto-generated ID, e.g. AUTO-TOYOTA-COROLLA-2015-FRONT_BRAKE-v01 */
@@ -1214,8 +1214,8 @@ export interface SkillEntry {
   authorYearsExperience?: number;
   /** The numbered steps. */
   steps: SkillStep[];
-  /** ID of the brain this skill was generated from (lineage, Task 8). */
-  sourceBrainId?: string;
+  /** ID of the mind this skill was generated from (lineage, Task 8). */
+  sourceMindId?: string;
   /** Publishing status (Task 8). */
   status: "private" | "in_review" | "published";
   /** Reviewer who approved (Task 8 — PR-style review). */
@@ -1227,8 +1227,8 @@ export interface SkillEntry {
 }
 
 /**
- * Task 3 (Part 2): a skill reference embedded in a brain node.
- * Stores BOTH a copied snapshot (so the brain works standalone — npm install model)
+ * Task 3 (Part 2): a skill reference embedded in a mind node.
+ * Stores BOTH a copied snapshot (so the mind works standalone — npm install model)
  * AND a reference pointer back to the source skill (for "Update to latest version").
  */
 export interface NodeSkillReference {
@@ -1238,15 +1238,15 @@ export interface NodeSkillReference {
   version: string;
   /** Title of the skill at copy time (snapshot). */
   title: string;
-  /** Copied step data (snapshot — brain works standalone, not live-synced). */
+  /** Copied step data (snapshot — mind works standalone, not live-synced). */
   steps: SkillStep[];
   /** When the skill was inserted. */
   insertedAt: number;
 }
 
 /**
- * Task 4 (Part 2): a Habit. Stored SEPARATELY from brain nodes (never inside
- * nodes — that risks the habit being overwritten when the brain is edited).
+ * Task 4 (Part 2): a Habit. Stored SEPARATELY from mind nodes (never inside
+ * nodes — that risks the habit being overwritten when the mind is edited).
  * Attached to a Milestone; the milestone's progress is driven by the habit's
  * tracked completion/streak.
  */
@@ -1260,7 +1260,7 @@ export interface Habit {
   timing: "before" | "after";
   /** The reward that reinforces the new routine immediately after. */
   reward: string;
-  /** The topic the habit is filed under (matched from the brain's headline). */
+  /** The topic the habit is filed under (matched from the mind's headline). */
   topic: string;
   /** ID of the milestone this habit is attached to. */
   milestoneId?: string;
@@ -1280,10 +1280,10 @@ export interface Habit {
   createdAt: number;
 }
 
-/** Task 4: a lightweight, non-editable reference shown in the brain editor. */
+/** Task 4: a lightweight, non-editable reference shown in the mind editor. */
 export interface HabitNote {
   habitId: string;
-  /** Snapshot of the habit summary shown in the brain (read-only). */
+  /** Snapshot of the habit summary shown in the mind (read-only). */
   summary: string;
 }
 
@@ -1292,15 +1292,15 @@ export interface HabitNote {
  * or mentorship lesson. Stored in `drain_entries` store.
  *
  * A DrainEntry is NOT a post. A post is a public Q&A artifact. A drain
- * entry is a piece of the expert's brain, captured forever. An expert
+ * entry is a piece of the expert's mind, captured forever. An expert
  * can write a drain entry privately (legacy-gated) without ever posting
  * it publicly — it only becomes drinkable when they die or explicitly
  * license it.
  */
 export interface DrainEntry {
   id: string;
-  /** The brain this entry belongs to (one brain per expert per skill). */
-  brainId: string;
+  /** The mind this entry belongs to (one mind per expert per skill). */
+  mindId: string;
   /** The expert who drained this entry. */
   userId: string;
   /** Skill domain, e.g. "cooking", "surgery". */
@@ -1360,17 +1360,17 @@ export type DrainLicense =
   | "apprentice-only";
 
 /**
- * A brain's will — what happens to the drained brain when the expert dies.
- * Stored in `brain_wills` store (one per brain).
+ * A mind's will — what happens to the drained mind when the expert dies.
+ * Stored in `mind_wills` store (one per mind).
  */
-export interface BrainWill {
-  brainId: string;
-  /** Current legacy status of the brain's owner. */
+export interface MindWill {
+  mindId: string;
+  /** Current legacy status of the mind's owner. */
   legacyStatus: LegacyStatus;
 
   /**
    * What happens on confirmed death.
-   * `private-forever` — brain dies with the owner. Used for entries the
+   * `private-forever` — mind dies with the owner. Used for entries the
    *                     expert never wanted shared (e.g. patient stories).
    * `delayed-unlock`  — private for N months, then legacy-unlocked.
    *                     Default: 12 months. Gives family time to grieve.
@@ -1383,7 +1383,7 @@ export interface BrainWill {
   /** User ID of the designated heir, when onDeath === "heir-designated". */
   heirUserId?: string;
 
-  /** Default license applied to all entries when the brain unlocks. */
+  /** Default license applied to all entries when the mind unlocks. */
   defaultLicenseOnUnlock: DrainLicense;
 
   /** Death confirmations — need 2 independent sources to transition. */
@@ -1414,7 +1414,7 @@ export interface DeathConfirmation {
  * "how much of this genius have we actually saved before they die?"
  */
 export interface DrainCompleteness {
-  brainId: string;
+  mindId: string;
   /** 0-100. */
   score: number;
   /** Breakdown of the score for transparency. */
@@ -1440,26 +1440,26 @@ export interface DrainCompleteness {
 /**
  * A read model for the lifelong timeline view (the "Facebook timeline
  * but for expertise" the user described). Not stored — computed on read
- * from drain_entries + brain_wills.
+ * from drain_entries + mind_wills.
  */
-export interface BrainTimelineEntry {
+export interface MindTimelineEntry {
   drainEntry: DrainEntry;
   /** Whether this entry is currently drinkable by the requesting user. */
   drinkable: boolean;
   /** Why it is or isn't drinkable. */
   drinkReason: string;
-  /** Legacy status of the brain at this point in the timeline. */
+  /** Legacy status of the mind at this point in the timeline. */
   legacyStatusAtEntry: LegacyStatus;
 }
 
-export interface BrainTimeline {
-  brainId: string;
+export interface MindTimeline {
+  mindId: string;
   ownerUserId: string;
   ownerTier: SkillTier;
   skill: string;
   legacyStatus: LegacyStatus;
   completeness: DrainCompleteness;
-  entries: BrainTimelineEntry[];
+  entries: MindTimelineEntry[];
 }
 
 // ── Phase 2: Provenance Ledger ───────────────────────────────────
@@ -1472,15 +1472,15 @@ export interface BrainTimeline {
 /**
  * The kind of record a provenance entry covers. Drains are the primary
  * case (they're the "worth more than gold" data), but we also hash
- * posts + comments + brain nodes so the whole content graph is
+ * posts + comments + mind nodes so the whole content graph is
  * tamper-evident.
  */
 export type ProvenanceRecordKind =
   | "drain-entry"
   | "post"
   | "comment"
-  | "brain-node"
-  | "brain-will"
+  | "mind-node"
+  | "mind-will"
   | "verification-record";
 
 /**

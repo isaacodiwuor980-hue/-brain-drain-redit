@@ -1,6 +1,6 @@
 # APEX-DEBUG 审计报告（修订版 v2）
 
-**项目**：Brain Drain（`/home/z/my-project/BRAIN-DRAIN-latest-`）
+**项目**：MindSpool（`/home/z/my-project/MindSpool-latest-`）
 **审计时段**：2026-11-04 23:20 → 2026-11-05 14:21（UTC+8）
 **审计员**：APEX-DEBUG 流程（科学家式 Phase 0–3）
 **审计范围**：只读审查，未修改任何代码、配置或数据。
@@ -91,7 +91,7 @@ Body: []
 | `posts` | 0 | ✗ feed 空的根因 |
 | `profiles` | 0 | ✗ 用户系统未启动 |
 | `reactions` | 0 | ✗ 无互动数据 |
-| `brains` | 0 | ✗ 无 brain 实体 |
+| `minds` | 0 | ✗ 无 mind 实体 |
 | `otp_requests` | HTTP 404 PGRST205 | ✗ 表不存在 |
 | `onboarding` | HTTP 404 PGRST205 | ✗ 表不存在 |
 | `personality_results` | HTTP 404 PGRST205 | ✗ 表不存在 |
@@ -114,7 +114,7 @@ Body: []
 ```http
 GET /api/v1/verify/test-user-123
 HTTP/1.1 501 Not Implemented
-{"error":"Not Implemented","message":"Verification page SSR is a stub. Full implementation pending.","roadmap":"Phase 2 — see Brain Drain Production Roadmap PDF"}
+{"error":"Not Implemented","message":"Verification page SSR is a stub. Full implementation pending.","roadmap":"Phase 2 — see MindSpool Production Roadmap PDF"}
 ```
 
 **路由代码**（`verify.ts` 全 27 行）：
@@ -123,7 +123,7 @@ router.get("/v1/verify/:userId", (_req, res) => {
   res.status(501).json({
     error: "Not Implemented",
     message: "Verification page SSR is a stub. Full implementation pending.",
-    roadmap: "Phase 2 — see Brain Drain Production Roadmap PDF",
+    roadmap: "Phase 2 — see MindSpool Production Roadmap PDF",
   });
 });
 ```
@@ -244,7 +244,7 @@ app.use(apiApp);
 | F8 | P2 | ✓ 确认 | verify 501 stub | Q3：已知 stub，注释明确说明 stash/restore 丢失 |
 | F9 | P3 | ✓ 确认 | MAINTENANCE_MODE 未设置 | Q5.3：当前未启用，但应作为部署文档的一部分 |
 | F10 | — | ✓ 确认 | posts 表 0 行（feed 空根因） | Q2：数据缺失，非代码缺陷 |
-| F11 | — | ✓ 确认 | profiles/reactions/brains 全空 | Q2：用户系统未启动 |
+| F11 | — | ✓ 确认 | profiles/reactions/minds 全空 | Q2：用户系统未启动 |
 | F12 | — | ✓ 确认 | 5 张新表全部 404 PGRST205 | Q2：otp_requests/onboarding/personality_results/experts/mentors 不存在 |
 | F13 | P2 | ✓ 确认 | pgvector 迁移风险 | 沿用 v1 推断，本轮未深入验证 |
 | F14–F22 | — | — | v1 清单中的次要项 | 沿用 v1，本轮未深入验证 |

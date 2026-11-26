@@ -1,5 +1,5 @@
 
-/home/z/my-project/BRAIN-DRAIN-latest-/App.tsx
+/home/z/my-project/MindSpool-latest-/App.tsx
   300:7  warning  Error: Calling setState synchronously within an effect can trigger cascading renders
 
 Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
@@ -8,19 +8,19 @@ Effects are intended to synchronize state between React and external systems suc
 
 Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
 
-/home/z/my-project/BRAIN-DRAIN-latest-/App.tsx:300:7
-  298 |         safeStorage.getSession("brain_builder_error_message") ||
+/home/z/my-project/MindSpool-latest-/App.tsx:300:7
+  298 |         safeStorage.getSession("mind_builder_error_message") ||
   299 |         "Persistent application error";
 > 300 |       setDefaultError(err);
       |       ^^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
   301 |       setIsOpen(true);
-  302 |       safeStorage.removeItem("brain_builder_open_bug_modal");
-  303 |       safeStorage.removeItem("brain_builder_error_message");  react-hooks/set-state-in-effect
+  302 |       safeStorage.removeItem("mind_builder_open_bug_modal");
+  303 |       safeStorage.removeItem("mind_builder_error_message");  react-hooks/set-state-in-effect
 
-/home/z/my-project/BRAIN-DRAIN-latest-/BrainDrawer.tsx
+/home/z/my-project/MindSpool-latest-/MindDrawer.tsx
   131:65  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
 
-/home/z/my-project/BRAIN-DRAIN-latest-/Dashboard.tsx
+/home/z/my-project/MindSpool-latest-/Dashboard.tsx
   44:9   warning  Error: Calling setState synchronously within an effect can trigger cascading renders
 
 Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
@@ -29,9 +29,9 @@ Effects are intended to synchronize state between React and external systems suc
 
 Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
 
-/home/z/my-project/BRAIN-DRAIN-latest-/Dashboard.tsx:44:9
-  42 |       if (sessionStorage.getItem("brain-drain-open-sample") === "1") {
-  43 |         sessionStorage.removeItem("brain-drain-open-sample");
+/home/z/my-project/MindSpool-latest-/Dashboard.tsx:44:9
+  42 |       if (sessionStorage.getItem("MindSpool-open-sample") === "1") {
+  43 |         sessionStorage.removeItem("MindSpool-open-sample");
 > 44 |         setIsSamplesOpen(true);
      |         ^^^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
   45 |       }
@@ -40,7 +40,7 @@ Calling setState synchronously within an effect body causes cascading renders th
   83:41  warning  Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          @typescript-eslint/no-explicit-any
   95:65  warning  Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          @typescript-eslint/no-explicit-any
 
-/home/z/my-project/BRAIN-DRAIN-latest-/NeuralGraph.tsx
+/home/z/my-project/MindSpool-latest-/NeuralGraph.tsx
   24:54  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
   25:51  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
   47:19  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
@@ -54,12 +54,12 @@ Calling setState synchronously within an effect body causes cascading renders th
   65:26  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
   67:17  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
 
-/home/z/my-project/BRAIN-DRAIN-latest-/NodeEditor.tsx
+/home/z/my-project/MindSpool-latest-/NodeEditor.tsx
   154:18  warning  Error: Cannot call impure function during render
 
 `Date.now` is an impure function. Calling an impure function can produce unstable results that update unpredictably when the component happens to re-render. (https://react.dev/reference/rules/components-and-hooks-must-be-pure#components-and-hooks-must-be-idempotent).
 
-/home/z/my-project/BRAIN-DRAIN-latest-/NodeEditor.tsx:154:18
+/home/z/my-project/MindSpool-latest-/NodeEditor.tsx:154:18
   152 |       completionLog: [],
   153 |       targetStreak: 7,
 > 154 |       createdAt: Date.now(),
@@ -71,7 +71,7 @@ Calling setState synchronously within an effect body causes cascading renders th
 
 `Date.now` is an impure function. Calling an impure function can produce unstable results that update unpredictably when the component happens to re-render. (https://react.dev/reference/rules/components-and-hooks-must-be-pure#components-and-hooks-must-be-idempotent).
 
-/home/z/my-project/BRAIN-DRAIN-latest-/NodeEditor.tsx:169:19
+/home/z/my-project/MindSpool-latest-/NodeEditor.tsx:169:19
   167 |       title: skill.title,
   168 |       steps: skill.steps,
 > 169 |       insertedAt: Date.now(),
@@ -83,7 +83,7 @@ Calling setState synchronously within an effect body causes cascading renders th
 
 `Date.now` is an impure function. Calling an impure function can produce unstable results that update unpredictably when the component happens to re-render. (https://react.dev/reference/rules/components-and-hooks-must-be-pure#components-and-hooks-must-be-idempotent).
 
-/home/z/my-project/BRAIN-DRAIN-latest-/NodeEditor.tsx:197:19
+/home/z/my-project/MindSpool-latest-/NodeEditor.tsx:197:19
   195 |       title: latest.title,
   196 |       steps: latest.steps,
 > 197 |       insertedAt: Date.now(),
@@ -92,12 +92,12 @@ Calling setState synchronously within an effect body causes cascading renders th
   199 |     updateNode(activeNode.id, { skillRef: updated });
   200 |     toast({ title: "Updated", description: `Updated to ${latest.title} (${latest.version})` });  react-hooks/purity
 
-/home/z/my-project/BRAIN-DRAIN-latest-/ReportBugModal.tsx
+/home/z/my-project/MindSpool-latest-/ReportBugModal.tsx
    67:28  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
    96:19  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
   169:66  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
 
-/home/z/my-project/BRAIN-DRAIN-latest-/ShareBrainModal.tsx
+/home/z/my-project/MindSpool-latest-/ShareMindModal.tsx
   35:15  warning  Error: Calling setState synchronously within an effect can trigger cascading renders
 
 Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
@@ -106,7 +106,7 @@ Effects are intended to synchronize state between React and external systems suc
 
 Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
 
-/home/z/my-project/BRAIN-DRAIN-latest-/ShareBrainModal.tsx:35:15
+/home/z/my-project/MindSpool-latest-/ShareMindModal.tsx:35:15
   33 |   useEffect(() => {
   34 |     const data = decodeShareHash(window.location.hash);
 > 35 |     if (data) setDecoded(data);
@@ -115,55 +115,55 @@ Calling setState synchronously within an effect body causes cascading renders th
   37 |
   38 |   const handleClose = () => {  react-hooks/set-state-in-effect
 
-/home/z/my-project/BRAIN-DRAIN-latest-/WizardModal.tsx
+/home/z/my-project/MindSpool-latest-/WizardModal.tsx
    50:18  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
    52:18  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
    55:18  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
   148:19  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
 
-/home/z/my-project/BRAIN-DRAIN-latest-/api-server/src/routes/habits.ts
+/home/z/my-project/MindSpool-latest-/api-server/src/routes/habits.ts
    64:37  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
    93:37  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
   129:37  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
   214:37  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
 
-/home/z/my-project/BRAIN-DRAIN-latest-/api-server/src/routes/search.ts
+/home/z/my-project/MindSpool-latest-/api-server/src/routes/search.ts
    99:25  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
   101:43  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
   125:28  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
   129:19  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
 
-/home/z/my-project/BRAIN-DRAIN-latest-/api-server/src/routes/skills.ts
+/home/z/my-project/MindSpool-latest-/api-server/src/routes/skills.ts
    55:37  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
   109:37  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
   184:37  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
 
-/home/z/my-project/BRAIN-DRAIN-latest-/auth/AuthContext.tsx
+/home/z/my-project/MindSpool-latest-/auth/AuthContext.tsx
   374:21  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
   421:21  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
   481:21  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
   548:21  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
   565:21  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
 
-/home/z/my-project/BRAIN-DRAIN-latest-/community/CircleRootAdmin.tsx
+/home/z/my-project/MindSpool-latest-/community/CircleRootAdmin.tsx
   238:41  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
 
-/home/z/my-project/BRAIN-DRAIN-latest-/feed/PostCard.tsx
+/home/z/my-project/MindSpool-latest-/feed/PostCard.tsx
   148:32  warning  Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              @typescript-eslint/no-explicit-any
   289:20  warning  Error: Cannot call impure function during render
 
 `Date.now` is an impure function. Calling an impure function can produce unstable results that update unpredictably when the component happens to re-render. (https://react.dev/reference/rules/components-and-hooks-must-be-pure#components-and-hooks-must-be-idempotent).
 
-/home/z/my-project/BRAIN-DRAIN-latest-/feed/PostCard.tsx:289:20
+/home/z/my-project/MindSpool-latest-/feed/PostCard.tsx:289:20
   287 |         commentCount: 0,
   288 |         repostCount: 0,
 > 289 |         createdAt: Date.now(),
       |                    ^^^^^^^^^^ Cannot call impure function
   290 |         authorName: profile?.displayName || "Me",
   291 |         mediaUrls: post.mediaUrls,
-  292 |         brainId: post.brainId,  react-hooks/purity
+  292 |         mindId: post.mindId,  react-hooks/purity
 
-/home/z/my-project/BRAIN-DRAIN-latest-/feed/PostCreator.tsx
+/home/z/my-project/MindSpool-latest-/feed/PostCreator.tsx
   200:7  warning  Error: Calling setState synchronously within an effect can trigger cascading renders
 
 Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
@@ -172,7 +172,7 @@ Effects are intended to synchronize state between React and external systems suc
 
 Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
 
-/home/z/my-project/BRAIN-DRAIN-latest-/feed/PostCreator.tsx:200:7
+/home/z/my-project/MindSpool-latest-/feed/PostCreator.tsx:200:7
   198 |   useEffect(() => {
   199 |     if (isOpen) {
 > 200 |       setPostType(initialPostType);
@@ -181,7 +181,7 @@ Calling setState synchronously within an effect body causes cascading renders th
   202 |         setSelectedQuestion(initialSelectedQuestion);
   203 |       }  react-hooks/set-state-in-effect
 
-/home/z/my-project/BRAIN-DRAIN-latest-/feed/StoriesBar.tsx
+/home/z/my-project/MindSpool-latest-/feed/StoriesBar.tsx
   198:7   warning  Error: Calling setState synchronously within an effect can trigger cascading renders
 
 Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
@@ -190,7 +190,7 @@ Effects are intended to synchronize state between React and external systems suc
 
 Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
 
-/home/z/my-project/BRAIN-DRAIN-latest-/feed/StoriesBar.tsx:198:7
+/home/z/my-project/MindSpool-latest-/feed/StoriesBar.tsx:198:7
   196 |   useEffect(() => {
   197 |     if (progress >= 100) {
 > 198 |       handleNext();
@@ -202,7 +202,7 @@ Calling setState synchronously within an effect body causes cascading renders th
 
 `Date.now` is an impure function. Calling an impure function can produce unstable results that update unpredictably when the component happens to re-render. (https://react.dev/reference/rules/components-and-hooks-must-be-pure#components-and-hooks-must-be-idempotent).
 
-/home/z/my-project/BRAIN-DRAIN-latest-/feed/StoriesBar.tsx:282:64
+/home/z/my-project/MindSpool-latest-/feed/StoriesBar.tsx:282:64
   280 |       let firstUnseenIdx = userSt.findIndex(s => !s.isViewed);
   281 |       if (firstUnseenIdx === -1) firstUnseenIdx = 0;
 > 282 |       setViewerState({ userIdx, storyIdx: firstUnseenIdx, key: Date.now(), isPaused: false });
@@ -211,7 +211,7 @@ Calling setState synchronously within an effect body causes cascading renders th
   284 |   };
   285 |                                                                                                                                                                                                                            react-hooks/purity
 
-/home/z/my-project/BRAIN-DRAIN-latest-/hooks/use-offline-sync.ts
+/home/z/my-project/MindSpool-latest-/hooks/use-offline-sync.ts
   122:12  warning  Error: Calling setState synchronously within an effect can trigger cascading renders
 
 Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
@@ -220,7 +220,7 @@ Effects are intended to synchronize state between React and external systems suc
 
 Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
 
-/home/z/my-project/BRAIN-DRAIN-latest-/hooks/use-offline-sync.ts:122:12
+/home/z/my-project/MindSpool-latest-/hooks/use-offline-sync.ts:122:12
   120 |   useEffect(() => {
   121 |     if (isOnline && queue.length > 0) {
 > 122 |       void syncNow();
@@ -229,7 +229,7 @@ Calling setState synchronously within an effect body causes cascading renders th
   124 |   }, [isOnline, queue.length, syncNow]);
   125 |  react-hooks/set-state-in-effect
 
-/home/z/my-project/BRAIN-DRAIN-latest-/hooks/use-realtime-session.ts
+/home/z/my-project/MindSpool-latest-/hooks/use-realtime-session.ts
   75:19  warning  Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 @typescript-eslint/no-explicit-any
   84:5   warning  Error: Calling setState synchronously within an effect can trigger cascading renders
 
@@ -239,7 +239,7 @@ Effects are intended to synchronize state between React and external systems suc
 
 Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
 
-/home/z/my-project/BRAIN-DRAIN-latest-/hooks/use-realtime-session.ts:84:5
+/home/z/my-project/MindSpool-latest-/hooks/use-realtime-session.ts:84:5
   82 |
   83 |   useEffect(() => {
 > 84 |     fetchSession();
@@ -248,33 +248,33 @@ Calling setState synchronously within an effect body causes cascading renders th
   86 |
   87 |   const persist = async (updated: RealtimeSession) => {  react-hooks/set-state-in-effect
 
-/home/z/my-project/BRAIN-DRAIN-latest-/hooks/use-toast.ts
+/home/z/my-project/MindSpool-latest-/hooks/use-toast.ts
   179:54  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
 
-/home/z/my-project/BRAIN-DRAIN-latest-/layout/AppShell.tsx
+/home/z/my-project/MindSpool-latest-/layout/AppShell.tsx
    69:18  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
   109:22  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
   124:20  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
   157:16  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
 
-/home/z/my-project/BRAIN-DRAIN-latest-/lib/confetti.ts
+/home/z/my-project/MindSpool-latest-/lib/confetti.ts
   45:28  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
   57:39  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
 
-/home/z/my-project/BRAIN-DRAIN-latest-/lib/device.ts
+/home/z/my-project/MindSpool-latest-/lib/device.ts
   103:28  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
 
-/home/z/my-project/BRAIN-DRAIN-latest-/lib/offline-sync.ts
+/home/z/my-project/MindSpool-latest-/lib/offline-sync.ts
   10:12  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
   36:73  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
 
-/home/z/my-project/BRAIN-DRAIN-latest-/lib/sw-cleanup.storage-blocked.test.ts
+/home/z/my-project/MindSpool-latest-/lib/sw-cleanup.storage-blocked.test.ts
   63:17  warning  Unexpected console statement. Only these console methods are allowed: warn, error  no-console
 
-/home/z/my-project/BRAIN-DRAIN-latest-/lib/theme.tsx
+/home/z/my-project/MindSpool-latest-/lib/theme.tsx
   84:34  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
 
-/home/z/my-project/BRAIN-DRAIN-latest-/library/SavedTopicsTab.tsx
+/home/z/my-project/MindSpool-latest-/library/SavedTopicsTab.tsx
   21:5  warning  Error: Calling setState synchronously within an effect can trigger cascading renders
 
 Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
@@ -283,7 +283,7 @@ Effects are intended to synchronize state between React and external systems suc
 
 Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
 
-/home/z/my-project/BRAIN-DRAIN-latest-/library/SavedTopicsTab.tsx:21:5
+/home/z/my-project/MindSpool-latest-/library/SavedTopicsTab.tsx:21:5
   19 |   useEffect(() => {
   20 |     const followed = topics.filter(t => t.isFollowed);
 > 21 |     setSavedTopics(followed);
@@ -292,13 +292,13 @@ Calling setState synchronously within an effect body causes cascading renders th
   23 |
   24 |   const handleReorder = async (newOrder: Topic[]) => {  react-hooks/set-state-in-effect
 
-/home/z/my-project/BRAIN-DRAIN-latest-/pages/CommunityPage.tsx
+/home/z/my-project/MindSpool-latest-/pages/CommunityPage.tsx
    291:40   warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
    291:108  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
   1015:63   warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
   1037:64   warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
 
-/home/z/my-project/BRAIN-DRAIN-latest-/pages/HomeFeed.tsx
+/home/z/my-project/MindSpool-latest-/pages/HomeFeed.tsx
   128:7   warning  Error: Calling setState synchronously within an effect can trigger cascading renders
 
 Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
@@ -307,7 +307,7 @@ Effects are intended to synchronize state between React and external systems suc
 
 Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
 
-/home/z/my-project/BRAIN-DRAIN-latest-/pages/HomeFeed.tsx:128:7
+/home/z/my-project/MindSpool-latest-/pages/HomeFeed.tsx:128:7
   126 |   useEffect(() => {
   127 |     if (window.location.search.includes("compose=1")) {
 > 128 |       openComposerFromMenu();
@@ -323,7 +323,7 @@ Effects are intended to synchronize state between React and external systems suc
 
 Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
 
-/home/z/my-project/BRAIN-DRAIN-latest-/pages/HomeFeed.tsx:199:5
+/home/z/my-project/MindSpool-latest-/pages/HomeFeed.tsx:199:5
   197 |   const [showColdStartBanner, setShowColdStartBanner] = useState(false);
   198 |   useEffect(() => {
 > 199 |     setShowColdStartBanner(shouldShowColdStartBanner(topics.length));
@@ -339,7 +339,7 @@ Effects are intended to synchronize state between React and external systems suc
 
 Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
 
-/home/z/my-project/BRAIN-DRAIN-latest-/pages/HomeFeed.tsx:210:5
+/home/z/my-project/MindSpool-latest-/pages/HomeFeed.tsx:210:5
   208 |
   209 |   useEffect(() => {
 > 210 |     setDisplayLimit(5);
@@ -351,7 +351,7 @@ Calling setState synchronously within an effect body causes cascading renders th
 
 `Date.now` is an impure function. Calling an impure function can produce unstable results that update unpredictably when the component happens to re-render. (https://react.dev/reference/rules/components-and-hooks-must-be-pure#components-and-hooks-must-be-idempotent).
 
-/home/z/my-project/BRAIN-DRAIN-latest-/pages/HomeFeed.tsx:312:19
+/home/z/my-project/MindSpool-latest-/pages/HomeFeed.tsx:312:19
   310 |     // FRAGMENT C: Apply Reddit-style sort mode on top of the ranked feed.
   311 |     if (!postIdFromUrl) {
 > 312 |       const now = Date.now();
@@ -360,7 +360,7 @@ Calling setState synchronously within an effect body causes cascading renders th
   314 |         allDisplayedPosts = [...allDisplayedPosts].sort((a, b) => b.createdAt - a.createdAt);
   315 |       } else if (sortMode === "top") {                                                                                                                                                                                                                                                                                                                                                                                react-hooks/purity
 
-/home/z/my-project/BRAIN-DRAIN-latest-/pages/MessagesPage.tsx
+/home/z/my-project/MindSpool-latest-/pages/MessagesPage.tsx
    83:7   warning  Error: Calling setState synchronously within an effect can trigger cascading renders
 
 Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
@@ -369,7 +369,7 @@ Effects are intended to synchronize state between React and external systems suc
 
 Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
 
-/home/z/my-project/BRAIN-DRAIN-latest-/pages/MessagesPage.tsx:83:7
+/home/z/my-project/MindSpool-latest-/pages/MessagesPage.tsx:83:7
   81 |     const cid = params.get("conversationId");
   82 |     if (cid) {
 > 83 |       setActiveId(cid);
@@ -381,19 +381,19 @@ Calling setState synchronously within an effect body causes cascading renders th
 
 `Date.now` is an impure function. Calling an impure function can produce unstable results that update unpredictably when the component happens to re-render. (https://react.dev/reference/rules/components-and-hooks-must-be-pure#components-and-hooks-must-be-idempotent).
 
-/home/z/my-project/BRAIN-DRAIN-latest-/pages/MessagesPage.tsx:100:22
+/home/z/my-project/MindSpool-latest-/pages/MessagesPage.tsx:100:22
    98 |       participantIds: [b.title, "me"],
    99 |       lastMessage: `Automated push: "Post related to ${b.title} highlights new structural gating."`,
 > 100 |       lastMessageAt: Date.now() - 3600000, // Fixed 1 hour ago (was Math.random — flickered every render)
       |                      ^^^^^^^^^^ Cannot call impure function
   101 |       unreadCount: 1,
-  102 |       isBrain: true
+  102 |       isMind: true
   103 |     }));                                                                                                                                                                                                                                                                                                                              react-hooks/purity
   119:59  warning  Error: Cannot call impure function during render
 
 `Date.now` is an impure function. Calling an impure function can produce unstable results that update unpredictably when the component happens to re-render. (https://react.dev/reference/rules/components-and-hooks-must-be-pure#components-and-hooks-must-be-idempotent).
 
-/home/z/my-project/BRAIN-DRAIN-latest-/pages/MessagesPage.tsx:119:59
+/home/z/my-project/MindSpool-latest-/pages/MessagesPage.tsx:119:59
   117 |           senderId: bTitle,
   118 |           content: `System Alert: Post tagged with ${bTitle} updated node constraints. Review cognitive layout.`,
 > 119 |           createdAt: activeConversation?.lastMessageAt || Date.now()
@@ -402,7 +402,7 @@ Calling setState synchronously within an effect body causes cascading renders th
   121 |       ];
   122 |     }                                                                                                                                                                                                                                                                                                                                                      react-hooks/purity
 
-/home/z/my-project/BRAIN-DRAIN-latest-/pages/MissionsPage.tsx
+/home/z/my-project/MindSpool-latest-/pages/MissionsPage.tsx
    107:44  warning  Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         @typescript-eslint/no-explicit-any
    118:5   warning  Error: Calling setState synchronously within an effect can trigger cascading renders
 
@@ -412,7 +412,7 @@ Effects are intended to synchronize state between React and external systems suc
 
 Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
 
-/home/z/my-project/BRAIN-DRAIN-latest-/pages/MissionsPage.tsx:118:5
+/home/z/my-project/MindSpool-latest-/pages/MissionsPage.tsx:118:5
   116 |       if (m.notes) notesByMilestone[m.id] = m.notes;
   117 |     }
 > 118 |     setMilestoneNotes((prev) => ({ ...notesByMilestone, ...prev }));
@@ -423,7 +423,7 @@ Calling setState synchronously within an effect body causes cascading renders th
    346:65  warning  Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         @typescript-eslint/no-explicit-any
   1062:61  warning  Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         @typescript-eslint/no-explicit-any
 
-/home/z/my-project/BRAIN-DRAIN-latest-/pages/ProfilePage.tsx
+/home/z/my-project/MindSpool-latest-/pages/ProfilePage.tsx
    89:60  warning  Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            @typescript-eslint/no-explicit-any
    91:58  warning  Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            @typescript-eslint/no-explicit-any
   106:67  warning  Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            @typescript-eslint/no-explicit-any
@@ -436,7 +436,7 @@ Calling setState synchronously within an effect body causes cascading renders th
 
 `Math.random` is an impure function. Calling an impure function can produce unstable results that update unpredictably when the component happens to re-render. (https://react.dev/reference/rules/components-and-hooks-must-be-pure#components-and-hooks-must-be-idempotent).
 
-/home/z/my-project/BRAIN-DRAIN-latest-/pages/ProfilePage.tsx:192:33
+/home/z/my-project/MindSpool-latest-/pages/ProfilePage.tsx:192:33
   190 |       displayName: `User ${(targetUserId || "Anon").substring(0, 5)}`,
   191 |       bio: "A fellow knowledge explorer in the network.",
 > 192 |       followerCount: Math.floor(Math.random() * 500) + 10,
@@ -448,7 +448,7 @@ Calling setState synchronously within an effect body causes cascading renders th
 
 `Math.random` is an impure function. Calling an impure function can produce unstable results that update unpredictably when the component happens to re-render. (https://react.dev/reference/rules/components-and-hooks-must-be-pure#components-and-hooks-must-be-idempotent).
 
-/home/z/my-project/BRAIN-DRAIN-latest-/pages/ProfilePage.tsx:193:34
+/home/z/my-project/MindSpool-latest-/pages/ProfilePage.tsx:193:34
   191 |       bio: "A fellow knowledge explorer in the network.",
   192 |       followerCount: Math.floor(Math.random() * 500) + 10,
 > 193 |       followingCount: Math.floor(Math.random() * 200) + 5
@@ -460,7 +460,7 @@ Calling setState synchronously within an effect body causes cascading renders th
 
 `Math.random` is an impure function. Calling an impure function can produce unstable results that update unpredictably when the component happens to re-render. (https://react.dev/reference/rules/components-and-hooks-must-be-pure#components-and-hooks-must-be-idempotent).
 
-/home/z/my-project/BRAIN-DRAIN-latest-/pages/ProfilePage.tsx:287:43
+/home/z/my-project/MindSpool-latest-/pages/ProfilePage.tsx:287:43
   285 |     id: "me",
   286 |     xp: 0,
 > 287 |     level: isCurrentUser ? 1 : Math.floor(Math.random() * 20) + 5,
@@ -472,18 +472,18 @@ Calling setState synchronously within an effect body causes cascading renders th
 
 `Math.random` is an impure function. Calling an impure function can produce unstable results that update unpredictably when the component happens to re-render. (https://react.dev/reference/rules/components-and-hooks-must-be-pure#components-and-hooks-must-be-idempotent).
 
-/home/z/my-project/BRAIN-DRAIN-latest-/pages/ProfilePage.tsx:288:44
+/home/z/my-project/MindSpool-latest-/pages/ProfilePage.tsx:288:44
   286 |     xp: 0,
   287 |     level: isCurrentUser ? 1 : Math.floor(Math.random() * 20) + 5,
 > 288 |     streak: isCurrentUser ? 0 : Math.floor(Math.random() * 10),
       |                                            ^^^^^^^^^^^^^ Cannot call impure function
   289 |     lastActiveDate: "",
   290 |     totalMissionsCompleted: 0,
-  291 |     totalBrainsCreated: 0,                                                                  react-hooks/purity
+  291 |     totalMindsCreated: 0,                                                                  react-hooks/purity
   550:38  warning  Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            @typescript-eslint/no-explicit-any
   606:53  warning  Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            @typescript-eslint/no-explicit-any
 
-/home/z/my-project/BRAIN-DRAIN-latest-/pages/SearchPage.tsx
+/home/z/my-project/MindSpool-latest-/pages/SearchPage.tsx
   50:7  warning  Error: Calling setState synchronously within an effect can trigger cascading renders
 
 Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
@@ -492,20 +492,20 @@ Effects are intended to synchronize state between React and external systems suc
 
 Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
 
-/home/z/my-project/BRAIN-DRAIN-latest-/pages/SearchPage.tsx:50:7
+/home/z/my-project/MindSpool-latest-/pages/SearchPage.tsx:50:7
   48 |     const queryFromUrl = new URLSearchParams(window.location.search).get("q");
   49 |     if (queryFromUrl) {
 > 50 |       setQuery(queryFromUrl);
      |       ^^^^^^^^ Avoid calling setState() directly within an effect
   51 |     }
   52 |
-  53 |     const saved = safeStorage.getItem("brain-builder-recent-searches");  react-hooks/set-state-in-effect
+  53 |     const saved = safeStorage.getItem("mind-builder-recent-searches");  react-hooks/set-state-in-effect
 
-/home/z/my-project/BRAIN-DRAIN-latest-/pages/SettingsPage.tsx
+/home/z/my-project/MindSpool-latest-/pages/SettingsPage.tsx
   123:16  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
   125:18  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
 
-/home/z/my-project/BRAIN-DRAIN-latest-/pages/TopicDetailPage.tsx
+/home/z/my-project/MindSpool-latest-/pages/TopicDetailPage.tsx
   23:7  warning  Error: Calling setState synchronously within an effect can trigger cascading renders
 
 Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
@@ -514,7 +514,7 @@ Effects are intended to synchronize state between React and external systems suc
 
 Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
 
-/home/z/my-project/BRAIN-DRAIN-latest-/pages/TopicDetailPage.tsx:23:7
+/home/z/my-project/MindSpool-latest-/pages/TopicDetailPage.tsx:23:7
   21 |     if (!topicsLoading) {
   22 |       const found = topics.find(t => t.id === params.id);
 > 23 |       setTopic(found || null);
@@ -530,7 +530,7 @@ Effects are intended to synchronize state between React and external systems suc
 
 Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
 
-/home/z/my-project/BRAIN-DRAIN-latest-/pages/TopicDetailPage.tsx:29:7
+/home/z/my-project/MindSpool-latest-/pages/TopicDetailPage.tsx:29:7
   27 |   useEffect(() => {
   28 |     if (!postsLoading && topic) {
 > 29 |       setTopicPosts(posts.filter(p => p.topicId === topic.id));
@@ -539,13 +539,13 @@ Calling setState synchronously within an effect body causes cascading renders th
   31 |   }, [posts, topic, postsLoading]);
   32 |  react-hooks/set-state-in-effect
 
-/home/z/my-project/BRAIN-DRAIN-latest-/pages/TopicsPage.tsx
+/home/z/my-project/MindSpool-latest-/pages/TopicsPage.tsx
   56:44  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
 
-/home/z/my-project/BRAIN-DRAIN-latest-/profile/ContributionHeatmap.tsx
+/home/z/my-project/MindSpool-latest-/profile/ContributionHeatmap.tsx
   9:11  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
 
-/home/z/my-project/BRAIN-DRAIN-latest-/profile/EditProfileModal.tsx
+/home/z/my-project/MindSpool-latest-/profile/EditProfileModal.tsx
   32:7   warning  Error: Calling setState synchronously within an effect can trigger cascading renders
 
 Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
@@ -554,7 +554,7 @@ Effects are intended to synchronize state between React and external systems suc
 
 Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
 
-/home/z/my-project/BRAIN-DRAIN-latest-/profile/EditProfileModal.tsx:32:7
+/home/z/my-project/MindSpool-latest-/profile/EditProfileModal.tsx:32:7
   30 |   useEffect(() => {
   31 |     if (isOpen) {
 > 32 |       setEditedProfile(profile);
@@ -565,12 +565,12 @@ Calling setState synchronously within an effect body causes cascading renders th
   54:96  warning  Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      @typescript-eslint/no-explicit-any
   61:79  warning  Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      @typescript-eslint/no-explicit-any
 
-/home/z/my-project/BRAIN-DRAIN-latest-/profile/ProfileNote.tsx
+/home/z/my-project/MindSpool-latest-/profile/ProfileNote.tsx
   25:100  warning  Error: Cannot call impure function during render
 
 `Date.now` is an impure function. Calling an impure function can produce unstable results that update unpredictably when the component happens to re-render. (https://react.dev/reference/rules/components-and-hooks-must-be-pure#components-and-hooks-must-be-idempotent).
 
-/home/z/my-project/BRAIN-DRAIN-latest-/profile/ProfileNote.tsx:25:100
+/home/z/my-project/MindSpool-latest-/profile/ProfileNote.tsx:25:100
   23 |
   24 |   // Get active note for current user
 > 25 |   const activeNote = stories.find(s => s.userId === user?.id && s.type === "note" && s.expiresAt > Date.now());
@@ -579,10 +579,10 @@ Calling setState synchronously within an effect body causes cascading renders th
   27 |   const handlePublishNote = async () => {
   28 |     if (!noteContent || !user) return;  react-hooks/purity
 
-/home/z/my-project/BRAIN-DRAIN-latest-/runtime/BrainChatRuntime.tsx
+/home/z/my-project/MindSpool-latest-/runtime/MindChatRuntime.tsx
   409:58  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
 
-/home/z/my-project/BRAIN-DRAIN-latest-/runtime/RealtimeSessionView.tsx
+/home/z/my-project/MindSpool-latest-/runtime/RealtimeSessionView.tsx
   162:7   warning  Error: Calling setState synchronously within an effect can trigger cascading renders
 
 Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
@@ -591,7 +591,7 @@ Effects are intended to synchronize state between React and external systems suc
 
 Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
 
-/home/z/my-project/BRAIN-DRAIN-latest-/runtime/RealtimeSessionView.tsx:162:7
+/home/z/my-project/MindSpool-latest-/runtime/RealtimeSessionView.tsx:162:7
   160 |     if (localStream) {
   161 |       localStream.getTracks().forEach(t => t.stop());
 > 162 |       setLocalStream(null);
@@ -604,7 +604,7 @@ Calling setState synchronously within an effect body causes cascading renders th
 
 `Date.now` is an impure function. Calling an impure function can produce unstable results that update unpredictably when the component happens to re-render. (https://react.dev/reference/rules/components-and-hooks-must-be-pure#components-and-hooks-must-be-idempotent).
 
-/home/z/my-project/BRAIN-DRAIN-latest-/runtime/RealtimeSessionView.tsx:813:46
+/home/z/my-project/MindSpool-latest-/runtime/RealtimeSessionView.tsx:813:46
   811 |                     <a
   812 |                       href={lastRecordingUrl}
 > 813 |                       download={`recording-${Date.now()}.webm`}
@@ -613,7 +613,7 @@ Calling setState synchronously within an effect body causes cascading renders th
   815 |                       className="inline-flex items-center gap-2 px-4 py-2.5 rounded-full text-xs font-semibold bg-emerald-500/15 text-emerald-600 border border-emerald-500/30"
   816 |                     >                                                                                                                                                      react-hooks/purity
 
-/home/z/my-project/BRAIN-DRAIN-latest-/ui/admin-gate-dialog.tsx
+/home/z/my-project/MindSpool-latest-/ui/admin-gate-dialog.tsx
   47:16  warning  Error: Calling setState synchronously within an effect can trigger cascading renders
 
 Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
@@ -622,7 +622,7 @@ Effects are intended to synchronize state between React and external systems suc
 
 Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
 
-/home/z/my-project/BRAIN-DRAIN-latest-/ui/admin-gate-dialog.tsx:47:16
+/home/z/my-project/MindSpool-latest-/ui/admin-gate-dialog.tsx:47:16
   45 |
   46 |   useEffect(() => {
 > 47 |     if (!open) setPhrase("");
@@ -631,7 +631,7 @@ Calling setState synchronously within an effect body causes cascading renders th
   49 |
   50 |   const matches = matchesAdminPhrase(phrase);  react-hooks/set-state-in-effect
 
-/home/z/my-project/BRAIN-DRAIN-latest-/ui/connection-loader.tsx
+/home/z/my-project/MindSpool-latest-/ui/connection-loader.tsx
   14:5  warning  Error: Calling setState synchronously within an effect can trigger cascading renders
 
 Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
@@ -640,7 +640,7 @@ Effects are intended to synchronize state between React and external systems suc
 
 Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
 
-/home/z/my-project/BRAIN-DRAIN-latest-/ui/connection-loader.tsx:14:5
+/home/z/my-project/MindSpool-latest-/ui/connection-loader.tsx:14:5
   12 |
   13 |   useEffect(() => {
 > 14 |     setVisible(true);
