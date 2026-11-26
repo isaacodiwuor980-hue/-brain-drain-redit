@@ -47,14 +47,11 @@ beforeEach(() => {
 const auth = (user: string) => ({ authorization: `Bearer ${user}` });
 async function save(user: string) { return fetch(`${base}/api/brains`, { method: "POST", headers: { ...auth(user), "content-type": "application/json" }, body: JSON.stringify({ brain: { id: "brain1", title: "Private" }, nodes: [] }) }); }
 describe("brain routes with mocked identity and database", () => {
-  it("uses mapped UUID for save and never the raw Firebase subject", async () => {
-    expect((await save("alice")).status).toBe(201);
-    expect(db.rpc).toHaveBeenCalledWith("save_brain_atomic", expect.objectContaining({ p_uid: a }));
-  });
-  it("does not write for unmapped users or lookup failure", async () => {
-    expect((await save("unknown")).status).toBe(403);
-    expect((await save("unavailable")).status).toBe(503);
+  it("pauses full-snapshot save even for mapped accounts", async () => {
+    expect((await save("alice")).status).toBe(503);
+    expect((await save("unknown")).status).toBe(503);
     expect(db.rpc).not.toHaveBeenCalled();
+    expect(db.getOne).not.toHaveBeenCalled();
   });
   it("scopes private list to the mapped UUID", async () => {
     const response = await fetch(`${base}/api/brains?mine=true`, { headers: auth("alice") });

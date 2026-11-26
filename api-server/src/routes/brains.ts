@@ -7,30 +7,6 @@ import { lookupMappedIdentity, requireMappedIdentity } from "../middleware/ident
 
 const router: IRouter = Router();
 
-const NodeSchema = z.object({
-  id: z.string().min(1).max(120).regex(/^[A-Za-z0-9_-]+$/, "id must be a slug"),
-  brain_id: z.string().min(1).max(120).regex(/^[A-Za-z0-9_-]+$/, "brain_id must be a slug"),
-  node_type: z.enum(["question", "outcome"]),
-  question_text: z.string().max(5000).nullable().optional(),
-  result_text: z.string().max(5000).nullable().optional(),
-  next_steps: z.string().max(10000).nullable().optional(),
-  if_true_node_id: z.string().max(120).nullable().optional(),
-  if_false_node_id: z.string().max(120).nullable().optional(),
-  attachments: z.array(z.unknown()).default([]),
-});
-
-const BrainSchema = z.object({
-  id: z.string().min(1).max(120).regex(/^[A-Za-z0-9_-]+$/, "id must be a slug"),
-  title: z.string().min(1).max(200),
-  category: z.string().max(200).default(""),
-  description: z.string().max(5000).default(""),
-  root_node_id: z.string().max(120).nullable().optional(),
-  is_public: z.boolean().default(false),
-  is_favorite: z.boolean().default(false),
-  repo_status: z.enum(["private", "public_repo"]).nullable().optional(),
-  active_branch: z.string().max(120).nullable().optional(),
-});
-
 const ListQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(50),
   offset: z.coerce.number().int().min(0).default(0),
@@ -195,56 +171,12 @@ router.get("/brains/:id", (_req, res, next) => { res.setHeader("Cache-Control", 
   }
 });
 
-const UpsertBrainSchema = z.object({
-  brain: BrainSchema,
-  nodes: z.array(NodeSchema).max(500),
-});
-
-/** Atomically create or update an owned brain and replace its nodes. */
-router.post("/brains", requireAuth, requireMappedIdentity, async (req, res) => {
-  const parsed = UpsertBrainSchema.safeParse(req.body);
-  if (!parsed.success) {
-    res.status(400).json({ error: "Invalid brain", details: parsed.error.flatten() });
-    return;
-  }
-  if (!supabase.isConfigured()) {
-    res.status(503).json({ error: "Brains not configured" });
-    return;
-  }
-
-  const { brain: input, nodes } = parsed.data;
-  const uid = req.mappedUserId!;
-
-  try {
-    // One database transaction enforces ownership and replaces the node set.
-    // If migration 0005 has not been deployed, fail closed instead of falling
-    // back to the old service-role read/check/upsert race.
-    const result = await supabase.rpc<{ brain: BrainRow; created: boolean; nodeCount: number }>(
-      "save_brain_atomic",
-      { p_uid: uid, p_brain: input, p_nodes: nodes },
-    );
-    res.status(result.created ? 201 : 200).json({
-      brain: toClientBrain(result.brain),
-      nodeCount: result.nodeCount,
-    });
-  } catch (error) {
-    if (error instanceof SupabaseError) {
-      let code: unknown;
-      try {
-        const body = typeof error.body === "string" ? JSON.parse(error.body) : error.body;
-        code = (body as { code?: unknown } | null)?.code;
-      } catch { /* malformed upstream error */ }
-      if (code === "42501") {
-        res.status(403).json({ error: "Brain or node ownership conflict" });
-      } else if (code === "22023") {
-        res.status(400).json({ error: "Invalid brain topology" });
-      } else {
-        res.status(502).json({ error: "Could not save brain" });
-      }
-      return;
-    }
-    throw error;
-  }
+/** The legacy full-snapshot writer cannot detect concurrent edits or retain
+ * all rich fields. Never invoke it from this mounted API, even if the RPC is
+ * present and the caller has an identity mapping. */
+router.post("/brains", (_req, res) => {
+  res.setHeader("Cache-Control", "no-store");
+  res.status(503).json({ error: "Cloud brain saving temporarily unavailable" });
 });
 
 /** Delete a brain (author only). Cascades to nodes via the schema. */

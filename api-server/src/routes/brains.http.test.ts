@@ -18,7 +18,6 @@ vi.mock("../middleware/auth", () => ({
   optionalAuth(_req: express.Request, _res: express.Response, next: express.NextFunction) { next(); },
 }));
 import router from "./brains";
-import { SupabaseError } from "../lib/supabase";
 
 let server: Server;
 let base: string;
@@ -39,24 +38,15 @@ async function post(body: unknown, authenticated = true) {
   return fetch(`${base}/api/brains`, { method: "POST", headers: { "content-type": "application/json", ...(authenticated ? { authorization: "Bearer test" } : {}) }, body: JSON.stringify(body) });
 }
 
-describe("brain save API with isolated auth/database mocks", () => {
-  it("rejects unauthenticated and invalid requests before database access", async () => {
-    expect((await post(payload, false)).status).toBe(401);
-    expect((await post({ brain: { id: "bad id", title: "x" }, nodes: [] })).status).toBe(400);
+describe("paused legacy brain save API with isolated database mocks", () => {
+  it("rejects full-snapshot writes regardless of authentication or payload", async () => {
+    for (const [body, authenticated] of [[payload, true], [payload, false], [{ brain: { id: "bad id" }, nodes: [] }, true]] as const) {
+      const response = await post(body, authenticated);
+      expect(response.status).toBe(503);
+      expect(response.headers.get("cache-control")).toContain("no-store");
+      expect(await response.json()).toEqual({ error: "Cloud brain saving temporarily unavailable" });
+    }
     expect(mock.rpc).not.toHaveBeenCalled();
-  });
-  it("sends the verified mapped UUID and payload to the atomic database function", async () => {
-    mock.rpc.mockResolvedValue({ created: true, nodeCount: 0, brain: { id: "b1", author_id: "00000000-0000-4000-8000-000000000001", title: "Example", category: "", description: "", root_node_id: null, is_public: false, is_favorite: false, repo_status: null, active_branch: null, created_at: "2025-01-01T00:00:00Z" } });
-    const response = await post(payload);
-    expect(response.status).toBe(201);
-    expect(mock.rpc).toHaveBeenCalledWith("save_brain_atomic", expect.objectContaining({ p_uid: "00000000-0000-4000-8000-000000000001", p_nodes: [] }));
-    expect(await response.json()).toMatchObject({ nodeCount: 0, brain: { id: "b1", created_at: 1735689600000 } });
-  });
-  it("fails closed on ownership conflicts and unavailable migrations", async () => {
-    mock.rpc.mockRejectedValueOnce(new SupabaseError("conflict", 403, JSON.stringify({ code: "42501" })));
-    expect((await post(payload)).status).toBe(403);
-    mock.rpc.mockRejectedValueOnce(new SupabaseError("missing function", 404, JSON.stringify({ code: "PGRST202" })));
-    expect((await post(payload)).status).toBe(502);
-    expect(mock.rpc).toHaveBeenCalledTimes(2);
+    expect(mock.getOne).not.toHaveBeenCalled();
   });
 });
