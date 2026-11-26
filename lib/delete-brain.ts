@@ -1,23 +1,11 @@
 import { idb } from "./db";
-import { env } from "./env";
-import { getAuthToken } from "./auth-token";
-import { deleteBrain as deleteBrainApi, isBrainsError } from "./api/brains";
 
-export type BrainDeletionResult = { cloud: "deleted" | "not-found" | "unconfirmed" };
+export type BrainDeletionResult = { cloud: "paused" };
 
-/** Delete local data durably, then attempt a cloud deletion if signed in.
- * An unconfirmed cloud deletion is NOT queued and may reappear on refresh. */
+/** Local records have no verified account owner, so an ID from this device
+ * must not be used to delete whichever account's cloud copy happens to match.
+ * Local deletion is durable; no cloud request or automatic retry is made. */
 export async function deleteBrainData(brainId: string): Promise<BrainDeletionResult> {
   await idb.deleteBrainWithNodes(brainId);
-  if (!env.apiEnabled) return { cloud: "unconfirmed" };
-  try {
-    const token = await getAuthToken();
-    if (!token) return { cloud: "unconfirmed" };
-    await deleteBrainApi(brainId, token);
-    return { cloud: "deleted" };
-  } catch (error) {
-    if (isBrainsError(error, 404)) return { cloud: "not-found" };
-    console.warn("Local brain deleted; cloud deletion was not confirmed.", error);
-    return { cloud: "unconfirmed" };
-  }
+  return { cloud: "paused" };
 }

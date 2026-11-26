@@ -88,15 +88,11 @@ export function BrainDrawer({ brain, isOpen, onClose, onLaunch, onDelete, onExpo
     deleteInProgress.current = true;
     triggerHaptic("warning");
     try {
-      const result = await onDelete(brain.id);
+      await onDelete(brain.id);
       onClose();
-      toast(result.cloud === "unconfirmed" ? {
-        title: "Brain and nodes removed locally",
-        description: "Cloud deletion could not be confirmed and was not queued. A cloud copy may reappear.",
-        variant: "destructive",
-      } : {
-        title: "Brain deleted",
-        description: result.cloud === "deleted" ? "Brain and nodes deleted locally and from the cloud." : "Brain and nodes deleted locally; no cloud copy was found.",
+      toast({
+        title: "Brain and nodes removed from this device",
+        description: "Cloud deletion is paused; any cloud copy remains and may reappear.",
       });
     } catch (error) {
       toast({ title: "Could not delete brain", description: error instanceof Error ? error.message : "Please try again.", variant: "destructive" });
@@ -834,7 +830,7 @@ export function BrainDrawer({ brain, isOpen, onClose, onLaunch, onDelete, onExpo
                         <AlertDialogHeader>
                           <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
                           <AlertDialogDescription>
-                            This action cannot be undone. This will permanently delete {brain.title} and remove it from your device.
+                            This permanently removes {brain.title} and its nodes from this device. Cloud deletion is paused, so any cloud copy remains and may reappear.
                           </AlertDialogDescription>
                         </AlertDialogHeader>
                         <AlertDialogFooter>

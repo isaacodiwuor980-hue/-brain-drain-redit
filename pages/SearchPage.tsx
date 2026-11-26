@@ -6,6 +6,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { trackEvent } from "@/lib/analytics";
 import { idb } from "@/lib/db";
+import { collectLocalBrainExport } from "@/lib/brain-local-export";
 import { Brain, Topic, Post, SkillEntry } from "@/lib/types";
 import { useLocation, useSearch } from "wouter";
 import { useToast } from "@/hooks/use-toast";
@@ -133,8 +134,8 @@ export function SearchPage() {
   };
 
   const exportBrain = (b: Brain) => {
-    idb.getAllByIndex("nodes", "brain_id", b.id).then(nodes => {
-      const exportObj = { brains: [b], nodes };
+    if (!window.confirm("Export this browser's local brain? Its ownership may not be verified, and cloud data is not included.")) return;
+    collectLocalBrainExport(b.id).then(exportObj => {
       const blob = new Blob([JSON.stringify(exportObj, null, 2)], { type: "application/json" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");

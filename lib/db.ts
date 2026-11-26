@@ -493,6 +493,34 @@ export function resetDBConnection() {
 }
 
 export const idb = {
+  /** Read brain and node stores in one transaction without storage fallback.
+   * A single-brain export rejects a missing or metadata-only record. */
+  async readBrainExportSnapshot<TBrain extends { id: string; __cloudMetadataOnly?: boolean }, TNode>(brainId?: string): Promise<{ brains: TBrain[]; nodes: TNode[] }> {
+    if (brainId !== undefined && (typeof brainId !== "string" || !brainId)) throw new Error("Invalid brain ID");
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(["brains", "nodes"], "readonly");
+      const brains = tx.objectStore("brains");
+      const nodes = tx.objectStore("nodes");
+      const brainRequest = brainId === undefined ? brains.getAll() : brains.get(brainId);
+      const nodeRequest = brainId === undefined ? nodes.getAll() : nodes.index("brain_id").getAll(brainId);
+      let found: TBrain[] = [];
+      let foundNodes: TNode[] = [];
+      brainRequest.onsuccess = () => {
+        found = brainId === undefined ? brainRequest.result as TBrain[] : brainRequest.result === undefined ? [] : [brainRequest.result as TBrain];
+      };
+      nodeRequest.onsuccess = () => { foundNodes = nodeRequest.result as TNode[]; };
+      tx.oncomplete = () => {
+        if (brainId !== undefined && (!found.length || found[0].__cloudMetadataOnly)) {
+          reject(new Error("Complete local brain data is unavailable for export.")); return;
+        }
+        resolve({ brains: found, nodes: foundNodes });
+      };
+      tx.onerror = () => reject(tx.error ?? new Error("Local export read failed"));
+      tx.onabort = () => reject(tx.error ?? new Error("Local export read aborted"));
+    });
+  },
+
   /** Persist a local-first brain and its nodes atomically. Unlike cache writes,
    * this must reject when storage is unavailable: no cloud write backs it up. */
   async saveBrainWithNodes(brain: { id: string }, nodes: Array<{ id: string; brain_id: string }>): Promise<void> {

@@ -75,6 +75,8 @@ export interface CreatePostInput {
   id: string;
   topicId: string;
   content: string;
+  /** Client explicitly requests the only supported audience. */
+  audience: "public";
   tags?: string[];
   postType?: "post" | "question" | "answer" | "note";
   event?: Post["event"];
@@ -89,6 +91,7 @@ export function toCreatePostInput(post: Post): CreatePostInput {
     id: post.id,
     topicId: post.topicId,
     content: post.content,
+    audience: "public",
     tags: post.tags,
     postType: post.postType,
     event: post.event,

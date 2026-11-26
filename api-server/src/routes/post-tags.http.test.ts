@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import express from "express";
 import type { Server } from "node:http";
-const db = vi.hoisted(() => ({ insert: vi.fn(), get: vi.fn(), isConfigured: vi.fn(() => true) }));
+const db = vi.hoisted(() => ({ insert: vi.fn(), get: vi.fn(), getOne: vi.fn(), isConfigured: vi.fn(() => true) }));
 vi.mock("../lib/supabase", () => ({ supabase: db, SupabaseError: class extends Error { status = 500; } }));
 vi.mock("../middleware/auth", () => ({
   requireAuth(req: express.Request, _res: express.Response, next: express.NextFunction) { req.auth = { uid: "author" }; next(); },
@@ -16,8 +16,8 @@ beforeAll(async () => {
   const address = server.address(); if (!address || typeof address === "string") throw new Error("No port"); base = `http://127.0.0.1:${address.port}`;
 });
 afterAll(async () => { await new Promise<void>((resolve, reject) => server.close(err => err ? reject(err) : resolve())); });
-beforeEach(() => { vi.clearAllMocks(); db.isConfigured.mockReturnValue(true); });
-const input = { id: "tagged-post", topicId: "coding", content: "example", tags: [" Coding ", "TypeScript"] };
+beforeEach(() => { vi.clearAllMocks(); db.isConfigured.mockReturnValue(true); db.getOne.mockResolvedValue({supabase_uid:"00000000-0000-4000-8000-000000000001"}); });
+const input = { id: "tagged-post", topicId: "coding", content: "example", audience: "public", tags: [" Coding ", "TypeScript"] };
 async function create(body: unknown) { return fetch(`${base}/api/posts`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) }); }
 describe("post tags round trip with mocked storage", () => {
   it("validates, stores, returns and reads tags in a feed", async () => {
@@ -34,7 +34,7 @@ describe("post tags round trip with mocked storage", () => {
   it.each([[" ", "valid"], ["a".repeat(41)], Array.from({ length: 11 }, () => "tag")])("rejects invalid tag lists", async (tags) => {
     expect((await create({ ...input, tags })).status).toBe(400); expect(db.insert).not.toHaveBeenCalled();
   });
-  it("keeps old clients without tags compatible", async () => {
+  it("accepts confirmed public posts without optional tags", async () => {
     db.insert.mockResolvedValueOnce(undefined);
     const { tags: _tags, ...oldClient } = input; const res = await create(oldClient);
     expect(res.status).toBe(201); expect((await res.json()).post.tags).toEqual([]);

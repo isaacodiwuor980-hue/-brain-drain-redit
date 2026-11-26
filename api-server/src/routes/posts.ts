@@ -2,6 +2,7 @@ import { Router, type IRouter, type RequestHandler } from "express";
 import { z } from "zod";
 import { supabase, SupabaseError } from "../lib/supabase";
 import { requireAuth } from "../middleware/auth";
+import { requireMappedIdentity } from "../middleware/identity-map";
 
 const router: IRouter = Router();
 
@@ -9,6 +10,9 @@ const CreatePostSchema = z.object({
   id: z.string().min(1).max(120),
   topicId: z.string().min(1).max(80),
   content: z.string().min(1).max(10_000),
+  // Only an explicit public audience is supported; never silently strip a
+  // private/Room audience from an older client and publish the post publicly.
+  audience: z.literal("public"),
   tags: z.array(z.string().trim().min(1).max(40)).max(10).optional(),
   postType: z.enum(["post", "question", "answer"]).default("post"),
   event: z
@@ -17,16 +21,14 @@ const CreatePostSchema = z.object({
       startsAt: z.number().int().positive(),
       endsAt: z.number().int().positive().optional(),
       location: z.string().max(200).optional(),
-      communityId: z.string().max(80).optional(),
-      communityName: z.string().max(200).optional(),
-    })
+    }).strict()
     .optional(),
   mediaUrls: z.array(z.string().url().max(2000)).max(10).optional(),
   // PostgREST filters below accept only simple IDs, not filter syntax.
   brainId: z.string().min(1).max(120).regex(/^[A-Za-z0-9_-]+$/).optional(),
   // Date.toISOString throws outside the JavaScript Date range.
   createdAt: z.number().int().positive().max(8_640_000_000_000_000).optional(),
-});
+}).strict();
 
 const ReactSchema = z.object({
   reactionType: z.enum(["upvote", "downvote", "repost"]),
@@ -36,7 +38,7 @@ const ReactSchema = z.object({
  * Create a post. Authenticated users only. Posts are written to Supabase and
  * also reflected back to the client for optimistic IndexedDB caching.
  */
-router.post("/posts", requireAuth, async (req, res) => {
+router.post("/posts", (_req, res, next) => { res.setHeader("Cache-Control", "no-store"); next(); }, requireAuth, requireMappedIdentity, async (req, res) => {
   const parsed = CreatePostSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "Invalid post", details: parsed.error.flatten() });
@@ -48,7 +50,6 @@ router.post("/posts", requireAuth, async (req, res) => {
     return;
   }
 
-  const { auth } = req;
   const input = parsed.data;
 
   if (input.brainId) {
@@ -70,7 +71,7 @@ router.post("/posts", requireAuth, async (req, res) => {
 
   const row = {
     id: input.id,
-    user_id: auth!.uid,
+    user_id: req.mappedUserId!,
     topic_id: input.topicId,
     content: input.content,
     tags: input.tags ?? [],

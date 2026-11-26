@@ -61,13 +61,15 @@ describe("unmounted legacy reaction transitions with a mocked database", () => {
 
 describe("post creation timestamp validation", () => {
   it("rejects an out-of-range date before writing instead of throwing during serialization", async () => {
-    const res = await fetch(`${base}/api/posts`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ id: "post1", topicId: "topic1", content: "hello", createdAt: 8_640_000_000_000_001 }) });
+    db.getOne.mockResolvedValueOnce({supabase_uid:"00000000-0000-4000-8000-000000000001"});
+    const res = await fetch(`${base}/api/posts`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ id: "post1", topicId: "topic1", content: "hello", audience:"public", createdAt: 8_640_000_000_000_001 }) });
     expect(res.status).toBe(400); expect(db.insert).not.toHaveBeenCalled();
   });
   it("accepts an ordinary creation timestamp", async () => {
+    db.getOne.mockResolvedValueOnce({supabase_uid:"00000000-0000-4000-8000-000000000001"});
     db.insert.mockResolvedValueOnce(undefined);
     const createdAt = 1_700_000_000_000;
-    const res = await fetch(`${base}/api/posts`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ id: "post1", topicId: "topic1", content: "hello", createdAt }) });
+    const res = await fetch(`${base}/api/posts`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ id: "post1", topicId: "topic1", content: "hello", audience:"public", createdAt }) });
     expect(res.status).toBe(201); expect((await res.json()).post.createdAt).toBe(createdAt);
   });
 });

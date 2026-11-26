@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Search, Plus, Network, Share, Download, PlayCircle } from "lucide-react";
-import { idb } from "@/lib/db";
+import { collectLocalBrainExport } from "@/lib/brain-local-export";
 import { SampleBrainLibrary } from "@/components/ui/SampleBrainLibrary";
 
 export function Dashboard() {
@@ -294,9 +294,8 @@ export function Dashboard() {
         onUpdated={refresh}
         onFork={(b) => { setIsDrawerOpen(false); openForkDialog(b); }}
         onExport={(b) => {
-          // Simple single export
-          idb.getAllByIndex("nodes", "brain_id", b.id).then(nodes => {
-            const exportObj = { brains: [b], nodes };
+          if (!window.confirm("Export this browser's local brain? Its ownership may not be verified, and cloud data is not included.")) return;
+          collectLocalBrainExport(b.id).then(exportObj => {
             const blob = new Blob([JSON.stringify(exportObj, null, 2)], { type: "application/json" });
             const url = URL.createObjectURL(blob);
             const a = document.createElement("a");
