@@ -195,13 +195,13 @@ export function SettingsPage() {
       id: "appearance",
       title: "Appearance",
       icon: Paintbrush,
-      description: "Customize the look and feel of Brain Builder."
+      description: "Customize the look and feel of Mind Builder."
     },
     {
       id: "advanced",
       title: "Advanced",
       icon: Database,
-      description: "Configure how your brains process and store logic."
+      description: "Configure how your minds process and store logic."
     }
   ];
 
@@ -214,7 +214,7 @@ export function SettingsPage() {
   };
 
   const handleExportAccountData = async () => {
-    const stores = ["profile", "settings", "posts", "topics", "brains", "nodes", "missions", "milestones", "comments", "conversations", "messages", "notifications", "communities", "checkins", "pathways", "books", "analytics_events"];
+    const stores = ["profile", "settings", "posts", "topics", "minds", "nodes", "missions", "milestones", "comments", "conversations", "messages", "notifications", "communities", "checkins", "pathways", "books", "analytics_events"];
     const data: Record<string, unknown> = {};
 
     for (const store of stores) {
@@ -229,7 +229,7 @@ export function SettingsPage() {
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement("a");
     anchor.href = url;
-    anchor.download = `brain-builder-export-${new Date().toISOString().slice(0, 10)}.json`;
+    anchor.download = `mind-builder-export-${new Date().toISOString().slice(0, 10)}.json`;
     document.body.appendChild(anchor);
     anchor.click();
     document.body.removeChild(anchor);
@@ -325,7 +325,7 @@ export function SettingsPage() {
               <h2 className="text-xl font-semibold flex items-center gap-2">
                 <Paintbrush className="w-5 h-5 text-primary" /> Appearance
               </h2>
-              <p className="text-sm text-muted-foreground mt-1">Customize how Brain Builder looks on your device.</p>
+              <p className="text-sm text-muted-foreground mt-1">Customize how Mind Builder looks on your device.</p>
             </div>
 
             <Card>
@@ -434,7 +434,7 @@ export function SettingsPage() {
                 <div className="p-6 flex items-center justify-between">
                   <div className="space-y-0.5">
                     <h3 className="font-medium">Private Profile</h3>
-                    <p className="text-sm text-muted-foreground">Only approved followers can see your posts and brains.</p>
+                    <p className="text-sm text-muted-foreground">Only approved followers can see your posts and minds.</p>
                   </div>
                   <Switch checked={privateProfile} onCheckedChange={setPrivateProfile} />
                 </div>
@@ -527,7 +527,7 @@ export function SettingsPage() {
           if (!isRefreshing) setIsRefreshOpen(open);
         }}
         title="Refresh local data"
-        description="This clears locally stored brains, posts, missions, messages and other content, then reloads the app with fresh starter data. Your profile, appearance and privacy settings are kept. This cannot be undone."
+        description="This clears locally stored minds, posts, missions, messages and other content, then reloads the app with fresh starter data. Your profile, appearance and privacy settings are kept. This cannot be undone."
         confirmLabel="Refresh data & reload"
         busy={isRefreshing}
         onConfirm={handleRefreshData}

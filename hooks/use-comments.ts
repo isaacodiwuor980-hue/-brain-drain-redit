@@ -143,7 +143,7 @@ export function useComments(postId?: string) {
       const repDelta = computeSourceLinkReputation(content);
       if (repDelta > 0) {
         try {
-          const rep = await idb.get<{ id: string; xp: number; level: number; streak: number; lastActiveDate: string; totalMissionsCompleted: number; totalBrainsCreated: number; totalCheckIns: number; badges: string[] }>("reputation", "me");
+          const rep = await idb.get<{ id: string; xp: number; level: number; streak: number; lastActiveDate: string; totalMissionsCompleted: number; totalMindsCreated: number; totalCheckIns: number; badges: string[] }>("reputation", "me");
           if (rep) {
             await idb.put("reputation", {
               ...rep,

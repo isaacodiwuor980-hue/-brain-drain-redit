@@ -70,14 +70,14 @@ export function useMessages(activeConversationId?: string) {
           {
             id: "conv-1",
             participantIds: ["user-1", "user-2"],
-            lastMessage: "Hey, how is the brain builder coming along?",
+            lastMessage: "Hey, how is the mind builder coming along?",
             lastMessageAt: Date.now() - 3600000,
             unreadCount: 1,
           },
           {
             id: "conv-2",
             participantIds: ["user-1", "user-3"],
-            lastMessage: "I just shared a new brain with you!",
+            lastMessage: "I just shared a new mind with you!",
             lastMessageAt: Date.now() - 7200000,
             unreadCount: 0,
           },
@@ -88,14 +88,14 @@ export function useMessages(activeConversationId?: string) {
             id: "msg-1",
             conversationId: "conv-1",
             senderId: "user-2",
-            content: "Hey, how is the brain builder coming along?",
+            content: "Hey, how is the mind builder coming along?",
             createdAt: Date.now() - 3600000,
           },
           {
             id: "msg-2",
             conversationId: "conv-2",
             senderId: "user-3",
-            content: "I just shared a new brain with you!",
+            content: "I just shared a new mind with you!",
             createdAt: Date.now() - 7200000,
           },
         ];

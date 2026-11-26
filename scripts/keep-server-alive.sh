@@ -15,12 +15,12 @@
 #   2. bash scripts/deploy.sh  (syntax-checks, kills node, waits for health)
 
 set -u
-cd /home/z/my-project/BRAIN-DRAIN-latest-
+cd /home/z/my-project/MindSpool-latest-
 
 # Logs persist under the project dir so they SURVIVE container recycles.
 # /tmp is wiped on every recycle — persisting logs here means crash history
 # is diagnosable after the fact (which it wasn't before). Verified 2026-11-14.
-LOG_DIR=/home/z/my-project/BRAIN-DRAIN-latest-/logs
+LOG_DIR=/home/z/my-project/MindSpool-latest-/logs
 mkdir -p "$LOG_DIR" 2>/dev/null
 LOG="$LOG_DIR/bd-server.log"
 # Cap log size — logs now persist across recycles, so trim to the last 2000

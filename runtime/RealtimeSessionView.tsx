@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Brain, Node } from "@/lib/types";
+import { Mind, Node } from "@/lib/types";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -61,7 +61,7 @@ const MEDIA_MODES: Array<{
 
 export function RealtimeSessionView({ sessionId, onClose }: RealtimeSessionViewProps) {
   const { session, joinSession, navigateNode, setMediaMode, grantMic, setMuted, sendChat } = useRealtimeSession(sessionId);
-  const [brain, setBrain] = useState<Brain | null>(null);
+  const [mind, setMind] = useState<Mind | null>(null);
   const [nodes, setNodes] = useState<Node[]>([]);
   const [chatInput, setChatInput] = useState("");
   // Guards: prevent rapid double-firing of async actions that leave
@@ -134,22 +134,22 @@ export function RealtimeSessionView({ sessionId, onClose }: RealtimeSessionViewP
       });
     }
 
-    // Only load brain if the session actually has one.
-    if (session?.brainId && session.brainId.trim() && !brain) {
-      idb.get<Brain>("brains", session.brainId).then((b) => {
+    // Only load mind if the session actually has one.
+    if (session?.mindId && session.mindId.trim() && !mind) {
+      idb.get<Mind>("minds", session.mindId).then((b) => {
         if (b) {
-          setBrain(b);
-          idb.getAllByIndex<Node>("nodes", "brain_id", b.id).then((n) => setNodes(n));
+          setMind(b);
+          idb.getAllByIndex<Node>("nodes", "mind_id", b.id).then((n) => setNodes(n));
         }
       });
     }
     // BUG FIX: removed joinSession from deps. joinSession is recreated every
     // render (it closes over `session` state), so having it in deps caused
     // this effect to re-run every render → duplicate joinSession calls +
-    // duplicate brain loading. The guard `!session.participants[userId]`
+    // duplicate mind loading. The guard `!session.participants[userId]`
     // already prevents duplicate joins, so the stale closure is safe.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session, brain]);
+  }, [session, mind]);
 
   // ── Media stream lifecycle ────────────────────────────────────
   // When the session's mediaMode changes, stop the old stream and start
@@ -939,8 +939,8 @@ export function RealtimeSessionView({ sessionId, onClose }: RealtimeSessionViewP
                 </div>
               )}
 
-              {/* ── Brain node stage (only if a brain is attached) ──── */}
-              {brain && currentNode && (activeMode === "idle" || !isHost) && (
+              {/* ── Mind node stage (only if a mind is attached) ──── */}
+              {mind && currentNode && (activeMode === "idle" || !isHost) && (
                 <AnimatePresence mode="wait">
                   <motion.div
                     key={currentNode.id}

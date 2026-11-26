@@ -241,7 +241,7 @@ export function useSocial(mode: "foryou" | "following" = "foryou", topicId: stri
       await trackEvent("post_created", {
         postId: post.id,
         topicId: post.topicId,
-        hasBrain: Boolean(post.brainId),
+        hasMind: Boolean(post.mindId),
         hasEvent: Boolean(post.event),
         postType: post.postType || "post",
         mediaCount: post.mediaUrls?.length || 0,
@@ -267,7 +267,7 @@ export function useSocial(mode: "foryou" | "following" = "foryou", topicId: stri
             postType: post.postType,
             event: post.event,
             mediaUrls: post.mediaUrls,
-            brainId: post.brainId,
+            mindId: post.mindId,
             createdAt: post.createdAt,
           },
           token,

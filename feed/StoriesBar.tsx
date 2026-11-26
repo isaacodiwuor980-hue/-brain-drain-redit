@@ -88,13 +88,13 @@ function SmartMedia({ src, alt, isVideo, poster, eager = false }: {
 export function StoriesBar() {
   const { stories, isLoading, markAsViewed, addStory } = useStories();
   const { user } = useAuth();
-  const { brains } = useDatabase();
+  const { minds } = useDatabase();
   
-  const [runningBrainId, setRunningBrainId] = useState<string | null>(null);
+  const [runningMindId, setRunningMindId] = useState<string | null>(null);
   
   const [isAddingNote, setIsAddingNote] = useState(false);
   const [noteContent, setNoteContent] = useState("");
-  const [selectedBrainId, setSelectedBrainId] = useState<string>("none");
+  const [selectedMindId, setSelectedMindId] = useState<string>("none");
 
   const [viewerState, setViewerState] = useState<{ userIdx: number, storyIdx: number, key: number, isPaused: boolean } | null>(null);
   const [progress, setProgress] = useState(0);
@@ -150,7 +150,7 @@ export function StoriesBar() {
   const closeViewer = useCallback(() => {
     triggerHaptic("light");
     setViewerState(null);
-    setRunningBrainId(null);
+    setRunningMindId(null);
     setProgress(0);
   }, []);
 
@@ -204,7 +204,7 @@ export function StoriesBar() {
   // - progress is read from ref (no recreation per tick)
   // - document.hidden is observed via visibilitychange so the timer pauses
   //   when the user switches tabs (battery-friendly, fixes BUG #6)
-  // - pausing via runningBrainId / isPaused / progress>=100 is handled by
+  // - pausing via runningMindId / isPaused / progress>=100 is handled by
   //   clearing the interval in those cases (still no per-tick recreation)
   //
   // APEX-OMEGA RESIDUE FIX (R1): the interval callback now NO-OPs when
@@ -215,7 +215,7 @@ export function StoriesBar() {
   // handleNext() AGAIN, and the user would skip a story. The guard below
   // makes the tick idempotent: only ONE tick can cross the 100 threshold.
   useEffect(() => {
-    if (!viewerState || runningBrainId || viewerState.isPaused) return undefined;
+    if (!viewerState || runningMindId || viewerState.isPaused) return undefined;
 
     let timer: ReturnType<typeof setInterval> | null = null;
     const start = () => {
@@ -249,7 +249,7 @@ export function StoriesBar() {
       stop();
       document.removeEventListener('visibilitychange', handleVisibility);
     };
-  }, [viewerState, runningBrainId, viewerState?.isPaused]);
+  }, [viewerState, runningMindId, viewerState?.isPaused]);
 
   // Per-story duration reset: every navigation stamps a new viewerState.key.
   // Video stories override this via onLoadedMetadata; text/image stories
@@ -293,11 +293,11 @@ export function StoriesBar() {
       authorAvatar: user.avatarUrl,
       type: "note",
       content: noteContent,
-      brainId: selectedBrainId !== "none" ? selectedBrainId : undefined
+      mindId: selectedMindId !== "none" ? selectedMindId : undefined
     });
     setIsAddingNote(false);
     setNoteContent("");
-    setSelectedBrainId("none");
+    setSelectedMindId("none");
   };
 
   if (isLoading) {
@@ -352,7 +352,7 @@ export function StoriesBar() {
             const previewPoster = previewVideoUrl ? resolveMediaUrl(findStoryImage(previewStory)) : undefined;
             const previewText = previewStory.content?.trim() || "";
             const displayName = uid === user?.id ? "You" : latest.authorName.split(' ')[0];
-            const hasBrain = !!(latest.brainId || previewStory.brainId);
+            const hasMind = !!(latest.mindId || previewStory.mindId);
 
             return (
               <button
@@ -402,8 +402,8 @@ export function StoriesBar() {
                       </div>
                     )}
 
-                    {/* Brain badge — story links a decision brain */}
-                    {hasBrain && !previewVideoUrl && (
+                    {/* Mind badge — story links a decision mind */}
+                    {hasMind && !previewVideoUrl && (
                       <div className="absolute top-1.5 right-1.5 bg-primary/90 text-primary-foreground rounded-full p-1 shadow-sm pointer-events-none">
                         <BrainCircuit className="w-3 h-3" />
                       </div>
@@ -433,14 +433,14 @@ export function StoriesBar() {
               />
             </div>
             <div className="space-y-2">
-              <Label>Attach a Brain (Optional)</Label>
-              <Select value={selectedBrainId} onValueChange={setSelectedBrainId}>
+              <Label>Attach a Mind (Optional)</Label>
+              <Select value={selectedMindId} onValueChange={setSelectedMindId}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Select a Brain" />
+                  <SelectValue placeholder="Select a Mind" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">None</SelectItem>
-                  {brains.map(b => (
+                  {minds.map(b => (
                     <SelectItem key={b.id} value={b.id}>{b.title}</SelectItem>
                   ))}
                 </SelectContent>
@@ -458,7 +458,7 @@ export function StoriesBar() {
       <Dialog open={!!viewerState} onOpenChange={(open) => !open && closeViewer()}>
         <DialogContent className="max-w-md p-0 overflow-hidden bg-black/95 border-border shadow-2xl h-[80vh] flex flex-col justify-between">
           <AnimatePresence mode="wait">
-            {activeStory && !runningBrainId && (
+            {activeStory && !runningMindId && (
               <motion.div 
                 key={activeStory.id}
                 initial={{ opacity: 0, scale: 0.95 }}
@@ -588,16 +588,16 @@ export function StoriesBar() {
                   )}
                 </div>
 
-                {activeStory.brainId && (
+                {activeStory.mindId && (
                   <div className="mt-8 mb-4 relative z-50">
                     <div className="bg-white/10 border border-white/20 p-4 rounded-[16px] flex items-center justify-between backdrop-blur-sm cursor-pointer hover:bg-white/20 transition-colors"
-                         onClick={() => setRunningBrainId(activeStory.brainId!)}>
+                         onClick={() => setRunningMindId(activeStory.mindId!)}>
                       <div className="flex items-center gap-3">
                          <div className="w-10 h-10 bg-primary/20 rounded-full flex items-center justify-center border border-primary/30">
                            <BrainCircuit className="w-5 h-5 text-primary" />
                          </div>
                          <div className="text-left">
-                           <p className="text-sm font-medium">Attached Brain</p>
+                           <p className="text-sm font-medium">Attached Mind</p>
                            <p className="text-xs text-white/60">Tap to run this module</p>
                          </div>
                       </div>
@@ -613,7 +613,7 @@ export function StoriesBar() {
               </motion.div>
             )}
 
-            {runningBrainId && (
+            {runningMindId && (
               <motion.div 
                 key="runtime"
                 initial={{ opacity: 0, y: 50 }}
@@ -621,14 +621,14 @@ export function StoriesBar() {
                 className="w-full h-full bg-background flex flex-col relative"
               >
                 <div className="flex items-center justify-between p-2 border-b bg-card">
-                  <span className="text-sm font-medium ml-2">Running Brain</span>
-                  <Button variant="ghost" size="sm" onClick={() => setRunningBrainId(null)}>Close</Button>
+                  <span className="text-sm font-medium ml-2">Running Mind</span>
+                  <Button variant="ghost" size="sm" onClick={() => setRunningMindId(null)}>Close</Button>
                 </div>
                 <div className="flex-1 overflow-hidden relative">
                    <RuntimeEngine 
-                     brain={brains.find(b => b.id === runningBrainId) || null} 
-                     isOpen={!!runningBrainId}
-                     onClose={() => setRunningBrainId(null)} 
+                     mind={minds.find(b => b.id === runningMindId) || null} 
+                     isOpen={!!runningMindId}
+                     onClose={() => setRunningMindId(null)} 
                    />
                 </div>
               </motion.div>

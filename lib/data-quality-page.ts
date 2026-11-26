@@ -2,7 +2,7 @@
  * lib/data-quality-page.ts — SSR template for /data-quality.
  *
  * Public data quality dashboard. This is what AI labs look at before
- * licensing data from Brain Drain. Shows:
+ * licensing data from MindSpool. Shows:
  *  - Total records, verified contributors, provenance chains
  *  - Confidence score distribution
  *  - Dispute resolution metrics
@@ -25,26 +25,26 @@ export function renderDataQualityPage(input: DataQualityPageInput): string {
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Data Quality Report · Brain Drain</title>
-<meta name="description" content="Public data quality dashboard for Brain Drain. Verification rates, confidence distributions, provenance integrity, and dispute resolution metrics." />
+<title>Data Quality Report · MindSpool</title>
+<meta name="description" content="Public data quality dashboard for MindSpool. Verification rates, confidence distributions, provenance integrity, and dispute resolution metrics." />
 <meta name="robots" content="index, follow" />
 <link rel="canonical" href="${origin}/data-quality" />
 <meta property="og:type" content="website" />
-<meta property="og:title" content="Brain Drain — Data Quality Report" />
+<meta property="og:title" content="MindSpool — Data Quality Report" />
 <meta property="og:description" content="Transparent data quality metrics for the world's most trusted source of human-verified knowledge." />
 <link rel="icon" href="/favicon.svg" />
 <script type="application/ld+json">
 ${JSON.stringify({
   "@context": "https://schema.org",
   "@type": "Dataset",
-  "name": "Brain Drain Data Quality Report",
+  "name": "MindSpool Data Quality Report",
   "description": "Public data quality dashboard showing verification rates, confidence distributions, provenance integrity, and dispute resolution metrics.",
   "url": `${origin}/data-quality`,
   "datePublished": now,
   "dateModified": now,
   "publisher": {
     "@type": "Organization",
-    "name": "Brain Drain",
+    "name": "MindSpool",
     "url": origin,
   },
   "isAccessibleForFree": true,
@@ -99,12 +99,12 @@ ${JSON.stringify({
 <body>
 <header>
   <h1>Data Quality Report</h1>
-  <p class="meta">Brain Drain · last updated ${now} · <a href="${origin}/llms.txt">llms.txt</a> · <a href="${origin}/sitemap.xml">sitemap.xml</a></p>
+  <p class="meta">MindSpool · last updated ${now} · <a href="${origin}/llms.txt">llms.txt</a> · <a href="${origin}/sitemap.xml">sitemap.xml</a></p>
 </header>
 
 <section class="card">
   <h2>Architecture capabilities</h2>
-  <p>Brain Drain is built on four data-quality pillars. Each is fully implemented and operational:</p>
+  <p>MindSpool is built on four data-quality pillars. Each is fully implemented and operational:</p>
   <div class="stats">
     <div class="stat">
       <div class="num">SHA-256</div>
@@ -127,7 +127,7 @@ ${JSON.stringify({
 
 <section class="card">
   <h2>Provenance integrity</h2>
-  <p>Every record (drain entry, post, comment, brain node, brain will, verification record) gets a SHA-256 hash chained to the previous version. Any tampering with historical versions is detectable via <code>verifyChain()</code>.</p>
+  <p>Every record (drain entry, post, comment, mind node, mind will, verification record) gets a SHA-256 hash chained to the previous version. Any tampering with historical versions is detectable via <code>verifyChain()</code>.</p>
   <table>
     <thead>
       <tr><th>Record type</th><th>Hash algorithm</th><th>Chain structure</th><th>Verification</th></tr>
@@ -136,8 +136,8 @@ ${JSON.stringify({
       <tr><td>Drain entry</td><td>SHA-256</td><td>Per-record linked list</td><td><span class="badge warn">Pending /api/v1/provenance</span></td></tr>
       <tr><td>Post</td><td>SHA-256</td><td>Per-record linked list</td><td><span class="badge warn">Pending /api/v1/provenance</span></td></tr>
       <tr><td>Comment</td><td>SHA-256</td><td>Per-record linked list</td><td><span class="badge warn">Pending /api/v1/provenance</span></td></tr>
-      <tr><td>Brain node</td><td>SHA-256</td><td>Per-record linked list</td><td><span class="badge warn">Pending /api/v1/provenance</span></td></tr>
-      <tr><td>Brain will</td><td>SHA-256</td><td>Per-record linked list</td><td><span class="badge warn">Pending /api/v1/provenance</span></td></tr>
+      <tr><td>Mind node</td><td>SHA-256</td><td>Per-record linked list</td><td><span class="badge warn">Pending /api/v1/provenance</span></td></tr>
+      <tr><td>Mind will</td><td>SHA-256</td><td>Per-record linked list</td><td><span class="badge warn">Pending /api/v1/provenance</span></td></tr>
       <tr><td>Verification record</td><td>SHA-256</td><td>Per-record linked list</td><td><span class="badge warn">Pending /api/v1/provenance</span></td></tr>
     </tbody>
   </table>
@@ -162,7 +162,7 @@ ${JSON.stringify({
 
 <section class="card">
   <h2>Data licensing</h2>
-  <p>Every record has an explicit, per-record license choice. AI labs must obtain API keys to access licensed data. Deceased experts' brains unlock according to their will (default: 12-month delay, then CC-BY-NC).</p>
+  <p>Every record has an explicit, per-record license choice. AI labs must obtain API keys to access licensed data. Deceased experts' minds unlock according to their will (default: 12-month delay, then CC-BY-NC).</p>
   <div>
     <span class="badge ok">CC0 (public domain)</span>
     <span class="badge ok">CC-BY (attribution)</span>
@@ -190,7 +190,7 @@ ${JSON.stringify({
 
 <footer>
   <p>This page is server-rendered and crawlable. Programmatic access: <code>GET /api/healthz</code> for liveness.</p>
-  <p>Brain Drain never claims 100% accuracy. We show evidence and confidence instead — every record's provenance, verification tier, and confidence breakdown is public.</p>
+  <p>MindSpool never claims 100% accuracy. We show evidence and confidence instead — every record's provenance, verification tier, and confidence breakdown is public.</p>
 </footer>
 </body>
 </html>`;

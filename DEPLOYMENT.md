@@ -1,4 +1,4 @@
-# Deployment Guide — Brain Drain
+# Deployment Guide — MindSpool
 
 ## Pre-deploy Checklist
 
@@ -24,15 +24,15 @@
 
 ```bash
 # Build
-docker build -t brain-drain:latest .
+docker build -t MindSpool:latest .
 
 # Run (single instance)
 docker run -d \
-  --name brain-drain \
+  --name MindSpool \
   -p 3000:3000 \
   --env-file .env \
   --restart unless-stopped \
-  brain-drain:latest
+  MindSpool:latest
 
 # Scale (3 instances behind a load balancer)
 docker compose up --build --scale app=3
@@ -65,10 +65,10 @@ curl http://localhost:3000/api/ready
 ```nginx
 server {
     listen 443 ssl http2;
-    server_name braindrain.app;
+    server_name MindSpool.app;
 
-    ssl_certificate /etc/letsencrypt/live/braindrain.app/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/braindrain.app/privkey.pem;
+    ssl_certificate /etc/letsencrypt/live/MindSpool.app/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/MindSpool.app/privkey.pem;
 
     location / {
         proxy_pass http://127.0.0.1:3000;
@@ -84,7 +84,7 @@ server {
 
 server {
     listen 80;
-    server_name braindrain.app;
+    server_name MindSpool.app;
     return 301 https://$server_name$request_uri;
 }
 ```

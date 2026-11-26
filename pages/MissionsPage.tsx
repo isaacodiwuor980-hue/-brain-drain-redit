@@ -88,7 +88,7 @@ export function MissionsPage() {
   // Progression Tracker bars use real per-category average mission progress
   // (mission.progress is maintained by milestone toggles).
   const categoryStats = computeCategoryStats(missions);
-  const { brains } = useDatabase();
+  const { minds } = useDatabase();
   const [filter, setFilter] = useState("all");
   const [selectedMissionId, setSelectedMissionId] = useState<string | null>(null);
   const [isNewOpen, setIsNewOpen] = useState(false);
@@ -101,9 +101,9 @@ export function MissionsPage() {
 
   // ── Task 2: new mission form fields ──────────────────────────────
   const [repeatsDaily, setRepeatsDaily] = useState(false);
-  // Attachment: either "brain" or "link" (mutually exclusive).
-  const [attachmentType, setAttachmentType] = useState<"brain" | "link">("brain");
-  const [attachedBrainId, setAttachedBrainId] = useState<string>("");
+  // Attachment: either "mind" or "link" (mutually exclusive).
+  const [attachmentType, setAttachmentType] = useState<"mind" | "link">("mind");
+  const [attachedMindId, setAttachedMindId] = useState<string>("");
   const [attachedLinkUrl, setAttachedLinkUrl] = useState<string>("");
   const [attachedLinkLabel, setAttachedLinkLabel] = useState<string>("");
 
@@ -200,8 +200,8 @@ export function MissionsPage() {
       setXpReward("200");
       setNewMilestones([""]);
       setRepeatsDaily(false);
-      setAttachmentType("brain");
-      setAttachedBrainId("");
+      setAttachmentType("mind");
+      setAttachedMindId("");
       setAttachedLinkUrl("");
       setAttachedLinkLabel("");
     } catch (error) {
@@ -240,10 +240,10 @@ export function MissionsPage() {
 
   /** Builds the attachment object from the current form state. Returns undefined if nothing is attached. */
   const buildAttachment = (): MissionAttachment | undefined => {
-    if (attachmentType === "brain") {
-      if (!attachedBrainId) return undefined;
-      const brain = brains.find(b => b.id === attachedBrainId);
-      return { type: "brain", brainId: attachedBrainId, brainTitle: brain?.title };
+    if (attachmentType === "mind") {
+      if (!attachedMindId) return undefined;
+      const mind = minds.find(b => b.id === attachedMindId);
+      return { type: "mind", mindId: attachedMindId, mindTitle: mind?.title };
     } else {
       if (!attachedLinkUrl.trim()) return undefined;
       return { type: "link", url: attachedLinkUrl.trim(), label: attachedLinkLabel.trim() || attachedLinkUrl.trim() };
@@ -291,18 +291,18 @@ export function MissionsPage() {
     const att = selectedMission.attachment;
     if (att) {
       setAttachmentType(att.type);
-      if (att.type === "brain") {
-        setAttachedBrainId(att.brainId ?? "");
+      if (att.type === "mind") {
+        setAttachedMindId(att.mindId ?? "");
         setAttachedLinkUrl("");
         setAttachedLinkLabel("");
       } else {
-        setAttachedBrainId("");
+        setAttachedMindId("");
         setAttachedLinkUrl(att.url ?? "");
         setAttachedLinkLabel(att.label ?? "");
       }
     } else {
-      setAttachmentType("brain");
-      setAttachedBrainId("");
+      setAttachmentType("mind");
+      setAttachedMindId("");
       setAttachedLinkUrl("");
       setAttachedLinkLabel("");
     }
@@ -419,16 +419,16 @@ export function MissionsPage() {
                   </div>
                 </div>
 
-                {/* Task 2b/c: Attach Resource — brain OR link (mutually exclusive) */}
+                {/* Task 2b/c: Attach Resource — mind OR link (mutually exclusive) */}
                 <div className="grid gap-2">
                   <Label>Attach Resource</Label>
                   <div className="flex gap-1 p-1 bg-muted/50 rounded-lg">
                     <button
                       type="button"
-                      onClick={() => setAttachmentType("brain")}
-                      className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${attachmentType === "brain" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+                      onClick={() => setAttachmentType("mind")}
+                      className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${attachmentType === "mind" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"}`}
                     >
-                      <BrainCircuit className="w-4 h-4" /> Attach Brain
+                      <BrainCircuit className="w-4 h-4" /> Attach Mind
                     </button>
                     <button
                       type="button"
@@ -438,22 +438,22 @@ export function MissionsPage() {
                       <LinkIcon className="w-4 h-4" /> Attach Link
                     </button>
                   </div>
-                  {attachmentType === "brain" ? (
+                  {attachmentType === "mind" ? (
                     <div className="space-y-2">
-                      <Select value={attachedBrainId} onValueChange={setAttachedBrainId}>
-                        <SelectTrigger><SelectValue placeholder="Pick a brain from your library" /></SelectTrigger>
+                      <Select value={attachedMindId} onValueChange={setAttachedMindId}>
+                        <SelectTrigger><SelectValue placeholder="Pick a mind from your library" /></SelectTrigger>
                         <SelectContent>
-                          {brains.length === 0 ? (
-                            <SelectItem value="__none__" disabled>No brains yet — create one below</SelectItem>
+                          {minds.length === 0 ? (
+                            <SelectItem value="__none__" disabled>No minds yet — create one below</SelectItem>
                           ) : (
-                            brains.map(b => (
+                            minds.map(b => (
                               <SelectItem key={b.id} value={b.id}>{b.title}</SelectItem>
                             ))
                           )}
                         </SelectContent>
                       </Select>
                       <Button variant="outline" size="sm" className="w-full gap-2" onClick={() => { setLocation("/library"); }}>
-                        <PlusCircle className="w-4 h-4" /> Build a new brain
+                        <PlusCircle className="w-4 h-4" /> Build a new mind
                       </Button>
                     </div>
                   ) : (
@@ -693,7 +693,7 @@ export function MissionsPage() {
                                   onChange={(e) => setMilestoneNotes({...milestoneNotes, [ms.id]: e.target.value})}
                                 />
                                 <div className="flex flex-wrap gap-2">
-                                  <Button variant="outline" size="sm" className="h-7 text-xs gap-1.5"><BrainCircuit className="w-3.5 h-3.5" /> Attach Brain</Button>
+                                  <Button variant="outline" size="sm" className="h-7 text-xs gap-1.5"><BrainCircuit className="w-3.5 h-3.5" /> Attach Mind</Button>
                                   <Button variant="outline" size="sm" className="h-7 text-xs gap-1.5"><MessageSquare className="w-3.5 h-3.5" /> Attach Post</Button>
                                   <Button variant="outline" size="sm" className="h-7 text-xs gap-1.5"><Target className="w-3.5 h-3.5" /> Link Resource</Button>
                                   <div className="flex-1" />
@@ -1115,16 +1115,16 @@ export function MissionsPage() {
               </div>
             </div>
 
-            {/* Task 2b/c: Attach Resource — brain OR link (mutually exclusive) */}
+            {/* Task 2b/c: Attach Resource — mind OR link (mutually exclusive) */}
             <div className="grid gap-2">
               <Label>Attach Resource</Label>
               <div className="flex gap-1 p-1 bg-muted/50 rounded-lg">
                 <button
                   type="button"
-                  onClick={() => setAttachmentType("brain")}
-                  className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${attachmentType === "brain" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+                  onClick={() => setAttachmentType("mind")}
+                  className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${attachmentType === "mind" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"}`}
                 >
-                  <BrainCircuit className="w-4 h-4" /> Attach Brain
+                  <BrainCircuit className="w-4 h-4" /> Attach Mind
                 </button>
                 <button
                   type="button"
@@ -1134,22 +1134,22 @@ export function MissionsPage() {
                   <LinkIcon className="w-4 h-4" /> Attach Link
                 </button>
               </div>
-              {attachmentType === "brain" ? (
+              {attachmentType === "mind" ? (
                 <div className="space-y-2">
-                  <Select value={attachedBrainId} onValueChange={setAttachedBrainId}>
-                    <SelectTrigger><SelectValue placeholder="Pick a brain from your library" /></SelectTrigger>
+                  <Select value={attachedMindId} onValueChange={setAttachedMindId}>
+                    <SelectTrigger><SelectValue placeholder="Pick a mind from your library" /></SelectTrigger>
                     <SelectContent>
-                      {brains.length === 0 ? (
-                        <SelectItem value="__none__" disabled>No brains yet — create one in the Library</SelectItem>
+                      {minds.length === 0 ? (
+                        <SelectItem value="__none__" disabled>No minds yet — create one in the Library</SelectItem>
                       ) : (
-                        brains.map(b => (
+                        minds.map(b => (
                           <SelectItem key={b.id} value={b.id}>{b.title}</SelectItem>
                         ))
                       )}
                     </SelectContent>
                   </Select>
                   <Button variant="outline" size="sm" className="w-full gap-2" onClick={() => { setIsEditOpen(false); setLocation("/library"); }}>
-                    <PlusCircle className="w-4 h-4" /> Build a new brain
+                    <PlusCircle className="w-4 h-4" /> Build a new mind
                   </Button>
                 </div>
               ) : (

@@ -52,7 +52,7 @@ Commit: `a3c08c5` on `feat/community-rebuild` (39 files, +1550/−403). All work
 ## 4. Clone & run
 
 ```bash
-git clone <repo-url> && cd BRAIN-DRAIN-latest-
+git clone <repo-url> && cd MindSpool-latest-
 npm ci
 cp .env.example .env        # zero-config works in local-only mode
 npm run dev                 # http://localhost:3000
@@ -71,4 +71,4 @@ npm run lint && npm test && npm run typecheck
 5. **LOW — Playwright e2e** (`tests/e2e/feed.spec.ts`, from the feed task) needs `npx playwright install` on a machine with browser binaries; excluded from vitest/tsc here.
 6. **LOW — Prettier not mass-applied.** Config + scripts exist; running `npm run format` once would touch most files — deliberately deferred to avoid burying this diff.
 7. **LOW — `rankComments` is exported but only used inside hive-mind** (kept exported for the fossilization API surface; unexport if you want stricter).
-8. **LOW — reactivation notifications reuse `type: "brain_run"`** (pre-existing; a dedicated `hive_reactivation` type would need a UI change).
+8. **LOW — reactivation notifications reuse `type: "mind_run"`** (pre-existing; a dedicated `hive_reactivation` type would need a UI change).

@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to Brain Drain are documented here.
+All notable changes to MindSpool are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
@@ -32,7 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - **MED: StoriesBar interval recreation** — `progress` in effect deps caused ~100 interval teardown/recreate cycles per 5s story. Fixed with ref-mirror + visibilitychange listener.
 - **MED: StoriesBar markAsViewed loop** — IDB write fired every time `groupedStories` re-derived. Fixed with session-scoped Set.
 - **MED: Post-vote optimistic UI** — added `onMutate` for instant cache update; `onError` only rolls back on local failures (POST_NOT_FOUND, IDB_WRITE_FAILED), not transient network errors.
-- **MED: BrainChatRuntime session resume** — closing the dialog mid-run discarded progress. Now persists to sessionStorage; reopen resumes where you left off.
+- **MED: MindChatRuntime session resume** — closing the dialog mid-run discarded progress. Now persists to sessionStorage; reopen resumes where you left off.
 
 ### Security
 - **CSP + X-Frame-Options** tuned for preview environments while maintaining clickjacking protection.
@@ -43,7 +43,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Initial features
 - Local-first PWA with IndexedDB (17 stores, DB v17)
-- Decision-brain editor with node graph (question → outcome tree)
+- Decision-mind editor with node graph (question → outcome tree)
 - Social feed with posts, comments, reactions (upvote/downvote/repost)
 - 4-river comment system (Facts, Experience, Debate, Breakthrough)
 - Hive-Mind maintenance (14-day pruning, 30-day fossilization)
@@ -57,6 +57,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Pathways (scenario-based learning)
 - Firebase Auth (Google popup + guest mode)
 - Optional Supabase cloud sync
-- SSR routes for SEO (/verify/:userId, /brain/:brainId, /verify/record/:recordId)
+- SSR routes for SEO (/verify/:userId, /mind/:mindId, /verify/record/:recordId)
 - Service worker (offline shell + cache-first assets)
 - 223 unit tests (14 test files)

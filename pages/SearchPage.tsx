@@ -6,12 +6,12 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { trackEvent } from "@/lib/analytics";
 import { idb } from "@/lib/db";
-import { Brain, Topic, Post, getPostUpvoteCount } from "@/lib/types";
+import { Mind, Topic, Post, getPostUpvoteCount } from "@/lib/types";
 import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { RuntimeEngine } from "@/components/RuntimeEngine";
-import { BrainDrawer } from "@/components/BrainDrawer";
+import { MindDrawer } from "@/components/MindDrawer";
 import { useSkills } from "@/hooks/use-skills";
 import { useUserSearch, useFollowUser } from "@/hooks/use-discover";
 import { safeStorage } from "@/lib/safe-storage";
@@ -29,7 +29,7 @@ export function SearchPage() {
     }
   });
   const [recentSearches, setRecentSearches] = useState<string[]>(() => {
-    const saved = safeStorage.getItem("brain-builder-recent-searches");
+    const saved = safeStorage.getItem("mind-builder-recent-searches");
     if (saved) {
       try {
         return JSON.parse(saved) as string[];
@@ -45,7 +45,7 @@ export function SearchPage() {
   const { toast } = useToast();
 
   // Search Results State
-  const [brains, setBrains] = useState<Brain[]>([]);
+  const [minds, setMinds] = useState<Mind[]>([]);
   const [topics, setTopics] = useState<Topic[]>([]);
   const [posts, setPosts] = useState<Post[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -59,21 +59,21 @@ export function SearchPage() {
   const followMutation = useFollowUser();
 
   // Runtime engine / Drawer modal state
-  const [engineBrain, setEngineBrain] = useState<Brain | null>(null);
+  const [engineMind, setEngineMind] = useState<Mind | null>(null);
   const [isEngineOpen, setIsEngineOpen] = useState(false);
-  const [drawerBrain, setDrawerBrain] = useState<Brain | null>(null);
+  const [drawerMind, setDrawerMind] = useState<Mind | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   
   useEffect(() => {
     async function loadData() {
       setIsLoading(true);
       try {
-        const [allBrains, allTopics, allPosts] = await Promise.all([
-          idb.getAll<Brain>("brains"),
+        const [allMinds, allTopics, allPosts] = await Promise.all([
+          idb.getAll<Mind>("minds"),
           idb.getAll<Topic>("topics"),
           idb.getAll<Post>("posts"),
         ]);
-        setBrains(allBrains || []);
+        setMinds(allMinds || []);
         setTopics(allTopics || []);
         setPosts(allPosts || []);
       } catch (err) {
@@ -92,7 +92,7 @@ export function SearchPage() {
     
     const updated = [trimmedQuery, ...recentSearches.filter(s => s !== trimmedQuery)].slice(0, 10);
     setRecentSearches(updated);
-    safeStorage.setItem("brain-builder-recent-searches", JSON.stringify(updated));
+    safeStorage.setItem("mind-builder-recent-searches", JSON.stringify(updated));
     void trackEvent("search_submitted", {
       query: trimmedQuery,
       queryLength: trimmedQuery.length,
@@ -103,14 +103,14 @@ export function SearchPage() {
     e.stopPropagation();
     const updated = recentSearches.filter(s => s !== search);
     setRecentSearches(updated);
-    safeStorage.setItem("brain-builder-recent-searches", JSON.stringify(updated));
+    safeStorage.setItem("mind-builder-recent-searches", JSON.stringify(updated));
   };
 
   const handleRecentClick = (search: string) => {
     setQuery(search);
     const updated = [search, ...recentSearches.filter(s => s !== search)].slice(0, 10);
     setRecentSearches(updated);
-    safeStorage.setItem("brain-builder-recent-searches", JSON.stringify(updated));
+    safeStorage.setItem("mind-builder-recent-searches", JSON.stringify(updated));
     void trackEvent("search_recent_selected", {
       query: search,
       queryLength: search.length,
@@ -118,24 +118,24 @@ export function SearchPage() {
     inputRef.current?.focus();
   };
 
-  const exportBrain = (b: Brain) => {
-    idb.getAllByIndex("nodes", "brain_id", b.id).then(nodes => {
-      const exportObj = { brains: [b], nodes };
+  const exportMind = (b: Mind) => {
+    idb.getAllByIndex("nodes", "mind_id", b.id).then(nodes => {
+      const exportObj = { minds: [b], nodes };
       const blob = new Blob([JSON.stringify(exportObj, null, 2)], { type: "application/json" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `${(b.title || "brain").replace(/\s+/g, '-').toLowerCase()}-export.json`;
+      a.download = `${(b.title || "mind").replace(/\s+/g, '-').toLowerCase()}-export.json`;
       a.click();
       URL.revokeObjectURL(url);
     }).catch(() => {
-      toast({ title: "Export failed", description: "Could not read brain data.", variant: "destructive" });
+      toast({ title: "Export failed", description: "Could not read mind data.", variant: "destructive" });
     });
   };
 
-  const deleteBrain = async (brainId: string) => {
-    await idb.delete("brains", brainId);
-    setBrains(prev => prev.filter(b => b.id !== brainId));
+  const deleteMind = async (mindId: string) => {
+    await idb.delete("minds", mindId);
+    setMinds(prev => prev.filter(b => b.id !== mindId));
     setIsDrawerOpen(false);
   };
 
@@ -150,15 +150,15 @@ export function SearchPage() {
     );
   }, [topics, q]);
 
-  const matchingBrains = useMemo(() => {
+  const matchingMinds = useMemo(() => {
     if (!q) return [];
-    return brains.filter(b => 
+    return minds.filter(b => 
       b.title.toLowerCase().includes(q) || 
       b.description.toLowerCase().includes(q) || 
       b.category.toLowerCase().includes(q) ||
       (b.tags && b.tags.some(t => t.toLowerCase().includes(q)))
     );
-  }, [brains, q]);
+  }, [minds, q]);
 
   const matchingPosts = useMemo(() => {
     if (!q) return [];
@@ -209,7 +209,7 @@ export function SearchPage() {
     }).slice(0, 20);
   }, [skills, q]);
 
-  const totalResults = matchingTopics.length + matchingBrains.length + matchingPosts.length + matchingPeople.length + matchingSkills.length;
+  const totalResults = matchingTopics.length + matchingMinds.length + matchingPosts.length + matchingPeople.length + matchingSkills.length;
 
   return (
     <div className="max-w-3xl mx-auto p-4 sm:p-6 min-h-screen">
@@ -220,7 +220,7 @@ export function SearchPage() {
             ref={inputRef}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search brains, topics, people, and posts..." 
+            placeholder="Search minds, topics, people, and posts..." 
             className="w-full pl-12 pr-12 py-6 text-base rounded-full bg-muted/30 border border-border/40 focus-visible:ring-1 focus-visible:ring-primary/50 focus-visible:border-primary focus-visible:bg-background transition-all"
           />
           {query && (
@@ -247,7 +247,7 @@ export function SearchPage() {
                 className="text-xs text-muted-foreground hover:text-foreground h-7"
                 onClick={() => {
                   setRecentSearches([]);
-                  safeStorage.removeItem("brain-builder-recent-searches");
+                  safeStorage.removeItem("mind-builder-recent-searches");
                 }}
               >
                 Clear all
@@ -292,8 +292,8 @@ export function SearchPage() {
             <TabsTrigger value="all" className="rounded-none data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:text-foreground data-[state=active]:font-bold data-[state=active]:border-b-[3px] data-[state=active]:border-primary h-full px-5 text-sm text-muted-foreground hover:bg-muted/15 transition-all cursor-pointer">
               All ({totalResults})
             </TabsTrigger>
-            <TabsTrigger value="brains" className="rounded-none data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:text-foreground data-[state=active]:font-bold data-[state=active]:border-b-[3px] data-[state=active]:border-primary h-full px-5 text-sm text-muted-foreground hover:bg-muted/15 transition-all cursor-pointer">
-              Brains ({matchingBrains.length})
+            <TabsTrigger value="minds" className="rounded-none data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:text-foreground data-[state=active]:font-bold data-[state=active]:border-b-[3px] data-[state=active]:border-primary h-full px-5 text-sm text-muted-foreground hover:bg-muted/15 transition-all cursor-pointer">
+              Minds ({matchingMinds.length})
             </TabsTrigger>
             <TabsTrigger value="topics" className="rounded-none data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:text-foreground data-[state=active]:font-bold data-[state=active]:border-b-[3px] data-[state=active]:border-primary h-full px-5 text-sm text-muted-foreground hover:bg-muted/15 transition-all cursor-pointer">
               Topics ({matchingTopics.length})
@@ -320,39 +320,39 @@ export function SearchPage() {
             <div className="py-4 space-y-6">
               {/* TOP / ALL VIEW */}
               <TabsContent value="all" className="space-y-6 mt-0">
-                {/* Matching Brains Section */}
-                {matchingBrains.length > 0 && (
+                {/* Matching Minds Section */}
+                {matchingMinds.length > 0 && (
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
                       <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-                        <BrainCircuit className="w-3.5 h-3.5 text-primary" /> Brains ({matchingBrains.length})
+                        <BrainCircuit className="w-3.5 h-3.5 text-primary" /> Minds ({matchingMinds.length})
                       </h3>
-                      {matchingBrains.length > 3 && (
-                        <Button variant="link" size="sm" onClick={() => setActiveTab("brains")} className="text-xs text-primary p-0 h-auto">
+                      {matchingMinds.length > 3 && (
+                        <Button variant="link" size="sm" onClick={() => setActiveTab("minds")} className="text-xs text-primary p-0 h-auto">
                           View all
                         </Button>
                       )}
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      {matchingBrains.slice(0, 4).map(brain => (
+                      {matchingMinds.slice(0, 4).map(mind => (
                         <div 
-                          key={brain.id}
+                          key={mind.id}
                           className="bg-card/40 border border-border/40 hover:border-border/80 rounded-2xl p-4 transition-all hover:bg-muted/20 flex flex-col justify-between group"
                         >
                           <div>
                             <div className="flex items-start justify-between gap-2 mb-2">
                               <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">
-                                {brain.category}
+                                {mind.category}
                               </span>
                               <span className="text-[11px] text-muted-foreground font-mono">
-                                v{brain.version}
+                                v{mind.version}
                               </span>
                             </div>
                             <h4 className="text-base font-bold text-foreground group-hover:text-primary transition-colors line-clamp-1">
-                              {brain.title}
+                              {mind.title}
                             </h4>
                             <p className="text-xs text-muted-foreground line-clamp-2 mt-1">
-                              {brain.description}
+                              {mind.description}
                             </p>
                           </div>
                           <div className="flex items-center gap-2 mt-4 pt-3 border-t border-border/40">
@@ -361,18 +361,18 @@ export function SearchPage() {
                               variant="default"
                               className="flex-1 h-7 text-xs font-semibold rounded-full gap-1"
                               onClick={() => {
-                                setEngineBrain(brain);
+                                setEngineMind(mind);
                                 setIsEngineOpen(true);
                               }}
                             >
-                              <Play className="w-3 h-3 fill-current" /> Run Brain
+                              <Play className="w-3 h-3 fill-current" /> Run Mind
                             </Button>
                             <Button 
                               size="sm" 
                               variant="outline"
                               className="h-7 text-xs font-semibold rounded-full gap-1 border-border/60"
                               onClick={() => {
-                                setDrawerBrain(brain);
+                                setDrawerMind(mind);
                                 setIsDrawerOpen(true);
                               }}
                             >
@@ -485,28 +485,28 @@ export function SearchPage() {
                 )}
               </TabsContent>
 
-              {/* BRAINS TAB */}
-              <TabsContent value="brains" className="space-y-4 mt-0">
+              {/* MINDS TAB */}
+              <TabsContent value="minds" className="space-y-4 mt-0">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {matchingBrains.map(brain => (
+                  {matchingMinds.map(mind => (
                     <div 
-                      key={brain.id}
+                      key={mind.id}
                       className="bg-card/40 border border-border/40 hover:border-border/80 rounded-2xl p-4 transition-all hover:bg-muted/20 flex flex-col justify-between group"
                     >
                       <div>
                         <div className="flex items-start justify-between gap-2 mb-2">
                           <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">
-                            {brain.category}
+                            {mind.category}
                           </span>
                           <span className="text-[11px] text-muted-foreground font-mono">
-                            v{brain.version}
+                            v{mind.version}
                           </span>
                         </div>
                         <h4 className="text-base font-bold text-foreground group-hover:text-primary transition-colors">
-                          {brain.title}
+                          {mind.title}
                         </h4>
                         <p className="text-xs text-muted-foreground line-clamp-3 mt-1.5">
-                          {brain.description}
+                          {mind.description}
                         </p>
                       </div>
                       <div className="flex items-center gap-2 mt-4 pt-3 border-t border-border/40">
@@ -515,18 +515,18 @@ export function SearchPage() {
                           variant="default"
                           className="flex-1 h-8 text-xs font-semibold rounded-full gap-1"
                           onClick={() => {
-                            setEngineBrain(brain);
+                            setEngineMind(mind);
                             setIsEngineOpen(true);
                           }}
                         >
-                          <Play className="w-3 h-3 fill-current" /> Run Brain
+                          <Play className="w-3 h-3 fill-current" /> Run Mind
                         </Button>
                         <Button 
                           size="sm" 
                           variant="outline"
                           className="h-8 text-xs font-semibold rounded-full gap-1 border-border/60"
                           onClick={() => {
-                            setDrawerBrain(brain);
+                            setDrawerMind(mind);
                             setIsDrawerOpen(true);
                           }}
                         >
@@ -554,7 +554,7 @@ export function SearchPage() {
                         <ArrowRight className="w-4 h-4 text-muted-foreground" />
                       </div>
                       <p className="text-xs text-muted-foreground line-clamp-2">
-                        {topic.description || "Explore decision brains, conversations, and contributors."}
+                        {topic.description || "Explore decision minds, conversations, and contributors."}
                       </p>
                     </div>
                   ))}
@@ -668,7 +668,7 @@ export function SearchPage() {
               <TabsContent value="skills" className="space-y-3 mt-0">
                 {matchingSkills.length === 0 ? (
                   <div className="py-8 text-center text-sm text-muted-foreground">
-                    No skills found. Publish skills from your brain library.
+                    No skills found. Publish skills from your mind library.
                   </div>
                 ) : (
                   matchingSkills.map((skill) => (
@@ -713,28 +713,28 @@ export function SearchPage() {
         </Tabs>
       )}
 
-      {/* Runtime Engine Modal for running matching brains directly from search */}
-      {engineBrain && (
+      {/* Runtime Engine Modal for running matching minds directly from search */}
+      {engineMind && (
         <RuntimeEngine 
-          brain={engineBrain}
+          mind={engineMind}
           isOpen={isEngineOpen}
           onClose={() => setIsEngineOpen(false)}
         />
       )}
 
-      {/* Brain Drawer for inspecting nodes/structure */}
-      {drawerBrain && (
-        <BrainDrawer 
-          brain={drawerBrain}
+      {/* Mind Drawer for inspecting nodes/structure */}
+      {drawerMind && (
+        <MindDrawer 
+          mind={drawerMind}
           isOpen={isDrawerOpen}
           onClose={() => setIsDrawerOpen(false)}
           onLaunch={(b) => {
             setIsDrawerOpen(false);
-            setEngineBrain(b);
+            setEngineMind(b);
             setIsEngineOpen(true);
           }}
-          onDelete={deleteBrain}
-          onExport={exportBrain}
+          onDelete={deleteMind}
+          onExport={exportMind}
         />
       )}
     </div>

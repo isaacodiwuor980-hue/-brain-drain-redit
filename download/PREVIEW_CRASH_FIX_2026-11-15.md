@@ -4,7 +4,7 @@ Commit: `beaa9aa` on `feat/community-rebuild` (3 files: `package.json`, `.env.ex
 
 ## The exact error
 
-Not a thrown exception — a **silent misconfiguration**. Every page route (`/`, `/search`, `/brains`…) returned **HTTP 404** while `/api/*` worked fine. The server process stayed alive (healthz 200 every 60 s), so it *looked* healthy — but the browser got nothing. The app appeared "down," and restarting the server never fixed it.
+Not a thrown exception — a **silent misconfiguration**. Every page route (`/`, `/search`, `/minds`…) returned **HTTP 404** while `/api/*` worked fine. The server process stayed alive (healthz 200 every 60 s), so it *looked* healthy — but the browser got nothing. The app appeared "down," and restarting the server never fixed it.
 
 ## Root cause (in plain language)
 

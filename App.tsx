@@ -5,13 +5,13 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/lib/theme";
 import { AppShell } from "@/components/layout/AppShell";
-// Note: ShareBrainModal, ReportBugModal, and NotFound are kept as eager
+// Note: ShareMindModal, ReportBugModal, and NotFound are kept as eager
 // imports. They were tried as lazy chunks, but the lazy wrapper machinery
 // added ~5KB to the entry chunk while the modals themselves only totaled
 // ~4.4KB gzipped — a net loss on first paint. Eager is the right call
 // here; the AppShell AlertDialog (a larger radix primitive) IS lazy
 // because that one's savings exceed the wrapper cost.
-import { ShareBrainModal } from "@/components/ShareBrainModal";
+import { ShareMindModal } from "@/components/ShareMindModal";
 import { ReportBugModal } from "./ReportBugModal";
 import { useShortcuts } from "@/hooks/use-shortcuts";
 import { useMissionReminders } from "@/hooks/use-mission-reminders";
@@ -20,7 +20,7 @@ import { AuthProvider } from "@/components/auth/AuthContext";
 import { Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { idb } from "@/lib/db";
-import { Post, Topic, Brain } from "@/lib/types";
+import { Post, Topic, Mind } from "@/lib/types";
 import NotFound from "@/pages/not-found";
 import { reportError } from "@/lib/error-monitor";
 import { safeStorage } from "@/lib/safe-storage";
@@ -94,12 +94,12 @@ function usePrefetch() {
       }
     });
 
-    // Prefetch brains
+    // Prefetch minds
     queryClient.prefetchQuery({
-      queryKey: ["brains"],
+      queryKey: ["minds"],
       queryFn: async () => {
-        const allBrains = await idb.getAll<Brain>("brains");
-        return allBrains;
+        const allMinds = await idb.getAll<Mind>("minds");
+        return allMinds;
       }
     });
   }, [queryClient]);
@@ -137,7 +137,7 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
     const now = Date.now();
     let timestamps: number[] = [];
     try {
-      const stored = localStorage.getItem("brain_builder_error_timestamps");
+      const stored = localStorage.getItem("mind_builder_error_timestamps");
       if (stored) {
         timestamps = JSON.parse(stored);
         if (!Array.isArray(timestamps)) timestamps = [];
@@ -154,7 +154,7 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
     if (timestamps.length > 2) {
       timestamps = timestamps.slice(-2);
     }
-    safeStorage.setItem("brain_builder_error_timestamps", JSON.stringify(timestamps));
+    safeStorage.setItem("mind_builder_error_timestamps", JSON.stringify(timestamps));
 
     if (isSecondErrorWithin15Sec) {
       // Second error within 15s: this is a persistent/deterministic error.
@@ -163,8 +163,8 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
       // old code did window.location.reload() here, which caused an
       // infinite reload loop on deterministic errors (the page would
       // reload, hit the same error, reload again, forever).
-      safeStorage.setItem("brain_builder_open_bug_modal", "true");
-      safeStorage.setItem("brain_builder_error_message", error.message || "Unknown error");
+      safeStorage.setItem("mind_builder_open_bug_modal", "true");
+      safeStorage.setItem("mind_builder_error_message", error.message || "Unknown error");
 
       this.props.toast({
         title: "Persistent Error Encountered",
@@ -290,20 +290,20 @@ function GlobalBugModalManager() {
     // localStorage access here threw during React's commit phase and unmounted
     // the ENTIRE app (blank page). All reads/writes go through safeStorage.
     const shouldOpen =
-      safeStorage.getItem("brain_builder_open_bug_modal") ||
-      safeStorage.getSession("brain_builder_open_bug_modal");
+      safeStorage.getItem("mind_builder_open_bug_modal") ||
+      safeStorage.getSession("mind_builder_open_bug_modal");
     if (shouldOpen === "true") {
       const err =
-        safeStorage.getItem("brain_builder_error_message") ||
-        safeStorage.getSession("brain_builder_error_message") ||
+        safeStorage.getItem("mind_builder_error_message") ||
+        safeStorage.getSession("mind_builder_error_message") ||
         "Persistent application error";
       // eslint-disable-next-line react-hooks/set-state-in-effect -- legitimate mount-sync of external storage flag → open ReportBugModal; reading storage in a lazy useState initializer would move a guarded read into the render phase (the effect is the safe place for blocked-storage access).
       setDefaultError(err);
       setIsOpen(true);
-      safeStorage.removeItem("brain_builder_open_bug_modal");
-      safeStorage.removeItem("brain_builder_error_message");
-      safeStorage.removeSession("brain_builder_open_bug_modal");
-      safeStorage.removeSession("brain_builder_error_message");
+      safeStorage.removeItem("mind_builder_open_bug_modal");
+      safeStorage.removeItem("mind_builder_error_message");
+      safeStorage.removeSession("mind_builder_open_bug_modal");
+      safeStorage.removeSession("mind_builder_error_message");
     }
   }, []);
 
@@ -399,13 +399,13 @@ function App() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <ThemeProvider defaultTheme="dark" storageKey="brain-builder-theme">
+      <ThemeProvider defaultTheme="dark" storageKey="mind-builder-theme">
         <TooltipProvider>
           <AuthProvider>
             <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
               <Router />
             </WouterRouter>
-            <ShareBrainModal />
+            <ShareMindModal />
             <GlobalBugModalManager />
             <Toaster />
           </AuthProvider>

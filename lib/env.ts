@@ -48,7 +48,7 @@ const localOnly = readBoolean("VITE_LOCAL_ONLY", false);
 
 export const env = {
   /** Public Firebase web config is loaded from firebase-applet-config.json. */
-  appName: "Brain Drain",
+  appName: "MindSpool",
   apiBaseUrl: normalizeBaseUrl(readString("VITE_API_BASE_URL")),
   /** Whether cloud API calls are attempted at all. Empty base URL = same-origin = enabled. */
   apiEnabled: !localOnly,

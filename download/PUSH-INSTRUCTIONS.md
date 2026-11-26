@@ -1,8 +1,8 @@
 # Push to GitHub — step by step
 
-You have a verified git bundle in `download/new-brain-drain.bundle` (1.4 MB,
+You have a verified git bundle in `download/new-MindSpool.bundle` (1.4 MB,
 complete history, all 3 branches). The target repo
-`https://github.com/isaacodiwuor980-hue/new-brain-drain.git` is **empty and
+`https://github.com/isaacodiwuor980-hue/new-MindSpool.git` is **empty and
 public**, and this sandbox has **no GitHub credentials** (no PAT, no SSH key,
 no `gh` CLI), so the push must run from **your own machine** where you are
 authenticated. Bundles carry refs + objects only — not config — so you set
@@ -12,12 +12,12 @@ the remote after cloning.
 
 ```bash
 # 1. Move the bundle somewhere on your machine, then clone it:
-git clone /path/to/new-brain-drain.bundle new-brain-drain
-cd new-brain-drain
+git clone /path/to/new-MindSpool.bundle new-MindSpool
+cd new-MindSpool
 #    → lands on feat/community-rebuild @ fa7e6fe (all fixes)
 
 # 2. Repoint origin from the bundle file to your GitHub repo:
-git remote set-url origin https://github.com/isaacodiwuor980-hue/new-brain-drain.git
+git remote set-url origin https://github.com/isaacodiwuor980-hue/new-MindSpool.git
 
 # 3. Push both branches:
 git push -u origin feat/community-rebuild
@@ -29,15 +29,15 @@ git push origin main
 #       git checkout main && git merge --ff-only feat/community-rebuild && git push origin main
 
 # 5. Verify the round-trip:
-git clone https://github.com/isaacodiwuor980-hue/new-brain-drain.git verify
+git clone https://github.com/isaacodiwuor980-hue/new-MindSpool.git verify
 cd verify && npm ci && npm start   # → http://localhost:3000
 ```
 
 ## Path B — you already cloned the empty GitHub repo
 
 ```bash
-cd new-brain-drain                                    # your empty authenticated clone
-git fetch /path/to/new-brain-drain.bundle 'refs/heads/*:refs/heads/*'
+cd new-MindSpool                                    # your empty authenticated clone
+git fetch /path/to/new-MindSpool.bundle 'refs/heads/*:refs/heads/*'
 git checkout feat/community-rebuild
 git push -u origin feat/community-rebuild
 git push origin main

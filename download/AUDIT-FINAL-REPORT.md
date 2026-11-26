@@ -1,4 +1,4 @@
-# Brain Drain — Preview Fix & GitHub-Ready Handoff
+# MindSpool — Preview Fix & GitHub-Ready Handoff
 
 **Branch:** `feat/community-rebuild` · **Head:** `0c51e53` · **Date:** 2026-11-16
 
@@ -26,13 +26,13 @@ A `curl` 200 only proves the server answers; it does not prove the page
 renders. So the running server was loaded in a real headless browser
 (`agent-browser open http://localhost:3000`):
 
-- **Title:** `Brain Drain — The Next Human LLM` · **URL:** `http://localhost:3000/`
+- **Title:** `MindSpool — The Next Human LLM` · **URL:** `http://localhost:3000/`
 - **Page errors:** none
 - **Console:** only `[preview] unregistered stale service workers` (the
   sw-killer doing its job — no warnings, no errors)
 - **Rendered DOM:** `root` has 1 mounted child; `<h1>` = "Build decision
-  brains"; onboarding copy + 5 buttons present; body text starts
-  "Build decision brains / A brain is a short, yes/no guide…"
+  minds"; onboarding copy + 5 buttons present; body text starts
+  "Build decision minds / A mind is a short, yes/no guide…"
 
 Both start modes were verified live: `npm run dev` (tsx, :3200) and
 `npm start` (serve.js → `dist/server.cjs`, :3000) each return 200 on

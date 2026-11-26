@@ -4,7 +4,7 @@
  *   crypto.randomUUID() requires a SECURE CONTEXT (HTTPS or localhost).
  *   On HTTP preview domains, Chrome / Opera / Safari leave the method
  *   undefined; any code that calls it (feed cold-start seeding, analytics
- *   trackEvent, share-as-post, brain creation, comment ids) throws a
+ *   trackEvent, share-as-post, mind creation, comment ids) throws a
  *   TypeError and the feed never renders. Firefox is more lenient in some
  *   versions, which is exactly why the feed loaded in Firefox but failed in
  *   Chrome and Opera Mini.

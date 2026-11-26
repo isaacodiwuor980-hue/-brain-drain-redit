@@ -8,7 +8,7 @@ This documents the permanent fixes for the two preview problems you kept hitting
 
 ### 1. The feed failed in Chrome and Opera Mini but worked in Firefox
 
-**Root cause:** `crypto.randomUUID()` requires a **secure context** (HTTPS or `localhost`). On an HTTP preview domain, Chrome / Opera / Safari leave the method `undefined`. The app calls it during feed cold-start seeding, analytics, share-as-post and brain creation → `TypeError: Cannot read properties of undefined` → the feed never renders. Firefox is more lenient about secure-context APIs, which is why it loaded there but not in Chrome/Opera Mini.
+**Root cause:** `crypto.randomUUID()` requires a **secure context** (HTTPS or `localhost`). On an HTTP preview domain, Chrome / Opera / Safari leave the method `undefined`. The app calls it during feed cold-start seeding, analytics, share-as-post and mind creation → `TypeError: Cannot read properties of undefined` → the feed never renders. Firefox is more lenient about secure-context APIs, which is why it loaded there but not in Chrome/Opera Mini.
 
 **Permanent fix:** `public/crypto-polyfill.js` is loaded **synchronously in `<head>`**, before the app bundle. It installs `crypto.randomUUID` (using `crypto.getRandomValues`, which works in *all* contexts) when the native method is missing, and is a no-op on HTTPS/localhost. It runs before any app code, so no call site can throw.
 
@@ -41,21 +41,21 @@ To keep the preview up permanently, run one of these in **your own persistent te
 
 ```bash
 # Option A — simplest: a terminal you leave open
-cd BRAIN-DRAIN-latest-
+cd MindSpool-latest-
 npm run build && npm start
 # (npm start now auto-restarts on crash)
 
 # Option B — pm2 (survives terminal close, restarts on reboot)
 npm i -g pm2
-pm2 start scripts/serve.js --name brain-drain
+pm2 start scripts/serve.js --name MindSpool
 pm2 save && pm2 startup   # auto-restart on server reboot
 
 # Option C — systemd (Linux host)
-# /etc/systemd/system/brain-drain.service
+# /etc/systemd/system/MindSpool.service
 # [Unit]
-# Description=Brain Drain
+# Description=MindSpool
 # [Service]
-# WorkingDirectory=/path/to/BRAIN-DRAIN-latest-
+# WorkingDirectory=/path/to/MindSpool-latest-
 # ExecStart=/usr/bin/node scripts/serve.js
 # Restart=always
 # Environment=NODE_ENV=production

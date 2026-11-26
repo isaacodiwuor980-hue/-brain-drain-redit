@@ -54,7 +54,7 @@ export function ReportBugModal({ trigger, defaultError = "", isOpen: controlledI
       const report = {
         id: reportId,
         description: description.trim(),
-        email: email.trim() || "anonymous@brain-drain.app",
+        email: email.trim() || "anonymous@MindSpool.app",
         severity,
         defaultError,
         userAgent: navigator.userAgent,
@@ -66,13 +66,13 @@ export function ReportBugModal({ trigger, defaultError = "", isOpen: controlledI
       // 1. Store locally in localStorage (guarded against private mode / quota)
       let existingReports: unknown[] = [];
       try {
-        existingReports = JSON.parse(localStorage.getItem("brain_builder_bug_reports") || "[]");
+        existingReports = JSON.parse(localStorage.getItem("mind_builder_bug_reports") || "[]");
       } catch {
         existingReports = [];
       }
       existingReports.push(report);
       try {
-        localStorage.setItem("brain_builder_bug_reports", JSON.stringify(existingReports));
+        localStorage.setItem("mind_builder_bug_reports", JSON.stringify(existingReports));
       } catch {
         // Even if persisting fails, we still treat the report as logged
         // in-memory so the user gets a success toast.
@@ -126,7 +126,7 @@ export function ReportBugModal({ trigger, defaultError = "", isOpen: controlledI
             <div>
               <DialogTitle className="text-lg font-bold">Report an Issue</DialogTitle>
               <DialogDescription className="text-xs">
-                Help us improve Brain Drain by reporting errors or unexpected behavior.
+                Help us improve MindSpool by reporting errors or unexpected behavior.
               </DialogDescription>
             </div>
           </div>

@@ -336,7 +336,7 @@ export async function runReactivation(): Promise<void> {
 
       const notification: Notification = {
         id: notificationId,
-        type: "brain_run", // closest existing type — could add 'hive_reactivation' later
+        type: "mind_run", // closest existing type — could add 'hive_reactivation' later
         actorName: "Hive-Mind",
         content: `The Hive has shifted — "${post.title || "a post you might care about"}" has new activity worth revisiting.`,
         postId,

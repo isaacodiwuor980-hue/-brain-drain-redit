@@ -431,12 +431,12 @@ select {
   outline-offset: 2px;
 }
 
-/* Card stagger-in animation — used by Dashboard.tsx's brain grid (and any
+/* Card stagger-in animation — used by Dashboard.tsx's mind grid (and any
    other list that wants a subtle entrance). Runs on the compositor only so
    it doesn't jank the main thread when many cards mount at once. The
    `both` fill-mode keeps the start state (opacity:0) until the delay
    elapses so the stagger reads cleanly. */
-@keyframes brain-card-in {
+@keyframes mind-card-in {
   from {
     opacity: 0;
     transform: translateY(12px);
@@ -451,7 +451,7 @@ select {
    prefer reduced motion. The card still becomes visible (the `to` state)
    because of `animation-fill-mode: both` — the keyframe just snaps. */
 @media (prefers-reduced-motion: reduce) {
-  [style*="brain-card-in"] {
+  [style*="mind-card-in"] {
     animation: none !important;
     opacity: 1 !important;
     transform: none !important;

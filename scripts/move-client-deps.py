@@ -7,7 +7,7 @@ Versions are unchanged — this is pure metadata placement.
 """
 import json
 
-PKG = "/home/z/my-project/BRAIN-DRAIN-latest-/package.json"
+PKG = "/home/z/my-project/MindSpool-latest-/package.json"
 
 MOVE = [
     "react", "react-dom", "wouter", "@tanstack/react-query", "firebase",

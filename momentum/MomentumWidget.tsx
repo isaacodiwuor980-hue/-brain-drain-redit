@@ -28,8 +28,8 @@ export function MomentumWidget() {
             <Sparkles className="w-6 h-6 text-primary" />
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-bold">Earn your first Brain Curator badge</p>
-            <p className="text-xs text-muted-foreground">Solve 1 brain → +50 XP → unlock streak protection</p>
+            <p className="text-sm font-bold">Earn your first Mind Curator badge</p>
+            <p className="text-xs text-muted-foreground">Solve 1 mind → +50 XP → unlock streak protection</p>
           </div>
           <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:translate-x-1 transition-transform shrink-0" />
         </div>

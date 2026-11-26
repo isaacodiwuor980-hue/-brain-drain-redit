@@ -22,7 +22,7 @@ export const DEFAULT_FEATURE_FLAGS: FeatureFlags = {
 };
 
 export type ChallengeDifficulty = "beginner" | "intermediate" | "advanced" | "expert";
-export type ChallengeType = "diagnostic_tree" | "causal_inference" | "logic_fallacy" | "brain_simulation";
+export type ChallengeType = "diagnostic_tree" | "causal_inference" | "logic_fallacy" | "mind_simulation";
 
 export interface ChallengeScenarioOption {
   id: string;
@@ -46,7 +46,7 @@ export interface DailyChallenge {
   communityId?: string;
   difficulty: ChallengeDifficulty;
   type: ChallengeType;
-  associatedBrainId?: string;
+  associatedMindId?: string;
   initialNodeId?: string;
   targetOutcomeNodeId?: string;
   scenarios: ChallengeScenario[];
@@ -70,7 +70,7 @@ export interface UserChallengeAttempt {
 }
 
 export type LeaderboardTimeframe = "daily" | "weekly" | "monthly" | "all_time";
-export type LeaderboardMetric = "reasoning_xp" | "brains_built" | "answers_accepted" | "streak_days";
+export type LeaderboardMetric = "reasoning_xp" | "minds_built" | "answers_accepted" | "streak_days";
 
 export interface LeaderboardEntry {
   userId: string;
@@ -103,7 +103,7 @@ export interface AchievementBadge {
   iconName: string;
   xpValue: number;
   requirement: {
-    type: "create_brain" | "solve_challenges" | "give_answers" | "streak_milestone";
+    type: "create_mind" | "solve_challenges" | "give_answers" | "streak_milestone";
     threshold: number;
   };
 }
@@ -159,7 +159,7 @@ export interface RealtimeSessionParticipant {
 export interface RealtimeSession {
   id: string;
   title: string;
-  brainId: string;
+  mindId: string;
   hostUserId: string;
   communityId?: string;
   status: SessionStatus;

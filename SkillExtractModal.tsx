@@ -1,18 +1,18 @@
 /**
  * SkillExtractModal.tsx — Skills + Habits publishing flow
- * (brain → scrape → edit → preview → publish to public).
+ * (mind → scrape → edit → preview → publish to public).
  *
  * The full flow:
- *   1. User opens a brain that's been helpful
+ *   1. User opens a mind that's been helpful
  *   2. "Extract as Skill" / "Extract as Habit" buttons are available in
- *      the brain's Overview tab (added to BrainDrawer)
- *   3. On click, the brain's info is SCRAPED (outcome nodes → SkillSteps
+ *      the mind's Overview tab (added to MindDrawer)
+ *   3. On click, the mind's info is SCRAPED (outcome nodes → SkillSteps
  *      for skills; routine/anchor pattern for habits)
  *   4. User reviews + EDITS the scraped info in this modal (steps are
  *      reorderable, editable, deletable; metadata is editable)
  *   5. Preview shows exactly what other users will see
  *   6. User publishes → the skill/habit goes live to the public (synced
- *      to Supabase so other users can find it while building their brains)
+ *      to Supabase so other users can find it while building their minds)
  */
 
 import { useState, useMemo } from "react";
@@ -33,7 +33,7 @@ import { useSkills } from "@/hooks/use-skills";
 import { useHabits } from "@/hooks/use-habits";
 import { useAuth } from "@/components/auth/AuthContext";
 import { userIdOr, displayNameOr } from "@/lib/user-data";
-import type { Brain, Node, SkillStep, SkillEntry, Habit } from "@/lib/types";
+import type { Mind, Node, SkillStep, SkillEntry, Habit } from "@/lib/types";
 import {
   Sparkles,
   Loader2,
@@ -51,16 +51,16 @@ import {
 export type ExtractMode = "skill" | "habit";
 
 interface SkillExtractModalProps {
-  brain: Brain;
+  mind: Mind;
   nodes: Node[];
   mode: ExtractMode;
   isOpen: boolean;
   onClose: () => void;
 }
 
-// ── Step 1: SCRAPE — extract skill steps from brain nodes ─────────────────
+// ── Step 1: SCRAPE — extract skill steps from mind nodes ─────────────────
 
-function scrapeSkillFromBrain(brain: Brain, nodes: Node[]): {
+function scrapeSkillFromMind(mind: Mind, nodes: Node[]): {
   steps: SkillStep[];
   title: string;
   domain: string;
@@ -71,7 +71,7 @@ function scrapeSkillFromBrain(brain: Brain, nodes: Node[]): {
       order: idx + 1,
       action: (n.result_text || n.next_steps || "").trim(),
       tool: undefined,
-      why: n.question_text || brain.title,
+      why: n.question_text || mind.title,
       errorIfSkipped: undefined,
       yesOutcome: undefined,
       noOutcome: undefined,
@@ -82,14 +82,14 @@ function scrapeSkillFromBrain(brain: Brain, nodes: Node[]): {
 
   return {
     steps,
-    title: brain.title,
-    domain: brain.category || "general",
+    title: mind.title,
+    domain: mind.category || "general",
   };
 }
 
-// ── Step 1b: SCRAPE habit — extract a habit pattern from brain nodes ──────
+// ── Step 1b: SCRAPE habit — extract a habit pattern from mind nodes ──────
 
-function scrapeHabitFromBrain(brain: Brain, nodes: Node[]): {
+function scrapeHabitFromMind(mind: Mind, nodes: Node[]): {
   newRoutine: string;
   anchorHabit: string;
   timing: "before" | "after";
@@ -108,17 +108,17 @@ function scrapeHabitFromBrain(brain: Brain, nodes: Node[]): {
     .trim() || "morning coffee";
 
   return {
-    newRoutine: firstOutcome?.result_text?.trim() || `Practice: ${brain.title}`,
+    newRoutine: firstOutcome?.result_text?.trim() || `Practice: ${mind.title}`,
     anchorHabit: anchor,
     timing: "after",
     reward: "Check off the streak + feel the progress",
-    topic: brain.category || "general",
+    topic: mind.category || "general",
   };
 }
 
 // ── Main component ────────────────────────────────────────────────────────
 
-export function SkillExtractModal({ brain, nodes, mode, isOpen, onClose }: SkillExtractModalProps) {
+export function SkillExtractModal({ mind, nodes, mode, isOpen, onClose }: SkillExtractModalProps) {
   const { user } = useAuth();
   const skills = useSkills();
   const habits = useHabits();
@@ -127,7 +127,7 @@ export function SkillExtractModal({ brain, nodes, mode, isOpen, onClose }: Skill
   const [wizardStep, setWizardStep] = useState<"review" | "preview" | "done">("review");
 
   // ── Skill state (mode === "skill") ──
-  const scrapedSkill = useMemo(() => scrapeSkillFromBrain(brain, nodes), [brain, nodes]);
+  const scrapedSkill = useMemo(() => scrapeSkillFromMind(mind, nodes), [mind, nodes]);
   const [skillTitle, setSkillTitle] = useState(scrapedSkill.title);
   const [skillDomain, setSkillDomain] = useState(scrapedSkill.domain);
   const [authorName, setAuthorName] = useState(displayNameOr(user));
@@ -135,7 +135,7 @@ export function SkillExtractModal({ brain, nodes, mode, isOpen, onClose }: Skill
   const [steps, setSteps] = useState<SkillStep[]>(scrapedSkill.steps);
 
   // ── Habit state (mode === "habit") ──
-  const scrapedHabit = useMemo(() => scrapeHabitFromBrain(brain, nodes), [brain, nodes]);
+  const scrapedHabit = useMemo(() => scrapeHabitFromMind(mind, nodes), [mind, nodes]);
   const [habitRoutine, setHabitRoutine] = useState(scrapedHabit.newRoutine);
   const [habitAnchor, setHabitAnchor] = useState(scrapedHabit.anchorHabit);
   const [habitTiming, setHabitTiming] = useState<"before" | "after">(scrapedHabit.timing);
@@ -203,8 +203,8 @@ export function SkillExtractModal({ brain, nodes, mode, isOpen, onClose }: Skill
     setError(null);
     try {
       // 1. Create the skill (private) with the edited metadata.
-      const created = await skills.createSkillFromBrain({
-        brainId: brain.id,
+      const created = await skills.createSkillFromMind({
+        mindId: mind.id,
         skillMetadata: {
           title: skillTitle.trim(),
           domain: skillDomain.trim() || "general",
@@ -214,7 +214,7 @@ export function SkillExtractModal({ brain, nodes, mode, isOpen, onClose }: Skill
       });
 
       // 2. Overwrite the auto-extracted steps with the user's edited steps
-      //    (the hook extracts from the brain; we let the user edit here).
+      //    (the hook extracts from the mind; we let the user edit here).
       const { idb } = await import("@/lib/db");
       const withEditedSteps: SkillEntry = { ...created, steps };
       await idb.put("skills", withEditedSteps);
@@ -295,7 +295,7 @@ export function SkillExtractModal({ brain, nodes, mode, isOpen, onClose }: Skill
             {wizardStep === "review" && (
               <>
                 We scraped {isSkillMode ? `${steps.length} step${steps.length === 1 ? "" : "s"}` : "a habit pattern"} from
-                “{brain.title}”. Review and edit below, then publish to make it public.
+                “{mind.title}”. Review and edit below, then publish to make it public.
               </>
             )}
             {wizardStep === "preview" && "Preview exactly what other users will see."}
@@ -352,7 +352,7 @@ export function SkillExtractModal({ brain, nodes, mode, isOpen, onClose }: Skill
               {/* Steps editor */}
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <Label>Steps ({steps.length}) — scraped from brain outcomes</Label>
+                  <Label>Steps ({steps.length}) — scraped from mind outcomes</Label>
                   <Button variant="outline" size="sm" onClick={addStep} type="button">
                     <Plus className="h-3 w-3 mr-1" />
                     Add step
@@ -360,8 +360,8 @@ export function SkillExtractModal({ brain, nodes, mode, isOpen, onClose }: Skill
                 </div>
                 {steps.length === 0 ? (
                   <div className="rounded-lg border border-dashed border-border/60 p-6 text-center text-sm text-muted-foreground">
-                    This brain has no outcome nodes. Add outcomes (final recommendations) to
-                    the brain first, then extract a skill.
+                    This mind has no outcome nodes. Add outcomes (final recommendations) to
+                    the mind first, then extract a skill.
                   </div>
                 ) : (
                   steps.map((step, idx) => (
@@ -424,7 +424,7 @@ export function SkillExtractModal({ brain, nodes, mode, isOpen, onClose }: Skill
           {wizardStep === "review" && !isSkillMode && (
             <div className="space-y-4 py-2">
               <div className="rounded-lg border border-primary/30 bg-primary/5 p-3 text-sm">
-                <p className="font-medium">Habit pattern scraped from this brain:</p>
+                <p className="font-medium">Habit pattern scraped from this mind:</p>
                 <p className="mt-1 text-muted-foreground">
                   “{habitTiming === "after" ? "After" : "Before"} <strong>{habitAnchor}</strong>, I will <strong>{habitRoutine}</strong>”
                   {" "}→ reward: {habitReward}
@@ -578,13 +578,13 @@ export function SkillExtractModal({ brain, nodes, mode, isOpen, onClose }: Skill
                 </h3>
                 <p className="mt-1 text-sm text-muted-foreground">
                   {isSkillMode
-                    ? `“${publishedSkill?.title}” is now live and searchable by other users building brains.`
+                    ? `“${publishedSkill?.title}” is now live and searchable by other users building minds.`
                     : `“${publishedHabit?.newRoutine}” is now live and searchable by other users.`}
                 </p>
               </div>
               <div className="rounded-lg border border-border/50 bg-muted/20 p-3 text-xs text-muted-foreground">
                 Other users can now find this via the @skill / @habit picker in the
-                brain node editor, and via search.
+                mind node editor, and via search.
               </div>
             </div>
           )}

@@ -1,4 +1,4 @@
-# Brain Drain — Community Rebuild (Task A Implementation)
+# MindSpool — Community Rebuild (Task A Implementation)
 
 **Branch**: `feat/community-rebuild`
 **Date**: 2026-11-05

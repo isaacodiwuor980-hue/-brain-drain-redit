@@ -1,61 +1,52 @@
 #!/usr/bin/env python3
-"""Generate PWA icons (192/512 + maskable) from public/icon.svg."""
-import io, os
+"""Generate PWA icons (192/512 + maskable + favicon + apple + OG) from public/logo.png.
+
+Uses ImageMagick (`convert`), which is available in the dev environment, so this
+script has no third-party Python dependencies. Run from the repo root:
+
+    python3 scripts/generate-pwa-icons.py
+"""
+import subprocess
 from pathlib import Path
-import cairosvg
-from PIL import Image
 
-PUBLIC = Path("/home/z/my-project/BRAIN-DRAIN-latest-/public")
-SRC = PUBLIC / "icon.svg"
-BG = (16, 16, 16)      # #101010
-FG = (255, 255, 255)
+PUBLIC = Path(__file__).resolve().parent.parent / "public"
+SRC = PUBLIC / "logo.png"
+BG = "#101010"  # brand background for maskable / social cards
 
-svg = SRC.read_text()
-svg_fixed = svg.replace(
-    """@media (prefers-color-scheme: light) {
-      .background { fill: black; }
-      .foreground { fill: white; }
-    }
-    @media (prefers-color-scheme: dark) {
-      .background { fill: white; }
-      .foreground { fill: black; }
-    }""",
-    f".background {{ fill: rgb{BG}; }} .foreground {{ fill: rgb{FG}; }}",
+if not SRC.exists():
+    raise SystemExit(f"Missing source logo: {SRC}")
+
+
+def convert(args):
+    subprocess.run(["convert", *args], check=True)
+
+
+# Standard icons (preserve the logo's own transparency).
+convert([str(SRC), "-resize", "32x32", str(PUBLIC / "favicon-32.png")])
+convert([str(SRC), "-resize", "180x180", str(PUBLIC / "apple-icon.png")])
+convert([str(SRC), "-resize", "192x192", str(PUBLIC / "icon-192.png")])
+convert([str(SRC), "-resize", "512x512", str(PUBLIC / "icon-512.png")])
+
+# Maskable icons: logo at 80% (inside the 80% safe zone) on a solid background.
+convert(["-size", "192x192", "xc:" + BG, "(", str(SRC), "-resize", "154x154", ")",
+         "-gravity", "center", "-composite", str(PUBLIC / "icon-192-maskable.png")])
+convert(["-size", "512x512", "xc:" + BG, "(", str(SRC), "-resize", "410x410", ")",
+         "-gravity", "center", "-composite", str(PUBLIC / "icon-512-maskable.png")])
+
+# Open Graph social card (JPG has no alpha → dark background).
+convert(["-size", "1200x630", "xc:" + BG, "(", str(SRC), "-resize", "360x360", ")",
+         "-gravity", "center", "-composite", "-quality", "90", str(PUBLIC / "opengraph.jpg")])
+
+# Self-contained SVG favicons (embed the PNG so they render as images).
+import base64
+b64 = base64.b64encode(SRC.read_bytes()).decode()
+(PUBLIC / "favicon.svg").write_text(
+    f'<svg xmlns="http://www.w3.org/2000/svg" width="180" height="180" viewBox="0 0 180 180">'
+    f'<image width="180" height="180" href="data:image/png;base64,{b64}"/></svg>'
+)
+(PUBLIC / "icon.svg").write_text(
+    f'<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">'
+    f'<image width="512" height="512" href="data:image/png;base64,{b64}"/></svg>'
 )
 
-def render(size: int) -> Image.Image:
-    png = cairosvg.svg2png(bytestring=svg_fixed.encode(), output_width=size * 2, output_height=size * 2)
-    return Image.open(io.BytesIO(png)).resize((size, size), Image.LANCZOS)
-
-def render_maskable(size: int) -> Image.Image:
-    # Logo at 60% (inside the 80% safe zone) on a full-bleed background.
-    svg_transparent = svg.replace(
-        """@media (prefers-color-scheme: light) {
-      .background { fill: black; }
-      .foreground { fill: white; }
-    }
-    @media (prefers-color-scheme: dark) {
-      .background { fill: white; }
-      .foreground { fill: black; }
-    }""",
-        f".background {{ fill: transparent; }} .foreground {{ fill: rgb{FG}; }}",
-    )
-    logo_size = int(size * 0.6)
-    png = cairosvg.svg2png(bytestring=svg_transparent.encode(), output_width=logo_size * 2, output_height=logo_size * 2)
-    logo = Image.open(io.BytesIO(png)).resize((logo_size, logo_size), Image.LANCZOS).convert("RGBA")
-    canvas = Image.new("RGBA", (size, size), BG + (255,))
-    canvas.paste(logo, ((size - logo_size) // 2, (size - logo_size) // 2), logo)
-    return canvas
-
-jobs = [
-    ("icon-192.png", lambda: render(192)),
-    ("icon-512.png", lambda: render(512)),
-    ("icon-192-maskable.png", lambda: render_maskable(192)),
-    ("icon-512-maskable.png", lambda: render_maskable(512)),
-    ("apple-icon.png", lambda: render(180)),
-    ("favicon-32.png", lambda: render(32)),
-]
-for name, fn in jobs:
-    fn().save(PUBLIC / name, format="PNG", optimize=True)
-    print(f"  OK {name} ({(PUBLIC / name).stat().st_size / 1024:.1f} KB)")
-print("All PWA icons generated.")
+print("All MindSpool PWA icons generated.")

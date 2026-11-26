@@ -13,11 +13,11 @@ import { useToast } from "@/hooks/use-toast";
 export function ProfileNote() {
   const { addStory, stories } = useStories();
   const { user } = useAuth();
-  const { brains } = useDatabase();
+  const { minds } = useDatabase();
   const { toast } = useToast();
   const [isAddingNote, setIsAddingNote] = useState(false);
   const [noteContent, setNoteContent] = useState("");
-  const [selectedBrainId, setSelectedBrainId] = useState<string>("none");
+  const [selectedMindId, setSelectedMindId] = useState<string>("none");
   // Publish guard — prevents duplicate notes on rapid double-click.
   const [isPublishing, setIsPublishing] = useState(false);
 
@@ -45,11 +45,11 @@ export function ProfileNote() {
         authorAvatar: user.avatarUrl,
         type: "note",
         content: noteContent,
-        brainId: selectedBrainId !== "none" ? selectedBrainId : undefined
+        mindId: selectedMindId !== "none" ? selectedMindId : undefined
       });
       setIsAddingNote(false);
       setNoteContent("");
-      setSelectedBrainId("none");
+      setSelectedMindId("none");
     } catch (error) {
       toast({ title: "Couldn't share note", description: error instanceof Error ? error.message : "Please try again.", variant: "destructive" });
     } finally {
@@ -89,14 +89,14 @@ export function ProfileNote() {
               />
             </div>
             <div className="space-y-2">
-              <Label>Attach a Brain (Optional)</Label>
-              <Select value={selectedBrainId} onValueChange={setSelectedBrainId}>
+              <Label>Attach a Mind (Optional)</Label>
+              <Select value={selectedMindId} onValueChange={setSelectedMindId}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Select a Brain" />
+                  <SelectValue placeholder="Select a Mind" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">None</SelectItem>
-                  {brains.map(b => (
+                  {minds.map(b => (
                     <SelectItem key={b.id} value={b.id}>{b.title}</SelectItem>
                   ))}
                 </SelectContent>

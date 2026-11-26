@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { SAMPLE_BRAINS, instantiateSample } from "./sample-brains";
-import { validateBrain } from "./brain-validator";
+import { SAMPLE_MINDS, instantiateSample } from "./sample-minds";
+import { validateMind } from "./mind-validator";
 import type { Node } from "./types";
 
-describe("sample brains", () => {
+describe("sample minds", () => {
   it("ships a reasonable set of curated samples", () => {
-    expect(SAMPLE_BRAINS.length).toBeGreaterThanOrEqual(4);
-    for (const sample of SAMPLE_BRAINS) {
+    expect(SAMPLE_MINDS.length).toBeGreaterThanOrEqual(4);
+    for (const sample of SAMPLE_MINDS) {
       expect(sample.title).toBeTruthy();
       expect(sample.description).toBeTruthy();
       expect(sample.emoji).toBeTruthy();
@@ -14,16 +14,16 @@ describe("sample brains", () => {
     }
   });
 
-  it("every sample is a valid, runnable brain", () => {
-    for (const sample of SAMPLE_BRAINS) {
-      const issues = validateBrain(sample.brain, sample.nodes);
+  it("every sample is a valid, runnable mind", () => {
+    for (const sample of SAMPLE_MINDS) {
+      const issues = validateMind(sample.mind, sample.nodes);
       const errors = issues.filter((i) => i.level === "error");
       expect(errors, `${sample.title}: ${errors.map((e) => e.message).join("; ")}`).toEqual([]);
     }
   });
 
   it("every question in a sample terminates at an outcome", () => {
-    for (const sample of SAMPLE_BRAINS) {
+    for (const sample of SAMPLE_MINDS) {
       const byId = new Map(sample.nodes.map((n) => [n.id, n]));
       const outcomes = new Set(
         sample.nodes.filter((n) => n.node_type === "outcome").map((n) => n.id),
@@ -44,12 +44,12 @@ describe("sample brains", () => {
 
 describe("instantiateSample", () => {
   it("produces unique IDs each time and rewires node references", () => {
-    const sample = SAMPLE_BRAINS[0];
+    const sample = SAMPLE_MINDS[0];
     const a = instantiateSample(sample);
     const b = instantiateSample(sample);
 
-    expect(a.brain.id).not.toBe(b.brain.id);
-    expect(a.brain.id).not.toBe(sample.brain.id);
+    expect(a.mind.id).not.toBe(b.mind.id);
+    expect(a.mind.id).not.toBe(sample.mind.id);
 
     const aIds = new Set(a.nodes.map((n: Node) => n.id));
     const bIds = new Set(b.nodes.map((n: Node) => n.id));
@@ -57,7 +57,7 @@ describe("instantiateSample", () => {
     for (const id of aIds) expect(bIds.has(id)).toBe(false);
 
     // The root points at a node that exists.
-    expect(aIds.has(a.brain.root_node_id as string)).toBe(true);
+    expect(aIds.has(a.mind.root_node_id as string)).toBe(true);
 
     // Internal references have been remapped (old sample IDs are gone).
     const oldIds = new Set(sample.nodes.map((n) => n.id));
@@ -68,10 +68,10 @@ describe("instantiateSample", () => {
     }
   });
 
-  it("instantiated copies remain valid brains", () => {
-    for (const sample of SAMPLE_BRAINS) {
-      const { brain, nodes } = instantiateSample(sample);
-      const errors = validateBrain(brain, nodes).filter((i) => i.level === "error");
+  it("instantiated copies remain valid minds", () => {
+    for (const sample of SAMPLE_MINDS) {
+      const { mind, nodes } = instantiateSample(sample);
+      const errors = validateMind(mind, nodes).filter((i) => i.level === "error");
       expect(errors).toEqual([]);
     }
   });

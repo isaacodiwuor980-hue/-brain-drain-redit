@@ -1,6 +1,6 @@
 # Home-Screen Preview Fix — Performance & Reliability Report
 
-**Date:** 2026-11-07 · **App:** Brain Drain (React 19 + Vite + Tailwind + wouter SPA · Express 5 · Supabase · Firebase Auth · PWA)
+**Date:** 2026-11-07 · **App:** MindSpool (React 19 + Vite + Tailwind + wouter SPA · Express 5 · Supabase · Firebase Auth · PWA)
 **Mission:** Fix the home-screen preview issue + full stability/performance pass per the Phase 1-6 protocol.
 
 ---
@@ -9,7 +9,7 @@
 
 **The home-screen preview bug was a two-layer storage-availability failure, both layers now fixed and regression-guarded:**
 
-The real preview runs Brain Drain inside a cross-origin iframe. In storage-blocked contexts — Safari ITP third-party frames, sandboxed iframes, private-mode edge cases — **merely accessing `indexedDB`/`localStorage` throws SecurityError**.
+The real preview runs MindSpool inside a cross-origin iframe. In storage-blocked contexts — Safari ITP third-party frames, sandboxed iframes, private-mode edge cases — **merely accessing `indexedDB`/`localStorage` throws SecurityError**.
 
 - **Layer 1 (empty feed):** the feed queryFn read its IndexedDB cache *before* the network fetch. The read rejected → the query died → **`/api/feed` was never called** → home feed permanently blank. Reproduced deterministically: **0 feed requests in 12s+**.
 - **Layer 2 (blank page):** once layer 1 was fixed, guest sign-in succeeded and HomeFeed mounted — where `App.tsx`'s `GlobalBugModalManager` read localStorage **unguarded** in a mount effect → the throw killed React's commit → **entire app blank**. Reproduced deterministically: empty `<body>`.

@@ -28,8 +28,8 @@ export function LiveSessionBanner() {
       const newSession: RealtimeSession = {
         id: newSessionId,
         title: "My Live Session",
-        // FRAG-1: removed brainId — live sessions are now standalone.
-        brainId: "",
+        // FRAG-1: removed mindId — live sessions are now standalone.
+        mindId: "",
         hostUserId: currentUserId,
         status: "active",
         activeNodeId: "",

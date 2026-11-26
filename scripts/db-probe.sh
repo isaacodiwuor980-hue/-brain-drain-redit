@@ -53,7 +53,7 @@ probe profiles
 probe topics
 probe comments
 probe skills
-probe brains
+probe minds
 echo ""
 echo "=== sample: first 3 posts (id, user_id prefix, created_at, post_type) ==="
 curl -s -m 12 \

@@ -4,7 +4,7 @@
 # pgrep -f self-match footgun). Truncates the server log so we see only
 # this run's events.
 set -u
-cd /home/z/my-project/BRAIN-DRAIN-latest-
+cd /home/z/my-project/MindSpool-latest-
 
 self=$$
 echo "▶ killing existing bd procs (excluding self=$self)…"

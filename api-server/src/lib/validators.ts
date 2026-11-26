@@ -2,7 +2,7 @@
  * api-server/src/lib/validators.ts — Shared request-param validators.
  *
  * Phase 4: extracts the UUID + slug regex checks duplicated across
- * experts.ts, mentors.ts, brains.ts, skills.ts, etc. Centralizing them
+ * experts.ts, mentors.ts, minds.ts, skills.ts, etc. Centralizing them
  * here means a future tightening (e.g. stricter UUID v4) only touches
  * one file.
  */

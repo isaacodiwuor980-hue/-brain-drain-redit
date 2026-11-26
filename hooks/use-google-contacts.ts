@@ -103,7 +103,7 @@ export function useGoogleContacts() {
       if (data.length === 0) {
         toast({
           title: "No friends found yet",
-          description: "None of your Gmail contacts have joined Brain Drain yet.",
+          description: "None of your Gmail contacts have joined MindSpool yet.",
         });
       } else {
         toast({

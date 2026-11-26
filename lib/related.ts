@@ -1,38 +1,38 @@
 /**
  * lib/related.ts — tag-based related content discovery.
  *
- * Product spec: "Tags should suggest related content and Brains by default."
- * This utility finds brains and posts that share tags with the given item.
+ * Product spec: "Tags should suggest related content and Minds by default."
+ * This utility finds minds and posts that share tags with the given item.
  * It's a simple set-intersection on the `tags` field — no AI, no external
  * services. Runs against local IDB so it's instant.
  */
 import { idb } from "@/lib/db";
-import { Brain, Post } from "@/lib/types";
+import { Mind, Post } from "@/lib/types";
 
 /**
- * Returns brains that share at least one tag with the given tags.
- * Excludes the brain with the given ID (self-exclusion).
+ * Returns minds that share at least one tag with the given tags.
+ * Excludes the mind with the given ID (self-exclusion).
  * Returns at most `limit` results, sorted by the number of shared tags
  * (most relevant first).
  */
-export async function getRelatedBrains(
+export async function getRelatedMinds(
   tags: string[],
-  excludeBrainId?: string,
+  excludeMindId?: string,
   limit = 5,
-): Promise<Brain[]> {
+): Promise<Mind[]> {
   if (!tags || tags.length === 0) return [];
-  const allBrains = await idb.getAll<Brain>("brains");
+  const allMinds = await idb.getAll<Mind>("minds");
   const tagSet = new Set(tags.map((t) => t.toLowerCase()));
-  return allBrains
-    .filter((b) => b.id !== excludeBrainId)
+  return allMinds
+    .filter((b) => b.id !== excludeMindId)
     .map((b) => ({
-      brain: b,
+      mind: b,
       sharedCount: (b.tags || []).filter((t) => tagSet.has(t.toLowerCase())).length,
     }))
     .filter((x) => x.sharedCount > 0)
     .sort((a, b) => b.sharedCount - a.sharedCount)
     .slice(0, limit)
-    .map((x) => x.brain);
+    .map((x) => x.mind);
 }
 
 /**

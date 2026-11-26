@@ -70,21 +70,21 @@ await test("P1-T6: FAB no nested circle", async () => {
   return src.includes("no-default-hover-elevate");
 });
 
-// Task 7: Brain DNA + Read tab removed
-await test("P1-T7: Brain DNA + Read tab removed", async () => {
+// Task 7: Mind DNA + Read tab removed
+await test("P1-T7: Mind DNA + Read tab removed", async () => {
   const src = await Bun.file("pages/LibraryPage.tsx").text();
-  return !src.includes("BrainDNA") && !src.includes("ReadTab") && !src.includes("value=\"dna\"") && !src.includes("value=\"read\"");
+  return !src.includes("MindDNA") && !src.includes("ReadTab") && !src.includes("value=\"dna\"") && !src.includes("value=\"read\"");
 });
 
 // Task 8: Diagnostic Engine renamed
-await test("P1-T8: Diagnostic Engine → Edit & Repair Brain", async () => {
-  const src = await Bun.file("BrainDrawer.tsx").text();
-  return src.includes("Edit & Repair Brain") && !src.includes("Launch Diagnostic Engine");
+await test("P1-T8: Diagnostic Engine → Edit & Repair Mind", async () => {
+  const src = await Bun.file("MindDrawer.tsx").text();
+  return src.includes("Edit & Repair Mind") && !src.includes("Launch Diagnostic Engine");
 });
 
-// Task 9: Swipe gestures + large text in brain chat
+// Task 9: Swipe gestures + large text in mind chat
 await test("P1-T9: swipe gestures + large text in chat", async () => {
-  const src = await Bun.file("runtime/BrainChatRuntime.tsx").text();
+  const src = await Bun.file("runtime/MindChatRuntime.tsx").text();
   return src.includes("drag=\"x\"") && src.includes("handleSwipeEnd") && src.includes("hasImage");
 });
 
@@ -94,9 +94,9 @@ await test("P1-T10: create tag in branch section", async () => {
   return src.includes("Create tag") && src.includes("onCreateTag") && src.includes("handleCreateTag");
 });
 
-// Task 11: Branch fork = PR-style, not blank brain
+// Task 11: Branch fork = PR-style, not blank mind
 await test("P1-T11: branch fork copies nodes", async () => {
-  const src = await Bun.file("hooks/use-brain-repo.ts").text();
+  const src = await Bun.file("hooks/use-mind-repo.ts").text();
   return src.includes("forked_from_node_id") && src.includes("branch_id") && src.includes("idMap");
 });
 
@@ -155,7 +155,7 @@ await test("P2-T4: @Habit picker + habit template", async () => {
 await test("P2-T5: SkillEntry type + use-skills hook", async () => {
   const types = await Bun.file("lib/types.ts").text();
   const hook = await Bun.file("hooks/use-skills.ts").text();
-  return types.includes("SkillEntry") && types.includes("SkillStep") && hook.includes("createSkillFromBrain") && hook.includes("buildSkillId");
+  return types.includes("SkillEntry") && types.includes("SkillStep") && hook.includes("createSkillFromMind") && hook.includes("buildSkillId");
 });
 
 // Task 6: Three-layer search

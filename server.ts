@@ -101,13 +101,13 @@ ${urls.map((u) => `  <url>\n    <loc>${origin}${u.loc}</loc>\n    <lastmod>${u.l
   });
 
   app.get("/llms.txt", (_req, res) => {
-    // B-13 fix: removed dead links to /verify/:userId, /brain/:brainId,
+    // B-13 fix: removed dead links to /verify/:userId, /mind/:mindId,
     // /verify/record/:recordId — none of these SSR routes exist (the
     // verify/provenance API routers were removed entirely in Phase 3, not
     // merely stubbed). Advertising them in llms.txt pointed LLMs/crawlers
     // at 404s. Only list real pages.
     const origin = `${_req.protocol}://${_req.get("host")}`;
-    res.type("text/plain").send(`# Brain Drain\n\n> A human knowledge engine.\n\n## Crawlable pages\n- ${origin}/\n- ${origin}/data-quality\n`);
+    res.type("text/plain").send(`# MindSpool\n\n> A human knowledge engine.\n\n## Crawlable pages\n- ${origin}/\n- ${origin}/data-quality\n`);
   });
 
   app.get("/data-quality", (_req, res) => {

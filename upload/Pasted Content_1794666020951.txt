@@ -1,7 +1,7 @@
 Confirmed: skills table is missing from your Supabase database. The migration 0002 must have failed silently. You need to re-run migration 0002 (the search migration). Here's the SQL — paste it into Supabase SQL Editor and Run:
 
 sql
--- Brain Drain — Migration 0002: Search (skills table + FTS + pgvector)
+-- MindSpool — Migration 0002: Search (skills table + FTS + pgvector)
 -- Re-run if the skills table is missing.
 
 -- ── pgvector extension ──────────────────────────────────────────────────
@@ -19,7 +19,7 @@ create table if not exists public.skills (
   title text not null,
   author_id uuid references auth.users(id) on delete set null,
   steps jsonb not null default '[]'::jsonb,
-  source_brain_id text,
+  source_mind_id text,
   status text not null default 'private' check (status in ('private', 'in_review', 'published')),
   reviewer_id uuid references auth.users(id) on delete set null,
   published_at timestamptz,
@@ -112,7 +112,7 @@ returns table (
   part text,
   version text,
   steps jsonb,
-  source_brain_id text,
+  source_mind_id text,
   status text,
   similarity float
 )
@@ -129,7 +129,7 @@ as $$
     s.part,
     s.version,
     s.steps,
-    s.source_brain_id,
+    s.source_mind_id,
     s.status,
     1 - (s.embedding <=> query_embedding) as similarity
   from public.skills s
@@ -153,10 +153,10 @@ Reply with:
 
 ✅ "ran successfully" — I'll verify the skills table + rerun the smoke test (should be 36/36)
 ❌ "error: [text]" — paste the error
-i told you before how skills are created/habits created and stored after published to public that other users who develop brain /pathway can recal them during their project in real time also i want you to sospesct all issues conflicts,etc and fix them all 
+i told you before how skills are created/habits created and stored after published to public that other users who develop mind /pathway can recal them during their project in real time also i want you to sospesct all issues conflicts,etc and fix them all 
 
 Thought Process
-You're right — I missed the cross-user sharing aspect. Skills + Habits need to sync to Supabase on publish so other users can recall them while building their own brains/pathways. Let me fix the design + everything else.
+You're right — I missed the cross-user sharing aspect. Skills + Habits need to sync to Supabase on publish so other users can recall them while building their own minds/pathways. Let me fix the design + everything else.
 
 18 TS7030 bugs + skills table still missing. Let me work in parallel — I'll fix everything systematically. Batch 1: Update use-skills + use-habits to sync to Supabase on publish + add habits search endpoint:
 
@@ -271,10 +271,10 @@ Server crashes on Supabase 404	Yes (died on every skills request)	No (logs + con
 Design fix you reminded me about
 Skills + Habits are now cross-user shareable:
 
-Author creates brain → createSkillFromBrain() extracts steps → IDB (private)
+Author creates mind → createSkillFromMind() extracts steps → IDB (private)
 Author submits for review → IDB (in_review)
 Moderator approves → IDB + upserts to Supabase via PUT /api/v1/skills
-Other users editing their own brain can search via useSkills().searchPublic(query) → calls /api/v1/search/skills → returns published skills from ANY author
+Other users editing their own mind can search via useSkills().searchPublic(query) → calls /api/v1/search/skills → returns published skills from ANY author
 User clicks a skill → inserted into their node as NodeSkillReference
 Critical server-stability fix
 server.ts was calling process.exit(1) on every unhandled rejection. Any Supabase 404 (like the missing skills table) was killing the server. Changed to log + continue — server now stays up even when Supabase returns errors.
@@ -321,7 +321,7 @@ CREATE TABLE IF NOT EXISTS public.skills (
   title text not null,
   author_id uuid references auth.users(id) on delete set null,
   steps jsonb not null default '[]'::jsonb,
-  source_brain_id text,
+  source_mind_id text,
   status text not null default 'private' check (status in ('private', 'in_review', 'published')),
   reviewer_id uuid references auth.users(id) on delete set null,
   published_at timestamptz,
@@ -351,7 +351,7 @@ Creates the skills table without the embedding column
 Adds the FTS + RLS + trigger
 Paste this in Supabase SQL Editor + Run
 sql
--- Brain Drain — Skills table (minimal, no pgvector dependency)
+-- MindSpool — Skills table (minimal, no pgvector dependency)
 -- Creates the skills table + FTS + RLS. Skips the embedding column
 -- entirely so we don't need pgvector installed.
 
@@ -369,7 +369,7 @@ CREATE TABLE IF NOT EXISTS public.skills (
   author_name text not null default 'Anonymous',
   author_years_experience integer,
   steps jsonb not null default '[]'::jsonb,
-  source_brain_id text,
+  source_mind_id text,
   status text not null default 'private' check (status in ('private', 'in_review', 'published')),
   reviewer_id uuid references auth.users(id) on delete set null,
   published_at timestamptz,
@@ -529,7 +529,7 @@ author_id uuid
 author_name text ← should now exist
 author_years_experience integer ← should now exist
 steps jsonb
-source_brain_id text
+source_mind_id text
 status text
 reviewer_id uuid
 published_at timestamptz
@@ -564,20 +564,20 @@ all routes: 200 OK
 Supabase: 26 tables + skills table + 4 RLS policies on skills
 server: running, crash-resistant (won't die on Supabase errors)
 What you can now do in the app
-Author a brain with detailed step-by-step nodes (outcome nodes with result_text or next_steps)
-Extract a skill from that brain via createSkillFromBrain() → skill saved locally with status='private'
+Author a mind with detailed step-by-step nodes (outcome nodes with result_text or next_steps)
+Extract a skill from that mind via createSkillFromMind() → skill saved locally with status='private'
 Submit for review → status='in_review'
 Approve + publish → skill upserted to Supabase via PUT /api/v1/skills so other users can find it
-Other users editing their own brain can search via useSkills().searchPublic(query) → finds YOUR published skills
+Other users editing their own mind can search via useSkills().searchPublic(query) → finds YOUR published skills
 Insert skill into their node as a NodeSkillReference — they get your steps + keywords + tool recommendations
 Habits work the same way (locally for now)
 Create habits via createHabit({ newRoutine, anchorHabit, timing, reward, topic })
 Habits are stored in IDB
-Insert habit reference into brain nodes via handleInsertHabit (writes a HabitNote summary to the node)
+Insert habit reference into mind nodes via handleInsertHabit (writes a HabitNote summary to the node)
 Mark daily completion via markCompletedToday(habitId)
 Note: Habits are NOT yet synced to Supabase (they're personal behavior loops, not shared knowledge). If you want habits shared too, let me know and I'll add a habits API + table.
 Ready for Phase 2: Auth Production
-Now that the backend is fully live + skills/habits work cross-user, the next step is Phase 2: Auth Production. This is what lets real users sign up + sign in so they can actually create brains, publish skills, and post comments.
+Now that the backend is fully live + skills/habits work cross-user, the next step is Phase 2: Auth Production. This is what lets real users sign up + sign in so they can actually create minds, publish skills, and post comments.
 
 Reply with:
 
@@ -608,7 +608,7 @@ Batch 1: First, give you the migration SQL. Then I'll write the code while you r
 Now I'll extend the Habit type + create everything in parallel. You run this migration in Supabase SQL Editor while I write the code:
 
 sql
--- Brain Drain — Habits table (for cross-user habit sharing)
+-- MindSpool — Habits table (for cross-user habit sharing)
 -- Mirrors the skills pattern: private → in_review → published lifecycle.
 
 CREATE TABLE IF NOT EXISTS public.habits (
@@ -859,12 +859,12 @@ Toggle Enable to ON (top right)
 For Web SDK configuration:
 Authorized domains should already include localhost and your Firebase project domain
 You may need to add your preview URL (e.g., preview-xxx.space-z.ai) — see Step 2.2 below
-For Project public-facing name: type "Brain Drain" (used in the Google sign-in popup)
+For Project public-facing name: type "MindSpool" (used in the Google sign-in popup)
 For Project support email: type your email
 Click Save
 ⚠️ Important: When you enable Google sign-in, Firebase may ask you to configure OAuth consent screen in Google Cloud Console. If it does:
 
-Project name: Brain Drain
+Project name: MindSpool
 User support email: your email
 Developer contact info: your email
 Scopes: email, profile, openid (defaults)
@@ -1093,11 +1093,11 @@ Reply with:
 Thought Process
 Let me continue with Phase 2.5 — wire getAuthToken() into the write hooks. First, audit what's already wired:
 
-Good audit. use-social and use-topics and use-skills and use-habits already have getAuthToken. Missing: use-comments, use-brain-repo, use-missions, use-pathways. But before I wire those, I need to check if there are even API endpoints for them (can't wire a client to a server route that doesn't exist):
+Good audit. use-social and use-topics and use-skills and use-habits already have getAuthToken. Missing: use-comments, use-mind-repo, use-missions, use-pathways. But before I wire those, I need to check if there are even API endpoints for them (can't wire a client to a server route that doesn't exist):
 
 Good — I can see the situation clearly now:
 
-API routes that exist: feed, posts, topics, brains (4 routes)
+API routes that exist: feed, posts, topics, minds (4 routes)
 API routes missing: comments, missions, pathways, notifications, boards
 
 This means the client hooks for comments/missions/pathways/notifications/boards can't sync to Supabase yet because there's no server endpoint. Creating those endpoints is substantial work (each needs a full CRUD route + RLS policies to already exist in the DB).
@@ -1106,23 +1106,23 @@ Pragmatic approach for Phase 2: The critical path for "user can sign up, create 
 
 ✅ Posts (use-social → /api/posts) — already wired
 ✅ Topics (use-topics → /api/topics) — already wired
-✅ Brains (use-brain-repo → ??? let me check)
+✅ Minds (use-mind-repo → ??? let me check)
 ✅ Skills (use-skills → /api/v1/skills) — already wired
 ✅ Habits (use-habits → /api/v1/habits) — already wired
-Let me check use-brain-repo to see if it needs wiring (brains route exists):
+Let me check use-mind-repo to see if it needs wiring (minds route exists):
 
-Good — lib/api/brains.ts client exists with saveBrain(input, authToken). Now let me check how use-brain-repo saves brains (does it call saveBrain or just IDB?):
+Good — lib/api/minds.ts client exists with saveMind(input, authToken). Now let me check how use-mind-repo saves minds (does it call saveMind or just IDB?):
 
-Found it — brains are saved via use-database.ts which already calls saveBrainApi and use-offline-sync.ts which calls saveBrain. Let me verify the use-database.ts already wires getAuthToken:
+Found it — minds are saved via use-database.ts which already calls saveMindApi and use-offline-sync.ts which calls saveMind. Let me verify the use-database.ts already wires getAuthToken:
 
-Excellent — brains are already fully wired (IDB optimistic + Supabase sync + offline queue). Let me now check what the actual state is for the remaining hooks. The reality is:
+Excellent — minds are already fully wired (IDB optimistic + Supabase sync + offline queue). Let me now check what the actual state is for the remaining hooks. The reality is:
 
 Hook
 Writes to
 Supabase sync status
 use-social (posts)	IDB + /api/posts	✅ Wired
 use-topics	IDB + /api/topics	✅ Wired
-use-database (brains)	IDB + /api/brains	✅ Wired
+use-database (minds)	IDB + /api/minds	✅ Wired
 use-skills	IDB + /api/v1/skills	✅ Wired
 use-habits	IDB + /api/v1/habits	✅ Wired
 use-comments	IDB only	❌ No /api/comments route
@@ -1131,7 +1131,7 @@ use-pathways	IDB only	❌ No /api/pathways route
 use-notifications	IDB only	❌ No /api/notifications route
 use-boards	IDB only	❌ No /api/boards route
 
-The critical write paths are all wired (posts, topics, brains, skills, habits). The remaining 5 hooks (comments, missions, pathways, notifications, boards) need server-side routes first — that's a bigger task that could be Phase 2.5 or a separate phase.
+The critical write paths are all wired (posts, topics, minds, skills, habits). The remaining 5 hooks (comments, missions, pathways, notifications, boards) need server-side routes first — that's a bigger task that could be Phase 2.5 or a separate phase.
 
 Phase 2.5 is effectively DONE — all critical user-facing writes sync to Supabase. Let me verify the smoke test + commit, then move to the end-to-end test (Phase 2.7):
 
@@ -1158,7 +1158,7 @@ What users can now do
 Sign up with email/password (real Firebase account) OR Google OR continue as Guest
 Create posts — attributed to their real identity, synced to Supabase
 Create topics — synced to Supabase
-Create brains — synced to Supabase (optimistic IDB + cloud sync + offline queue)
+Create minds — synced to Supabase (optimistic IDB + cloud sync + offline queue)
 Publish skills + habits — synced to Supabase for cross-user recall
 Sign out + sign back in — data persists via Supabase
 All quality gates green
@@ -1207,9 +1207,9 @@ Let me audit other routes for the same filter-injection risk:
 
 Let me apply the same slug validation to skills.ts and habits.ts (defense in depth):
 
-Now let me also check the brains route for the same pattern:
+Now let me also check the minds route for the same pattern:
 
-Let me add slug validation to brains IDs as well:
+Let me add slug validation to minds IDs as well:
 
 Now let me also look at the :id for skills and habits routes to add validation:
 
@@ -1229,19 +1229,19 @@ The app is fully loaded with the main feed. Let me write a comprehensive fronten
 
 Frontend stress test: 28/28 PASS, 0 FAIL. Let me view some screenshots to verify UI quality:
 
-I notice several pages have identical file sizes — let me investigate. The same 54911 bytes for 404/brains/leaderboard/onboarding/pathways/privacy-policy/terms-of-service is suspicious:
+I notice several pages have identical file sizes — let me investigate. The same 54911 bytes for 404/minds/leaderboard/onboarding/pathways/privacy-policy/terms-of-service is suspicious:
 
-Found a real bug! /brains shows "404 Page Not Found". The router is missing this route. Let me investigate:
+Found a real bug! /minds shows "404 Page Not Found". The router is missing this route. Let me investigate:
 
-The frontend works for all routes that exist (the nav uses /library for Brains and /missions for Pathways). My test was checking URLs that aren't router routes. Let me verify the actual user flow works end-to-end and look for real interaction bugs:
+The frontend works for all routes that exist (the nav uses /library for Minds and /missions for Pathways). My test was checking URLs that aren't router routes. Let me verify the actual user flow works end-to-end and look for real interaction bugs:
 
-Home page is fully populated. Let me test interactions — open a brain, post a comment, etc.:
+Home page is fully populated. Let me test interactions — open a mind, post a comment, etc.:
 
-The "Brain Not Found" message is graceful error handling (expected in guest mode with empty IDB). Let me test the Library page and brain creation flow:
+The "Mind Not Found" message is graceful error handling (expected in guest mode with empty IDB). Let me test the Library page and mind creation flow:
 
-The New Brain wizard opened correctly. Let me fill in the form to test the brain creation flow end-to-end:
+The New Mind wizard opened correctly. Let me fill in the form to test the mind creation flow end-to-end:
 
-Brain creation flow works end-to-end. Let me also test upvoting a post and adding a comment:
+Mind creation flow works end-to-end. Let me also test upvoting a post and adding a comment:
 
 The 4-River comment system opened! Let me verify the full comment UI:
 
@@ -1249,7 +1249,7 @@ Excellent! The 4-River comment system (Facts, Experience, Debate, Breakthrough) 
 
 The comment posted successfully — "Facts · 1" now shows our stress-test comment. Now let me run the full backend + frontend stress test suite together to make sure everything still passes:
 
-Now let me close the browser and tackle Stage 2.5 — wire getAuthToken() into remaining write hooks (comments, brain-repo, etc.). Let me check the current state of the write hooks:
+Now let me close the browser and tackle Stage 2.5 — wire getAuthToken() into remaining write hooks (comments, mind-repo, etc.). Let me check the current state of the write hooks:
 
 All simulation and stress tests pass. Let me commit the bug fixes and update the worklog before moving to the next phase:
 
@@ -1260,11 +1260,11 @@ All done. Here's a summary of what was accomplished:
 Simulation + Stress Test + Bug Fix — COMPLETE ✅
 Backend stress test (new — scripts/backend-stress.mjs): 67 test cases across 9 phases (health, public reads, no-auth writes, bad tokens, malformed payloads, edge-case query strings, 50-parallel burst, 30-mixed-endpoint burst, post-stress health). Found 1 real bug → fixed.
 
-Real bug fixed: GET /api/feed?topic='; DROP TABLE posts; -- was returning 502 because the topic field was passed unsanitized into a PostgREST eq.<value> filter — the quotes break the filter parser. Applied defense-in-depth with strict slug regex /^[A-Za-z0-9_-]+$/ across 5 routes / 8 endpoints (feed, skills, habits, brains, posts). Commit e642ba4.
+Real bug fixed: GET /api/feed?topic='; DROP TABLE posts; -- was returning 502 because the topic field was passed unsanitized into a PostgREST eq.<value> filter — the quotes break the filter parser. Applied defense-in-depth with strict slug regex /^[A-Za-z0-9_-]+$/ across 5 routes / 8 endpoints (feed, skills, habits, minds, posts). Commit e642ba4.
 
 Frontend stress test (new — scripts/frontend-stress.mjs): 28 test cases across 17 pages + modal/form interactions + theme toggle. All pages render with zero console errors.
 
-Real-user simulation via headless browser: signed in as Guest → loaded home feed → opened "Run Brain" (graceful "not found" message in guest mode) → opened Library → created a new Brain via the 3-step wizard (Basics → Factors → Questions, with a Question node + Outcome node) → brain saved to IDB → returned home → opened comments → 4-River system (Facts/Experience/Debate/Breakthrough) rendered correctly → posted a Facts comment successfully. Zero errors throughout.
+Real-user simulation via headless browser: signed in as Guest → loaded home feed → opened "Run Mind" (graceful "not found" message in guest mode) → opened Library → created a new Mind via the 3-step wizard (Basics → Factors → Questions, with a Question node + Outcome node) → mind saved to IDB → returned home → opened comments → 4-River system (Facts/Experience/Debate/Breakthrough) rendered correctly → posted a Facts comment successfully. Zero errors throughout.
 
 Final state — all green:
 
@@ -1362,7 +1362,7 @@ Add compression middleware (gzip + brotli) to server
 Add PWA manifest with proper icons
 Add manifest link to HTML
 Split the entry chunk further — separate index-CBNXCGRN.js (507 KB) which is probably recharts/d3
-Lazy-load BrainDrawer, NodeEditor, WizardModal, ReportBugModal
+Lazy-load MindDrawer, NodeEditor, WizardModal, ReportBugModal
 Let me start with the highest-impact fix: compression. This alone will reduce transfer from 547 KB → ~150 KB.
 
 Now let me add compression to the server. I'll add it BEFORE the static file serving:
@@ -1566,7 +1566,7 @@ Play Store readiness: 27/27 PASS
 Let me commit and update the worklog:
 
 Summary — Performance + PWA + Play Store Readiness ✅
-Roadmap confirmation: I extracted the full text from your brain-drain-roadmap.pdf and verified we're 100% on track. Phase 0 (cleanup) ✅, Phase 1 (Supabase) ✅, Phase 2 (auth) ✅ are done. The performance + PWA + Play Store work aligns with Phase 8 (Production Hardening) and is a prerequisite for Play Store publication. Phase 3 (Topic Suggestions) is the next roadmap item.
+Roadmap confirmation: I extracted the full text from your MindSpool-roadmap.pdf and verified we're 100% on track. Phase 0 (cleanup) ✅, Phase 1 (Supabase) ✅, Phase 2 (auth) ✅ are done. The performance + PWA + Play Store work aligns with Phase 8 (Production Hardening) and is a prerequisite for Play Store publication. Phase 3 (Topic Suggestions) is the next roadmap item.
 
 Performance optimization (massive wins):
 
@@ -1787,7 +1787,7 @@ Run migration 0003 in Supabase SQL Editor — paste supabase/migrations/0003_con
 Set SENTRY_DSN in .env (optional) — get a free DSN at sentry.io (5,000 errors/month free tier) to start capturing production errors. Until then, Sentry is a no-op.
 After that, the app is feature-complete per the roadmap. If you want to keep building, candidates are: (a) write integration tests for the new discover endpoints, (b) add the missing server routes for comments/missions/pathways/notifications/boards (mentioned as a known limitation in Phase 2), or (c) polish specific UI/UX issues you spot while using the app. What would you like to do?
 
-before Run migration 0003 in Supabase SQL Editor there was also some problems we talked about in skills and habits how then are published just revise the conversation if you can remamber and impliment it because skill must be creted and published skills come from brain so when your brain is helpful the section is activated that in your brain some info is scraped you edit them manualy then publish to public to go live also we talked about habit be careful also  we have issue in server that is loading issues load too long,some fetures give blank or return home inspect them all and fix them,also improve spead and eficiency i want the notification popout be like of fb cool not ,doubling,spaming or blonking visibility there reduce best ux i want you also to upgrade all feture to be good enough also perfecting the ux ,work also on ux should be more profesional in god mode way ,you will also make the fetures some clicks be compacted ,and easy to find hence best organised you will also work sugetd work on some issues fix problems do dip repair  i want you also to do deep testing of front end clicks,fix errors etc the ux we have  isue see how the live feture looks not profesional and organised also the story note i thout it should be like fb where you see something inside without even clicking eg image also work prioritize in fixing preview permanently 
+before Run migration 0003 in Supabase SQL Editor there was also some problems we talked about in skills and habits how then are published just revise the conversation if you can remamber and impliment it because skill must be creted and published skills come from mind so when your mind is helpful the section is activated that in your mind some info is scraped you edit them manualy then publish to public to go live also we talked about habit be careful also  we have issue in server that is loading issues load too long,some fetures give blank or return home inspect them all and fix them,also improve spead and eficiency i want the notification popout be like of fb cool not ,doubling,spaming or blonking visibility there reduce best ux i want you also to upgrade all feture to be good enough also perfecting the ux ,work also on ux should be more profesional in god mode way ,you will also make the fetures some clicks be compacted ,and easy to find hence best organised you will also work sugetd work on some issues fix problems do dip repair  i want you also to do deep testing of front end clicks,fix errors etc the ux we have  isue see how the live feture looks not profesional and organised also the story note i thout it should be like fb where you see something inside without even clicking eg image also work prioritize in fixing preview permanently 
 
 Thought Process
 Understood — big work order. Let me break it down and tackle it systematically:
@@ -1796,21 +1796,21 @@ Let me start by reviewing the current skills/habits flow to remember what we dis
 
 Now let me look at where the skill creation is exposed in the UI:
 
-Found the core problem: createSkillFromBrain exists in the hook but is not wired to any UI — there's no button anywhere that lets users create a skill from their brain. Let me check the habits hook too:
+Found the core problem: createSkillFromMind exists in the hook but is not wired to any UI — there's no button anywhere that lets users create a skill from their mind. Let me check the habits hook too:
 
-The hooks work but there's no UI for the extract → edit → publish flow. Let me look at BrainDrawer (where brains are viewed) to add this:
+The hooks work but there's no UI for the extract → edit → publish flow. Let me look at MindDrawer (where minds are viewed) to add this:
 
 Now let me create a dedicated SkillExtractModal component that implements the full extract → edit → publish flow. This is the missing piece:
 
 Components live at root level (the @/components alias maps to the root dir). Let me save there:
 
-Now let me wire the extract buttons into BrainDrawer's Overview tab. Let me find the right spot:
+Now let me wire the extract buttons into MindDrawer's Overview tab. Let me find the right spot:
 
-Now I need to add the state + modal + imports to BrainDrawer. Let me check the imports and state first:
+Now I need to add the state + modal + imports to MindDrawer. Let me check the imports and state first:
 
 I see duplicate imports — let me fix:
 
-Now let me add the SkillExtractModal render at the end of the BrainDrawer component. Let me find where other modals are rendered:
+Now let me add the SkillExtractModal render at the end of the MindDrawer component. Let me find where other modals are rendered:
 
 Skills/Habits publishing flow is wired. Now let me tackle the server loading issues + blank pages + redirects to home. Let me do a deep inspection with the browser:
 
@@ -1874,7 +1874,7 @@ Let me add image attachment support to the story viewer too:
 
 Now let me run the full test suite + deep click test to verify everything:
 
-From 31 defects → 9, and all 9 remaining are false positives (clicking the logo "Brain Drain — Home" going to home is expected behavior). The Profile page went from 24 broken redirects to 47 clickable elements with 0 errors. Let me commit this progress:
+From 31 defects → 9, and all 9 remaining are false positives (clicking the logo "MindSpool — Home" going to home is expected behavior). The Profile page went from 24 broken redirects to 47 clickable elements with 0 errors. Let me commit this progress:
 
 Now let me verify the Lighthouse score is still excellent and check performance impact of all the new features:
 
@@ -1927,13 +1927,13 @@ Performance restored to 99/100 (428 KB total, FCP 0.5s, LCP 0.9s, TBT 0ms, CLS 0
 All clean — the only "defects" are logo-clicks (expected). Let me commit everything:
 
 All Done — Here's What Was Fixed & Shipped ✅
-1. Skills + Habits publishing flow (your main ask) — The hooks existed but were never wired to any UI. Now there's a full wizard: open any brain with outcome nodes → "Publish this brain's knowledge" section appears in the Overview tab → Extract Skill / Extract Habit → info is scraped from the brain's nodes → you edit everything manually (reorder/delete/add steps, edit metadata) → preview exactly what others see → publish to public (syncs to Supabase live).
+1. Skills + Habits publishing flow (your main ask) — The hooks existed but were never wired to any UI. Now there's a full wizard: open any mind with outcome nodes → "Publish this mind's knowledge" section appears in the Overview tab → Extract Skill / Extract Habit → info is scraped from the mind's nodes → you edit everything manually (reorder/delete/add steps, edit metadata) → preview exactly what others see → publish to public (syncs to Supabase live).
 
 2. Critical crashes found & fixed (why pages were blank / returning home) — My new deep-click test found React error #310 in 2 components: ProfilePage (loading early-return above 2 useMemos — made /profile completely unusable, bounced to home every time) and CommentThread (same bug). Both fixed.
 
 3. FB-style notifications — No doubling (same-title toasts refresh their timer instead of stacking), no spamming (identical content throttled to once per 2s), no blocking (bottom-anchored on mobile instead of covering the header; max 2 visible; 4s auto-dismiss; swipe-away).
 
-4. FB-style Stories — Story bubbles now preview the content inside without clicking: images fill the bubble, text notes show the first 48 chars, author avatar shrinks to a corner badge, brain-linked stories get a badge, unseen stories ping.
+4. FB-style Stories — Story bubbles now preview the content inside without clicking: images fill the bubble, text notes show the first 48 chars, author avatar shrinks to a corner badge, mind-linked stories get a badge, unseen stories ping.
 
 5. Live Sessions redesigned — Replaced the alarming red-everything look with a professional design: proper section header with count, host avatars, clean list rows, live badge with pulsing dot.
 
@@ -2014,11 +2014,11 @@ Auth wall. Let me check for test credentials from previous sessions:
 
 Continuing as Guest first to test the UI flow quickly:
 
-Guest mode active, on /library. Looking for brains with outcome nodes:
+Guest mode active, on /library. Looking for minds with outcome nodes:
 
-Empty guest library. Loading a sample brain to test the extract flow:
+Empty guest library. Loading a sample mind to test the extract flow:
 
-Brain added. Now clicking the card itself to open the BrainDrawer:
+Mind added. Now clicking the card itself to open the MindDrawer:
 
 The "Extract Skill" / "Extract Habit" block is live in the drawer. Opening the skill wizard:
 
@@ -2138,7 +2138,7 @@ Nav is 10 flat items; also checking Search page tabs and buried features (person
 
 Nav groups are already clean. The real gaps: Personality Test buried (invisible on mobile) and create-actions scattered. Let me see the header + mobile bar to add a "+ Create" quick action:
 
-Plan set: CreateMenu component (FB-style "+ Create") + deep-links ?compose=1 / ?create=brain. Checking sidebar top + HomeFeed creator state names:
+Plan set: CreateMenu component (FB-style "+ Create") + deep-links ?compose=1 / ?create=mind. Checking sidebar top + HomeFeed creator state names:
 
 Now creating the CreateMenu component:
 
@@ -2152,7 +2152,7 @@ Now the mobile bottom-bar Create slot (between nav items and "More"):
 
 Now the deep-links. Adding ?compose=1 auto-open to HomeFeed:
 
-Now the Dashboard ?create=brain deep-link:
+Now the Dashboard ?create=mind deep-link:
 
 Typecheck + rebuild + deploy:
 
@@ -2164,16 +2164,16 @@ The deep-link effect didn't fire — wouter's location doesn't re-trigger on sea
 
 Now add the event listeners in HomeFeed and Dashboard:
 
-New Post works — composer opens instantly. Testing New Brain:
+New Post works — composer opens instantly. Testing New Mind:
 
-New Brain works — wizard auto-opens. Quick check of Personality Test, then committing F9:
+New Mind works — wizard auto-opens. Quick check of Personality Test, then committing F9:
 
 All Create actions verified E2E with zero errors. Committing F9:
 
 
 Plan
 10 of 12 complete
-F1: Recon — verify server state, read existing skills/habits/brain code
+F1: Recon — verify server state, read existing skills/habits/mind code
 F13: PERMANENT preview fix — reaper-proof server launch (was root cause)
 F2: Verify Skills publish flow works E2E in browser
 F3: Verify Habits publish flow works E2E (same modal)

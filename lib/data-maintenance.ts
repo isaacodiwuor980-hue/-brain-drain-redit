@@ -8,11 +8,11 @@ import { idb } from "./db";
  * the signed-in/guest profile or the user's appearance and privacy choices.
  */
 const REFRESHABLE_STORES = [
-  "brains",
+  "minds",
   "nodes",
   "posts",
   "topics",
-  "brain_dna",
+  "mind_dna",
   "messages",
   "conversations",
   "notifications",

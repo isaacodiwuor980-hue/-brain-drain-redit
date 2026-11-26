@@ -155,8 +155,8 @@ export function useCommunities() {
       if (existing.length === 0) {
         const seedData: Community[] = [
           { id: "c1", name: "AI Safety", description: "Discussing the safety and alignment of AGI.", memberCount: 1250, active: true, icon: "shield", privacy: "public", joinStatus: "not_member", tags: ["ai", "safety", "alignment"] },
-          { id: "c2", name: "Medical Diagnosis", description: "Using brains for differential diagnosis.", memberCount: 840, active: true, icon: "stethoscope", privacy: "restricted", joinStatus: "not_member", tags: ["medical", "health", "diagnosis"] },
-          { id: "c3", name: "Game Dev", description: "Creating game logic with brains.", memberCount: 300, active: false, icon: "gamepad", privacy: "public", joinStatus: "not_member", tags: ["gamedev", "logic", "design"] },
+          { id: "c2", name: "Medical Diagnosis", description: "Using minds for differential diagnosis.", memberCount: 840, active: true, icon: "stethoscope", privacy: "restricted", joinStatus: "not_member", tags: ["medical", "health", "diagnosis"] },
+          { id: "c3", name: "Game Dev", description: "Creating game logic with minds.", memberCount: 300, active: false, icon: "gamepad", privacy: "public", joinStatus: "not_member", tags: ["gamedev", "logic", "design"] },
           { id: "c4", name: "Philosophy", description: "Epistemology and ontology.", memberCount: 150, active: true, icon: "book", privacy: "public", joinStatus: "not_member", tags: ["philosophy", "epistemology"] },
           { id: "c5", name: "Founders Circle", description: "Private circle for verified startup founders.", memberCount: 42, active: true, icon: "shield", privacy: "private", joinStatus: "not_member", tags: ["startups", "founders"] },
         ];

@@ -1,4 +1,4 @@
-# Brain Drain — Google Play Store Readiness Audit
+# MindSpool — Google Play Store Readiness Audit
 
 **Document ID:** BD-PSA-001
 **Date:** 2026-10-28
@@ -9,7 +9,7 @@
 
 ## Executive Summary
 
-Brain Drain is a local-first PWA (Progressive Web App) that can be packaged for Google Play Store distribution via **Trusted Web Activity (TWA)** — a technology that wraps a PWA in a native Android app shell without requiring any native code. This audit evaluates the app's current state against Google Play's PWA/TWA requirements and identifies the gaps that must be closed before publication.
+MindSpool is a local-first PWA (Progressive Web App) that can be packaged for Google Play Store distribution via **Trusted Web Activity (TWA)** — a technology that wraps a PWA in a native Android app shell without requiring any native code. This audit evaluates the app's current state against Google Play's PWA/TWA requirements and identifies the gaps that must be closed before publication.
 
 **Bottom line:** The app is **85% Play Store-ready**. The PWA foundation is solid (Lighthouse Performance 99/100, full manifest, maskable icons, offline support). The remaining 15% is procedural work: creating a Google Play Developer account ($25 one-time), generating a signing key, running Bubblewrap to produce the AAB, deploying the `assetlinks.json` file, and passing the 20-person closed testing requirement that Google enforces for new developer accounts. Total estimated time to publication: **3-5 days** of wall-clock time (mostly waiting on Google reviews), with **~4 hours of hands-on engineering work**.
 
@@ -40,7 +40,7 @@ curl -sI https://preview-<bot-id>.space-z.ai/manifest.webmanifest
 
 ## 2. Performance — ✅ PASS (Excellent)
 
-Google Play's app quality guidelines recommend (but don't strictly require) good performance. Brain Drain exceeds all targets:
+Google Play's app quality guidelines recommend (but don't strictly require) good performance. MindSpool exceeds all targets:
 
 | Metric | Value | Lighthouse Score | Target |
 |--------|-------|------------------|--------|
@@ -84,14 +84,14 @@ npm install -g @bubblewrap/cli
 
 **Initialization (when ready):**
 ```bash
-mkdir brain-drain-twa && cd brain-drain-twa
+mkdir MindSpool-twa && cd MindSpool-twa
 bubblewrap init --manifest=https://preview-<bot-id>.space-z.ai/manifest.webmanifest
 ```
 
 Bubblewrap will prompt for:
-- **Application name:** `Brain Drain`
-- **Short name:** `Brain Drain` (≤ 12 chars recommended for launcher)
-- **Package ID:** `com.braindrain.app` (must be globally unique; lowercase, reverse-DNS)
+- **Application name:** `MindSpool`
+- **Short name:** `MindSpool` (≤ 12 chars recommended for launcher)
+- **Package ID:** `com.MindSpool.app` (must be globally unique; lowercase, reverse-DNS)
 - **Display mode:** `standalone` (matches manifest)
 - **Orientation:** `default` (allow rotation)
 - **Theme color:** `#101010`
@@ -123,7 +123,7 @@ keytool -genkeypair -v \
   -validity 10000 \
   -storepass <YOUR_STRONG_PASSWORD> \
   -keypass <YOUR_STRONG_PASSWORD> \
-  -dname "CN=Brain Drain, OU=Engineering, O=Brain Drain, L=Nairobi, ST=Nairobi, C=KE"
+  -dname "CN=MindSpool, OU=Engineering, O=MindSpool, L=Nairobi, ST=Nairobi, C=KE"
 ```
 
 **Critical safeguards:**
@@ -211,7 +211,7 @@ Before publishing, prepare these assets:
 | No hate speech | ✅ | No hate speech in app; will rely on user reporting for UGC |
 | No violence/threats | ✅ | App has no violent content |
 | No illegal activities | ✅ | App promotes learning; no illegal activity |
-| No spam/minimal functionality | ✅ | App has substantial functionality (decision brains, feed, comments, profiles) |
+| No spam/minimal functionality | ✅ | App has substantial functionality (decision minds, feed, comments, profiles) |
 | No deceptive behavior | ✅ | App does what it claims |
 | No personal data exposure | ✅ | PII handling designed per Phase 6/7 of roadmap (hashed phone/email) |
 
@@ -222,7 +222,7 @@ Before publishing, prepare these assets:
 | Target API level | ✅ | Bubblewrap will set to latest required (currently Android 14 / API 34) |
 | 64-bit support | ✅ | Bubblewrap-generated AAB includes 64-bit binaries |
 | App signing | ⏳ | Will use Play App Signing (recommended) |
-| Data safety form | ⏳ | Must declare: email, auth tokens, user-generated content (posts, comments, brains) |
+| Data safety form | ⏳ | Must declare: email, auth tokens, user-generated content (posts, comments, minds) |
 | Permissions | ✅ | TWA inherits PWA permissions; no special Android permissions needed (no camera, no location, no contacts — those are Phase 6/7 features with their own consent flows) |
 | Privacy policy | ✅ | Live at `/privacy-policy` |
 | Terms of service | ✅ | Live at `/terms-of-service` |
@@ -238,12 +238,12 @@ Before publishing, prepare these assets:
 
 ## 6. Offline Support — ✅ PASS
 
-Google Play's app quality guidelines recommend that apps work offline. Brain Drain's service worker (v7) provides:
+Google Play's app quality guidelines recommend that apps work offline. MindSpool's service worker (v7) provides:
 
 - **App shell caching:** `/`, `/index.html`, `/manifest.webmanifest`, `/icon-192.png`, `/icon-512.png`, `/apple-icon.png` are precached on install
 - **Asset caching:** All hashed JS/CSS chunks are cache-first (content-addressed, safe to cache forever)
 - **Navigation fallback:** Network-first for HTML, falls back to cached `index.html` when offline
-- **Local-first data:** All user data (brains, posts, comments, missions) is stored in IndexedDB; works fully offline
+- **Local-first data:** All user data (minds, posts, comments, missions) is stored in IndexedDB; works fully offline
 - **Sync-on-reconnect:** When the network returns, the offline queue replays pending writes to Supabase
 
 **Verification:** Open the app, sign in, browse the feed, then disable network. The app should remain usable — you can view cached posts, create new posts (queued for sync), and browse your library.
@@ -289,19 +289,19 @@ Google Play's app quality guidelines recommend that apps work offline. Brain Dra
 
 ### Store Listing (2 hours)
 
-- [ ] Create feature graphic (1024×500) — use the brand colors + Brain Drain logo
+- [ ] Create feature graphic (1024×500) — use the brand colors + MindSpool logo
 - [ ] Capture 4-8 phone screenshots (1080×1920 portrait recommended)
   - [ ] Home feed (with posts visible)
-  - [ ] Library page (with brains)
-  - [ ] Brain editor (with nodes)
+  - [ ] Library page (with minds)
+  - [ ] Mind editor (with nodes)
   - [ ] Profile page
   - [ ] Community page
   - [ ] Comment thread (4-river view)
-- [ ] Draft short description (≤ 80 chars): e.g. "Decision brains — drain your reasoning into structured guides."
+- [ ] Draft short description (≤ 80 chars): e.g. "Decision minds — drain your reasoning into structured guides."
 - [ ] Draft full description (≤ 4000 chars) — emphasize: local-first, 4-river comments, cross-user skill sharing
 - [ ] Fill out IARC content rating questionnaire (expect "Everyone" rating)
 - [ ] Fill out Data Safety form:
-  - [ ] Data collected: email, auth tokens, user-generated content (posts, comments, brains, skills, habits)
+  - [ ] Data collected: email, auth tokens, user-generated content (posts, comments, minds, skills, habits)
   - [ ] Data encrypted: yes (HTTPS + Supabase RLS)
   - [ ] Data deletion: users can delete their account via Settings → Delete Account (TODO: implement this)
   - [ ] No data shared with third parties
@@ -332,7 +332,7 @@ Google Play's app quality guidelines recommend that apps work offline. Brain Dra
 | Signing key lost | Low | **Catastrophic** — can never update the app | Use Play App Signing (Google holds the key); back up upload key to 2+ locations |
 | `assetlinks.json` not served correctly | Medium | High — URL bar shows, app feels like a website | Test with `curl` before submitting; verify the file is reachable at the canonical URL with no redirects |
 | Closed testing takes longer than 14 days | Medium | Medium — delays launch by 1-2 weeks | Recruit 20 testers before starting the test; use a Discord/Slack channel to coordinate |
-| Google rejects the app for "minimal functionality" | Low | High — must add features before re-submitting | App already has substantial functionality (brains, feed, comments, skills, habits, pathways, missions); rejection is unlikely |
+| Google rejects the app for "minimal functionality" | Low | High — must add features before re-submitting | App already has substantial functionality (minds, feed, comments, skills, habits, pathways, missions); rejection is unlikely |
 | Google rejects for "misleading metadata" | Low | Medium | Ensure screenshots match actual app UI; don't over-promise in description |
 | App crashes on Android (TWA-specific issue) | Medium | High — rejection | Test thoroughly on real Android device before submitting; check Logcat for any errors |
 | COPPA violation (targeting children) | Low | **Catastrophic** — account termination | Set target audience to 13+ in Play Console; don't market to children |

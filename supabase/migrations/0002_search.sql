@@ -1,4 +1,4 @@
--- Brain Drain — Part 2 Task 6: three-layer search (rule + BM25 + semantic)
+-- MindSpool — Part 2 Task 6: three-layer search (rule + BM25 + semantic)
 -- Supabase / Postgres migration 0002
 --
 -- This migration adds:
@@ -31,7 +31,7 @@ create table if not exists public.skills (
   author_name text not null,
   author_years_experience integer,
   steps jsonb not null default '[]'::jsonb,
-  source_brain_id text,
+  source_mind_id text,
   status text not null default 'private' check (status in ('private', 'in_review', 'published')),
   reviewer_id text,
   published_at timestamptz,
@@ -49,7 +49,7 @@ create index if not exists skills_model_idx on public.skills(model);
 create index if not exists skills_year_idx on public.skills(year);
 create index if not exists skills_part_idx on public.skills(part);
 create index if not exists skills_status_idx on public.skills(status);
-create index if not exists skills_source_brain_idx on public.skills(source_brain_id);
+create index if not exists skills_source_mind_idx on public.skills(source_mind_id);
 
 -- GIN index for full-text search (layer 2).
 create index if not exists skills_fts_idx on public.skills using gin (fts);
@@ -115,12 +115,12 @@ begin
       version text,
       author_name text,
       status text,
-      source_brain_id text,
+      source_mind_id text,
       similarity float
     ) as $$
       select
         s.id, s.title, s.domain, s.make, s.model, s.year, s.part, s.version,
-        s.author_name, s.status, s.source_brain_id,
+        s.author_name, s.status, s.source_mind_id,
         1 - (s.embedding <=> query_embedding) as similarity
       from public.skills s
       where s.status = 'published'

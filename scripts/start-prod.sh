@@ -1,5 +1,5 @@
 #!/bin/bash
-cd /home/z/my-project/BRAIN-DRAIN-latest-
+cd /home/z/my-project/MindSpool-latest-
 
 # PERMANENT FIX: Run the PRODUCTION server instead of the Vite dev server.
 # The production server (dist/server.cjs) serves pre-built static files

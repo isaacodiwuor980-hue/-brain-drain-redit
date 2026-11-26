@@ -1,4 +1,4 @@
-# Brain Drain — Before / After Summary
+# MindSpool — Before / After Summary
 
 **Phase 1-10 complete.** This is a one-page summary of what changed across the full audit + fix cycle.
 

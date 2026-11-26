@@ -76,13 +76,13 @@ export function FindFriendsFromGmail() {
           <DialogHeader>
             <DialogTitle>Friends from your Gmail contacts</DialogTitle>
             <DialogDescription>
-              {matches.length} friend{matches.length === 1 ? "" : "s"} on Brain Drain
+              {matches.length} friend{matches.length === 1 ? "" : "s"} on MindSpool
             </DialogDescription>
           </DialogHeader>
           <div className="flex-1 overflow-y-auto -mx-6 px-6">
             {matches.length === 0 ? (
               <div className="py-8 text-center text-sm text-muted-foreground">
-                No matches yet. Invite your friends to join Brain Drain!
+                No matches yet. Invite your friends to join MindSpool!
               </div>
             ) : (
               <div className="space-y-2">

@@ -5,12 +5,12 @@
  * fires when a component's hook count changes between renders. The classic
  * cause is an early `return null` BEFORE a `useState`/`useEffect`/etc call:
  *
- *   function BrainDrawer({ brain }) {
- *     if (!brain) return null;            // ← early return
+ *   function MindDrawer({ mind }) {
+ *     if (!mind) return null;            // ← early return
  *     const [x, setX] = useState(0);      // ← hook AFTER early return = BUG
  *   }
  *
- * When `brain` flips from null → object, the component suddenly calls one
+ * When `mind` flips from null → object, the component suddenly calls one
  * more hook than last render → React throws #310 → blank screen in prod.
  *
  * This test scans every .tsx file in the project (excluding node_modules,
@@ -24,7 +24,7 @@
  *
  * This is a static heuristic — it can't catch every hook-order bug, but it
  * catches the pattern that bit us in production on the /library route
- * (BrainDrawer.tsx, fixed in commit prior to this test).
+ * (MindDrawer.tsx, fixed in commit prior to this test).
  */
 import { describe, it, expect } from "vitest";
 import * as fs from "node:fs";
@@ -202,7 +202,7 @@ describe("React hook-order regression guard (#310)", () => {
       expect.fail(
         `React error #310 risk detected — ${allViolations.length} component(s) have a hook call AFTER an early return.\n` +
           `When the early-return condition flips between renders, React sees a different hook count → #310 crash.\n` +
-          `Move all hooks ABOVE the early return, or use a default value (e.g. brain?.id ?? "") instead of returning null.\n\n` +
+          `Move all hooks ABOVE the early return, or use a default value (e.g. mind?.id ?? "") instead of returning null.\n\n` +
           `Violations:\n${report}`,
       );
     }

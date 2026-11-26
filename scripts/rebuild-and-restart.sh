@@ -1,5 +1,5 @@
 #!/bin/bash
-cd /home/z/my-project/BRAIN-DRAIN-latest-
+cd /home/z/my-project/MindSpool-latest-
 
 # REBUILD + RESTART: Use this after making code changes.
 # 1. Kill the production server

@@ -6,13 +6,13 @@
 
 export interface QueuedAction {
   id: string;
-  type: "create_post" | "post_reaction" | "add_comment" | "save_profile" | "update_brain";
+  type: "create_post" | "post_reaction" | "add_comment" | "save_profile" | "update_mind";
   payload: Record<string, unknown>;
   createdAt: number;
   retryCount: number;
 }
 
-const STORAGE_KEY = "brainbuilder_offline_queue";
+const STORAGE_KEY = "mindbuilder_offline_queue";
 
 export function getOfflineQueue(): QueuedAction[] {
   try {
@@ -27,7 +27,7 @@ export function saveOfflineQueue(queue: QueuedAction[]): void {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(queue));
     // Dispatch custom event so hooks in other components react immediately
-    window.dispatchEvent(new CustomEvent("brainbuilder_queue_change", { detail: queue.length }));
+    window.dispatchEvent(new CustomEvent("mindbuilder_queue_change", { detail: queue.length }));
   } catch {
     // Ignore storage quota errors
   }

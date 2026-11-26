@@ -3,7 +3,7 @@
  *
  * Manages Habit records in IndexedDB (local cache) + syncs to Supabase
  * when a habit is published (so other users can recall it in real time
- * while building their own brains/pathways).
+ * while building their own minds/pathways).
  *
  * Lifecycle (mirrors skills):
  *   1. Author creates a habit locally (IDB) with status='private'
@@ -11,7 +11,7 @@
  *   3. Moderator calls approveAndPublish(habitId) → status='published'
  *      AND upserts to Supabase via PUT /api/v1/habits so other users
  *      can find it via /api/v1/habits/search?q=...
- *   4. Other users, when editing their brain, can search public habits
+ *   4. Other users, when editing their mind, can search public habits
  *      via useHabits().searchPublic(query) and insert a habit reference
  *      into their node via NodeEditor's handleInsertHabit.
  *
@@ -106,7 +106,7 @@ export function useHabits() {
   /**
    * habitsByTopic: returns habits matching a given topic.
    * Used by NodeEditor to filter the habit picker to relevant habits
-   * for the current brain's topic.
+   * for the current mind's topic.
    */
   const habitsByTopic = useCallback(
     (topic: string): Habit[] => {
@@ -250,7 +250,7 @@ export function useHabits() {
       void queryClient.invalidateQueries({ queryKey });
       toast({
         title: "Habit published",
-        description: `"${habit.newRoutine}" is now public and searchable by other users building brains.`,
+        description: `"${habit.newRoutine}" is now public and searchable by other users building minds.`,
       });
     },
     onError: (err: Error) => {
@@ -265,7 +265,7 @@ export function useHabits() {
   /**
    * Search public habits from Supabase via the keyword search endpoint.
    * Used by NodeEditor when a user wants to insert a habit reference
-   * into their own brain — they can find any published habit by any author.
+   * into their own mind — they can find any published habit by any author.
    */
   const searchPublic = useMutation({
     mutationFn: async (input: {

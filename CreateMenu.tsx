@@ -3,12 +3,12 @@
  *
  * WHY: content creation was scattered across the app and buried in
  * page-specific corners (post composer only via the home feed's floating
- * button, New Brain only inside the Library toolbar, the Personality Test
+ * button, New Mind only inside the Library toolbar, the Personality Test
  * only via a `hidden sm:flex` button on the Pathways page — invisible on
  * mobile). This puts every create action ONE click away from anywhere:
  *
  *   - New Post       → /?compose=1          (HomeFeed auto-opens the composer)
- *   - New Brain      → /library?create=brain (Dashboard auto-opens the wizard)
+ *   - New Mind      → /library?create=mind (Dashboard auto-opens the wizard)
  *   - Personality Test → /personality-test
  *   - Find Friends   → / (contact-sync widgets live on the home feed)
  *
@@ -87,10 +87,10 @@ export function CreateMenu({ variant = "sidebar" }: CreateMenuProps) {
             <span className="text-xs text-muted-foreground">Share a thought, question, or answer</span>
           </div>
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => go("/library?create=brain", "bd:open-brain-wizard")} className="gap-3 cursor-pointer">
+        <DropdownMenuItem onClick={() => go("/library?create=mind", "bd:open-mind-wizard")} className="gap-3 cursor-pointer">
           <Brain className="w-4 h-4 text-primary" aria-hidden />
           <div className="flex flex-col">
-            <span className="text-sm font-medium">New Brain</span>
+            <span className="text-sm font-medium">New Mind</span>
             <span className="text-xs text-muted-foreground">Build a yes/no decision guide</span>
           </div>
         </DropdownMenuItem>

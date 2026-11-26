@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """
-Brain Drain — Production Roadmap PDF (body).
+MindSpool — Production Roadmap PDF (body).
 Generated via ReportLab. Cover is generated separately via html2poster.js
 and merged in a post-step.
 
-Output: /home/z/my-project/download/brain-drain-roadmap-body.pdf
-Final merge step: /home/z/my-project/download/brain-drain-roadmap.pdf
+Output: /home/z/my-project/download/MindSpool-roadmap-body.pdf
+Final merge step: /home/z/my-project/download/MindSpool-roadmap.pdf
 """
 import os
 import sys
@@ -142,7 +142,7 @@ H1_ORPHAN_THRESHOLD = AVAILABLE_HEIGHT * 0.15
 
 # ── Page number footer (drawn on every body page) ──────────────────
 def draw_page_footer(canvas, doc):
-    """Draw 'Brain Drain · Production Roadmap' (left) + page number (right)
+    """Draw 'MindSpool · Production Roadmap' (left) + page number (right)
     in the bottom margin of every body page. Body starts at page 2 (cover is page 1)."""
     canvas.saveState()
     # Footer line
@@ -154,7 +154,7 @@ def draw_page_footer(canvas, doc):
     canvas.setFont("FreeSerif-Italic", 8.5)
     canvas.setFillColor(TEXT_MUTED)
     canvas.drawString(LEFT_MARGIN, BOTTOM_MARGIN - 30,
-                      "Brain Drain  ·  Production Roadmap")
+                      "MindSpool  ·  Production Roadmap")
     # Right: page number (cover is page 1, so body page N = canvas page N+1)
     page_num = canvas.getPageNumber() + 1
     canvas.setFont("FreeSerif", 8.5)
@@ -260,7 +260,7 @@ story.append(PageBreak())
 story.extend(major_section("Chapter 1 — Executive Summary"))
 
 story.append(P(
-    "This roadmap takes Brain Drain from <b>working locally</b> to <b>running live for real users</b>. "
+    "This roadmap takes MindSpool from <b>working locally</b> to <b>running live for real users</b>. "
     "It is deliberately phased so that each phase is independently shippable: stop after any phase and "
     "the app is in a better state than before. No big-bang rewrite, no risky merges, no surprise regressions."
 ))
@@ -312,7 +312,7 @@ audit_data = [
      "supabase/migrations/0001_initial_schema.sql is 25 KB, 25 tables, 47 RLS policies; SUPABASE_URL still placeholder",
      "High — blocks cloud sync"],
     ["API server", "12 routes, live",
-     "feed, posts, topics, search, brains, events, intelligence, recommendations, health, data-api, client-errors, index — all mounted in app.ts",
+     "feed, posts, topics, search, minds, events, intelligence, recommendations, health, data-api, client-errors, index — all mounted in app.ts",
      "Low"],
     ["Auth middleware", "Real, server-side",
      "requireAuth + optionalAuth verify Firebase ID tokens; tests exist",
@@ -331,7 +331,7 @@ audit_data = [
 story.extend(std_table(
     audit_data,
     col_widths=[85, 110, 230, 80],
-    caption="Table 1 — Verified state of the Brain Drain codebase at start of this roadmap."
+    caption="Table 1 — Verified state of the MindSpool codebase at start of this roadmap."
 ))
 
 story.extend(sub_section("Regressions Found and Fixed This Session"))
@@ -475,7 +475,7 @@ story.append(P(
     "file storage, and 50,000 monthly active users — more than enough for the first 10,000 users."
 ))
 story.append(P(
-    "<b>Step 2.</b> Click <b>New Project</b>. Pick a name (e.g. <font name='DejaVuSans'>brain-drain-prod</font>), "
+    "<b>Step 2.</b> Click <b>New Project</b>. Pick a name (e.g. <font name='DejaVuSans'>MindSpool-prod</font>), "
     "generate a strong database password (save it in a password manager — Supabase will not show it "
     "again), and pick the region closest to your users. For a Kenya-based audience, the Frankfurt "
     "(eu-central-1) region gives the best latency compromise across Africa and Europe."
@@ -567,7 +567,7 @@ story.append(P(
 ))
 story.append(P(
     "<b>Add authorized domains.</b> In the same Firebase Auth settings, scroll to <b>Authorized "
-    "domains</b> and add your production URL (e.g. <font name='DejaVuSans'>braindrain.app</font>, "
+    "domains</b> and add your production URL (e.g. <font name='DejaVuSans'>MindSpool.app</font>, "
     "<font name='DejaVuSans'>preview-xxx.space-z.ai</font>, etc.). Firebase rejects auth requests from "
     "domains not on this list — a common gotcha."
 ))
@@ -590,7 +590,7 @@ story.append(P(
     "<b>Wire getAuthToken into every API write.</b> <font name='DejaVuSans'>hooks/use-social.ts</font> "
     "already calls <font name='DejaVuSans'>getAuthToken()</font> before "
     "<font name='DejaVuSans'>createPostApi()</font> — that pattern needs to be replicated in "
-    "<font name='DejaVuSans'>use-comments.ts</font>, <font name='DejaVuSans'>use-brain-repo.ts</font>, "
+    "<font name='DejaVuSans'>use-comments.ts</font>, <font name='DejaVuSans'>use-mind-repo.ts</font>, "
     "and the other write hooks. The server's <font name='DejaVuSans'>requireAuth</font> middleware "
     "already rejects requests without a valid token, so this is a client-side fix."
 ))
@@ -757,7 +757,7 @@ story.append(P(
 ))
 story.append(P(
     "<b>Seed starter content.</b> Before launch, manually create 12 high-quality starter posts across "
-    "the 6 default topics (2 per topic). These should be real, useful posts — sample brains, interesting "
+    "the 6 default topics (2 per topic). These should be real, useful posts — sample minds, interesting "
     "questions, helpful answers — not lorem ipsum. They become the cold-start pool for the first week "
     "until organic content overtakes them."
 ))
@@ -906,7 +906,7 @@ story.append(P(
     "<b>UI.</b> 'Find Gmail friends' button next to the contact-sync button. On click: if user is "
     "already signed in with Google, fetch contacts immediately; if not, trigger Google sign-in with "
     "the contacts.readonly scope. Show a consent modal first explaining: 'We will read your Google "
-    "contacts to find people you already know on Brain Drain. We never store your raw emails — only "
+    "contacts to find people you already know on MindSpool. We never store your raw emails — only "
     "a one-way hash.' After the user agrees, show a loading spinner, then the matched-users screen."
 ))
 
@@ -914,7 +914,7 @@ story.extend(sub_section("Verification Gate"))
 story.append(P(
     "User signs in with Google, taps 'Find Gmail friends', sees the consent modal, agrees, sees 5+ "
     "matched users within 5 seconds. User can revoke Google contacts access at any time from the "
-    "Google Account security page (link to it from Brain Drain's settings page)."
+    "Google Account security page (link to it from MindSpool's settings page)."
 ))
 
 story.extend(sub_section("Effort & Risk"))
@@ -1134,14 +1134,14 @@ story.append(P(
 ))
 
 # ── Build ──────────────────────────────────────────────────────────
-OUTPUT = "/home/z/my-project/download/brain-drain-roadmap-body.pdf"
+OUTPUT = "/home/z/my-project/download/MindSpool-roadmap-body.pdf"
 
 doc = TocDocTemplate(
     OUTPUT,
     pagesize=A4,
     leftMargin=LEFT_MARGIN, rightMargin=RIGHT_MARGIN,
     topMargin=TOP_MARGIN, bottomMargin=BOTTOM_MARGIN,
-    title="Brain Drain — Production Roadmap",
+    title="MindSpool — Production Roadmap",
     author="Z.ai",
     creator="Z.ai",
     subject="Zero-to-launch engineering plan: backend, auth, discovery, hardening",

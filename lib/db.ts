@@ -1,4 +1,4 @@
-const DB_NAME = "brainBuilder";
+const DB_NAME = "mindBuilder";
 const DB_VERSION = 21;
 
 let dbPromise: Promise<IDBDatabase> | null = null;
@@ -116,13 +116,13 @@ export function openDB(): Promise<IDBDatabase> {
       const oldVersion = event.oldVersion;
 
       if (oldVersion < 1) {
-        if (!db.objectStoreNames.contains("brains")) {
-          db.createObjectStore("brains", { keyPath: "id" });
+        if (!db.objectStoreNames.contains("minds")) {
+          db.createObjectStore("minds", { keyPath: "id" });
         }
 
         if (!db.objectStoreNames.contains("nodes")) {
           const nodeStore = db.createObjectStore("nodes", { keyPath: "id" });
-          nodeStore.createIndex("brain_id", "brain_id", { unique: false });
+          nodeStore.createIndex("mind_id", "mind_id", { unique: false });
         }
       }
 
@@ -141,9 +141,9 @@ export function openDB(): Promise<IDBDatabase> {
         if (!db.objectStoreNames.contains("settings")) {
           db.createObjectStore("settings", { keyPath: "id" });
         }
-        if (!db.objectStoreNames.contains("brain_dna")) {
-          const dnaStore = db.createObjectStore("brain_dna", { keyPath: "id" });
-          dnaStore.createIndex("brainId", "brainId", { unique: true });
+        if (!db.objectStoreNames.contains("mind_dna")) {
+          const dnaStore = db.createObjectStore("mind_dna", { keyPath: "id" });
+          dnaStore.createIndex("mindId", "mindId", { unique: true });
         }
       }
 
@@ -248,9 +248,9 @@ export function openDB(): Promise<IDBDatabase> {
       // and data are untouched. Old records continue rendering because
       // all new fields on existing types are optional with safe defaults.
       if (oldVersion < 9) {
-        // Phase 2: Brain contributions (answer branches on question brains)
-        if (!db.objectStoreNames.contains("brain_contributions")) {
-          db.createObjectStore("brain_contributions", { keyPath: "id" });
+        // Phase 2: Mind contributions (answer branches on question minds)
+        if (!db.objectStoreNames.contains("mind_contributions")) {
+          db.createObjectStore("mind_contributions", { keyPath: "id" });
         }
         // Phase 4: Bookmark collections
         if (!db.objectStoreNames.contains("bookmark_collections")) {
@@ -296,38 +296,38 @@ export function openDB(): Promise<IDBDatabase> {
           db.createObjectStore("verification_records", { keyPath: "userId" });
         }
       }
-      // v12: Phase 1.5 Brain Drain Core. Two new stores — drain_entries
-      // (the atomic unit of drained expertise) and brain_wills (the
-      // succession rules for each brain). Both additive; existing stores
+      // v12: Phase 1.5 MindSpool Core. Two new stores — drain_entries
+      // (the atomic unit of drained expertise) and mind_wills (the
+      // succession rules for each mind). Both additive; existing stores
       // and records are untouched.
       if (oldVersion < 12) {
         if (!db.objectStoreNames.contains("drain_entries")) {
           const drainStore = db.createObjectStore("drain_entries", {
             keyPath: "id",
           });
-          drainStore.createIndex("brainId", "brainId", { unique: false });
+          drainStore.createIndex("mindId", "mindId", { unique: false });
           drainStore.createIndex("userId", "userId", { unique: false });
           drainStore.createIndex("skill", "skill", { unique: false });
           drainStore.createIndex("createdAt", "createdAt", { unique: false });
           drainStore.createIndex("visibility", "visibility", { unique: false });
         }
-        if (!db.objectStoreNames.contains("brain_wills")) {
-          db.createObjectStore("brain_wills", { keyPath: "brainId" });
+        if (!db.objectStoreNames.contains("mind_wills")) {
+          db.createObjectStore("mind_wills", { keyPath: "mindId" });
         }
       }
       // v13: Phase B-5 — branches + pull_requests stores for GitHub-style
-      // answer branching. Previously use-brain-repo.ts used in-memory mock
+      // answer branching. Previously use-mind-repo.ts used in-memory mock
       // data; now branches and PRs persist to IDB so answer-branches
       // survive reloads. Additive — no existing store touched.
       if (oldVersion < 13) {
         if (!db.objectStoreNames.contains("branches")) {
           const branchStore = db.createObjectStore("branches", { keyPath: "id" });
-          branchStore.createIndex("brain_id", "brain_id", { unique: false });
+          branchStore.createIndex("mind_id", "mind_id", { unique: false });
           branchStore.createIndex("name", "name", { unique: false });
         }
         if (!db.objectStoreNames.contains("pull_requests")) {
           const prStore = db.createObjectStore("pull_requests", { keyPath: "id" });
-          prStore.createIndex("brain_id", "brain_id", { unique: false });
+          prStore.createIndex("mind_id", "mind_id", { unique: false });
           prStore.createIndex("status", "status", { unique: false });
           prStore.createIndex("originPostId", "originPostId", { unique: false });
         }
@@ -433,13 +433,13 @@ export function openDB(): Promise<IDBDatabase> {
 
       if (oldVersion < 19) {
         // Part 2 Task 5/8: skills store (private skill library + published skills).
-        // Part 2 Task 4: habits store (separate from brain nodes — never overwritten).
+        // Part 2 Task 4: habits store (separate from mind nodes — never overwritten).
         if (!db.objectStoreNames.contains("skills")) {
           const skillStore = db.createObjectStore("skills", { keyPath: "id" });
           // Index on status for "private" vs "published" filtering.
           skillStore.createIndex("status", "status", { unique: false });
-          // Index on sourceBrainId for lineage traceability (Task 8).
-          skillStore.createIndex("sourceBrainId", "sourceBrainId", { unique: false });
+          // Index on sourceMindId for lineage traceability (Task 8).
+          skillStore.createIndex("sourceMindId", "sourceMindId", { unique: false });
         }
         if (!db.objectStoreNames.contains("habits")) {
           const habitStore = db.createObjectStore("habits", { keyPath: "id" });

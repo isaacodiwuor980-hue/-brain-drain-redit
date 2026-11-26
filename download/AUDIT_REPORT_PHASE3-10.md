@@ -1,4 +1,4 @@
-# Brain Drain — Phase 3-10 Audit Fix Report
+# MindSpool — Phase 3-10 Audit Fix Report
 
 **Date:** 2026-11-07 · **Auditor:** Senior staff engineer audit (AI-assisted, evidence-based)
 **Scope:** All 15 confirmed backend bugs (B-1 to B-15), 4 security findings (S-1 to S-4), 7 NEEDS_MY_DECISION items, dependency upgrades, and full live validation.
@@ -72,7 +72,7 @@ The audit listed 7 ambiguous items. The user said "continue working on all remai
 | 2. `metadata.json` (z.ai applet manifest) | **Kept** | The workspace is a hosted applet; the platform may require it. |
 | 3a. Truly dead endpoints | **Deleted** | `GET /api/events/summary`, `GET /api/intelligence/summary`, `GET /api/v1/health/detailed`, `POST /api/discover/set-contact-hash` |
 | 3b. 501 stubs | **Deleted** | `GET /api/v1/verify/:userId`, `GET /api/v1/provenance/:recordId` — also removed their false "Live" badges from /data-quality |
-| 3c. Future/contract surface | **Kept** | `/api/v1/datasets`, `/api/v1/search`, skills/habits GET+DELETE, `/api/recommendations/brains` — clearly separated as contract surface |
+| 3c. Future/contract surface | **Kept** | `/api/v1/datasets`, `/api/v1/search`, skills/habits GET+DELETE, `/api/recommendations/minds` — clearly separated as contract surface |
 | 4. `public/sw.js` | **Deleted** | Functionally disabled (app actively unregisters SWs); was the source of months of stale-cache bugs. Replaced by `/sw-killer.js` (external, CSP-compliant). |
 | 5. Historical/utility files | **Mixed** | Deleted: `DEPLOYMENT-CHECKLIST-PHASE4-6.md`, `scripts/test-sm2.ts`, `scripts/simulate-20k-users.mjs`. Kept: `public/terms-of-service.html` + `privacy-policy.html` (legal), `scripts/feature-smoke-test.ts` (dev tool), `scripts/apply-migration-0004.ts` (until migration applied). |
 | 6. Security decisions | **Applied** | (1) OTP mock delivery blocked in prod (S-2). (2) Rate-limit keying fixed (S-1). (3) Migration 0004 still pending (needs PAT). (4) MAINTENANCE_MODE hot-reload (B-14). |
@@ -158,7 +158,7 @@ This captures the real DRY benefit without adding indirection or regression risk
 | Live: `/data-quality` (B-13) | ✅ "Pending" badges on unimplemented endpoints, no dead route refs |
 | Live: `/api/healthz` | ✅ `status=ok env=production` |
 | Browser: onboarding → guest → feed renders | ✅ Posts with full content ("salary negotiation", "international offer") |
-| Browser: navigation (Home, Search, Brains, etc.) | ✅ All present |
+| Browser: navigation (Home, Search, Minds, etc.) | ✅ All present |
 
 ---
 

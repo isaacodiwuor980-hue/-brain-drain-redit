@@ -1,9 +1,9 @@
-import type { Brain, Node } from "./types";
+import type { Mind, Node } from "./types";
 
-export type BrainIssueLevel = "error" | "warning";
+export type MindIssueLevel = "error" | "warning";
 
-export interface BrainIssue {
-  level: BrainIssueLevel;
+export interface MindIssue {
+  level: MindIssueLevel;
   /** Stable id for the affected node, if any. */
   nodeId?: string;
   code:
@@ -20,23 +20,23 @@ export interface BrainIssue {
 }
 
 /**
- * Validates a brain's topology so creators catch problems before publishing:
+ * Validates a mind's topology so creators catch problems before publishing:
  * missing root, empty questions/outcomes, unanswered text, dead ends (a
  * question that leads nowhere), unreachable nodes, self-loops, and questions
  * with neither YES nor NO branch.
  *
  * Pure and unit-testable. The UI simply renders the returned issues.
  */
-export function validateBrain(brain: Brain, nodes: Node[]): BrainIssue[] {
-  const issues: BrainIssue[] = [];
+export function validateMind(mind: Mind, nodes: Node[]): MindIssue[] {
+  const issues: MindIssue[] = [];
   const byId = new Map(nodes.map((n) => [n.id, n]));
 
   // No root at all.
-  if (!brain.root_node_id || !byId.has(brain.root_node_id)) {
+  if (!mind.root_node_id || !byId.has(mind.root_node_id)) {
     issues.push({
       level: "error",
       code: "no-root",
-      message: "This brain has no starting question. Set one as the root.",
+      message: "This mind has no starting question. Set one as the root.",
     });
   }
 
@@ -120,9 +120,9 @@ export function validateBrain(brain: Brain, nodes: Node[]): BrainIssue[] {
   }
 
   // Reachability: walk from the root and flag anything not visited.
-  if (brain.root_node_id && byId.has(brain.root_node_id)) {
+  if (mind.root_node_id && byId.has(mind.root_node_id)) {
     const visited = new Set<string>();
-    const stack = [brain.root_node_id];
+    const stack = [mind.root_node_id];
     while (stack.length) {
       const id = stack.pop()!;
       if (visited.has(id)) continue;
@@ -156,7 +156,7 @@ export function validateBrain(brain: Brain, nodes: Node[]): BrainIssue[] {
   return issues;
 }
 
-export function summarizeIssues(issues: BrainIssue[]): {
+export function summarizeIssues(issues: MindIssue[]): {
   errors: number;
   warnings: number;
   ready: boolean;

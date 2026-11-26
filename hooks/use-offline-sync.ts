@@ -8,8 +8,8 @@ import { idb } from "@/lib/db";
 import { env } from "@/lib/env";
 import { getAuthToken } from "@/lib/auth-token";
 import { createPost, reactToPost } from "@/lib/api/feed";
-import { saveBrain } from "@/lib/api/brains";
-import type { Post, Brain, Node } from "@/lib/types";
+import { saveMind } from "@/lib/api/minds";
+import type { Post, Mind, Node } from "@/lib/types";
 
 export function useOfflineSync() {
   const status = useOnlineStatus();
@@ -24,8 +24,8 @@ export function useOfflineSync() {
     const handleQueueChange = () => {
       setQueue(getOfflineQueue());
     };
-    window.addEventListener("brainbuilder_queue_change", handleQueueChange);
-    return () => window.removeEventListener("brainbuilder_queue_change", handleQueueChange);
+    window.addEventListener("mindbuilder_queue_change", handleQueueChange);
+    return () => window.removeEventListener("mindbuilder_queue_change", handleQueueChange);
   }, []);
 
   /**
@@ -104,7 +104,7 @@ export function useOfflineSync() {
       void queryClient.invalidateQueries({ queryKey: ["posts"] });
       void queryClient.invalidateQueries({ queryKey: ["profile"] });
       void queryClient.invalidateQueries({ queryKey: ["missions"] });
-      void queryClient.invalidateQueries({ queryKey: ["brains"] });
+      void queryClient.invalidateQueries({ queryKey: ["minds"] });
     } else {
       triggerHaptic("warning");
       toast({
@@ -159,7 +159,7 @@ async function replayAction(
           postType: post.postType,
           event: post.event,
           mediaUrls: post.mediaUrls,
-          brainId: post.brainId,
+          mindId: post.mindId,
           createdAt: post.createdAt,
         },
         token,
@@ -177,12 +177,12 @@ async function replayAction(
       return "synced";
     }
 
-    case "update_brain": {
-      // Payload should be { brain, nodes } matching UpsertBrainInput.
-      const brain = action.payload?.brain as Brain | undefined;
+    case "update_mind": {
+      // Payload should be { mind, nodes } matching UpsertMindInput.
+      const mind = action.payload?.mind as Mind | undefined;
       const nodes = action.payload?.nodes as Node[] | undefined;
-      if (!brain || !nodes) return "skipped";
-      await saveBrain({ brain: { ...brain, is_public: false }, nodes }, token);
+      if (!mind || !nodes) return "skipped";
+      await saveMind({ mind: { ...mind, is_public: false }, nodes }, token);
       return "synced";
     }
 

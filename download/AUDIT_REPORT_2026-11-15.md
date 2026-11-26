@@ -1,4 +1,4 @@
-# Brain Drain — Stability & Performance Audit (2026-11-15)
+# MindSpool — Stability & Performance Audit (2026-11-15)
 
 Supersedes the Phase-1 audit of 2026-11-06 (kept as `AUDIT_REPORT.md`). Scope: full repo (React/Vite frontend, Express 5 + pino API server, local-first IndexedDB, Supabase cloud sync, Docker deploy). Method: on-disk verification of every hardening claim, fresh gates, live route probes, browser console sweep, bundle measurement, 2-minute soak. No code was rewritten blindly; every fix below is small and reversible.
 

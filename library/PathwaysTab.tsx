@@ -15,7 +15,7 @@ import { Pathway } from "@/lib/types";
 
 export function PathwaysTab() {
   const { pathways, createPathway, forkPathway } = usePathways();
-  const { brains } = useDatabase();
+  const { minds } = useDatabase();
   const { toast } = useToast();
   
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -26,7 +26,7 @@ export function PathwaysTab() {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [category, setCategory] = useState("");
-  const [selectedBrains, setSelectedBrains] = useState<string[]>([]);
+  const [selectedMinds, setSelectedMinds] = useState<string[]>([]);
   
   const [forkTitle, setForkTitle] = useState("");
 
@@ -37,7 +37,7 @@ export function PathwaysTab() {
         title,
         description,
         category,
-        brainIds: selectedBrains,
+        mindIds: selectedMinds,
         authorId: "me"
       });
       toast({ title: "Pathway created", description: "Your new knowledge pathway has been saved." });
@@ -65,11 +65,11 @@ export function PathwaysTab() {
     setTitle("");
     setDescription("");
     setCategory("");
-    setSelectedBrains([]);
+    setSelectedMinds([]);
   };
 
-  const toggleBrain = (id: string) => {
-    setSelectedBrains(prev => 
+  const toggleMind = (id: string) => {
+    setSelectedMinds(prev => 
       prev.includes(id) ? prev.filter(b => b !== id) : [...prev, id]
     );
   };
@@ -79,7 +79,7 @@ export function PathwaysTab() {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-xl font-bold tracking-tight">Knowledge Pathways</h2>
-          <p className="text-sm text-muted-foreground">Curated sequences of expert brains.</p>
+          <p className="text-sm text-muted-foreground">Curated sequences of expert minds.</p>
         </div>
         
         <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
@@ -92,7 +92,7 @@ export function PathwaysTab() {
             <DialogHeader>
               <DialogTitle>Create Pathway</DialogTitle>
               <DialogDescription>
-                Sequence multiple brains into a learning pathway.
+                Sequence multiple minds into a learning pathway.
               </DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4">
@@ -109,16 +109,16 @@ export function PathwaysTab() {
                 <Input value={category} onChange={e => setCategory(e.target.value)} placeholder="e.g. Programming" />
               </div>
               <div className="space-y-2">
-                <Label>Select Brains ({selectedBrains.length} selected)</Label>
+                <Label>Select Minds ({selectedMinds.length} selected)</Label>
                 <div className="max-h-[200px] overflow-y-auto space-y-2 border rounded-md p-2">
-                  {brains.length === 0 ? (
-                    <p className="text-sm text-muted-foreground text-center p-2">No brains in your library.</p>
+                  {minds.length === 0 ? (
+                    <p className="text-sm text-muted-foreground text-center p-2">No minds in your library.</p>
                   ) : (
-                    brains.map(b => (
+                    minds.map(b => (
                       <div 
                         key={b.id} 
-                        className={`flex items-center gap-2 p-2 rounded cursor-pointer text-sm ${selectedBrains.includes(b.id) ? 'bg-primary/10 border-primary/30 border' : 'hover:bg-muted border border-transparent'}`}
-                        onClick={() => toggleBrain(b.id)}
+                        className={`flex items-center gap-2 p-2 rounded cursor-pointer text-sm ${selectedMinds.includes(b.id) ? 'bg-primary/10 border-primary/30 border' : 'hover:bg-muted border border-transparent'}`}
+                        onClick={() => toggleMind(b.id)}
                       >
                         <BookOpen className="w-4 h-4 text-muted-foreground" />
                         <span className="flex-1 truncate">{b.title}</span>
@@ -140,7 +140,7 @@ export function PathwaysTab() {
         <div className="p-12 text-center border border-dashed border-border/50 rounded-[16px] bg-card/30">
           <MapIcon className="w-12 h-12 text-muted-foreground/50 mx-auto mb-4" />
           <h3 className="text-lg font-medium">No pathways yet</h3>
-          <p className="text-muted-foreground mb-4">Create your first pathway to sequence your expert brains.</p>
+          <p className="text-muted-foreground mb-4">Create your first pathway to sequence your expert minds.</p>
           <Button variant="outline" onClick={() => setIsCreateOpen(true)}>Create Pathway</Button>
         </div>
       ) : (
@@ -186,7 +186,7 @@ export function PathwaysTab() {
                 <CardContent className="flex-1">
                   <p className="text-sm text-muted-foreground line-clamp-2">{pathway.description}</p>
                   <div className="mt-4 flex gap-4 text-xs text-muted-foreground font-mono">
-                    <span>{pathway.brainIds.length} brains</span>
+                    <span>{pathway.mindIds.length} minds</span>
                     <span>{pathway.forkCount} forks</span>
                   </div>
                 </CardContent>

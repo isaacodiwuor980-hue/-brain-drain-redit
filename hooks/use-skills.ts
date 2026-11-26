@@ -3,19 +3,19 @@
  *
  * Manages SkillEntry records in IndexedDB (local cache) + syncs to
  * Supabase when a skill is published (so other users can recall it
- * in real time while building their own brains/pathways).
+ * in real time while building their own minds/pathways).
  *
  * Lifecycle:
- *   1. Author creates a brain with detailed step-by-step nodes
- *   2. Author calls createSkillFromBrain(brainId, metadata) — extracts
- *      the brain's nodes into SkillStep[] and creates a SkillEntry
+ *   1. Author creates a mind with detailed step-by-step nodes
+ *   2. Author calls createSkillFromMind(mindId, metadata) — extracts
+ *      the mind's nodes into SkillStep[] and creates a SkillEntry
  *      with status='private' (local only, not yet in Supabase)
  *   3. Author calls submitForReview(skillId) — changes status to
  *      'in_review' so moderators can see it (still local)
  *   4. Moderator calls approveAndPublish(skillId) — changes status
  *      to 'published' + UPSERTS to Supabase so other users can find
  *      it via /api/v1/search/skills
- *   5. Other users, when editing their own brain, search public skills
+ *   5. Other users, when editing their own mind, search public skills
  *      via useSkills().searchPublic(query) which calls the server-side
  *      search endpoint. They can then insert a skill into their node
  *      via NodeEditor's handleInsertSkill.
@@ -28,37 +28,37 @@ import { idb } from "@/lib/db";
 import { env } from "@/lib/env";
 import { getAuthToken } from "@/lib/auth-token";
 import { useToast } from "@/hooks/use-toast";
-import type { SkillEntry, SkillStep, Brain, Node } from "@/lib/types";
+import type { SkillEntry, SkillStep, Mind, Node } from "@/lib/types";
 
 const STORE = "skills";
 
 /**
- * Deterministic skill ID from the source brain. The same brain + version
+ * Deterministic skill ID from the source mind. The same mind + version
  * always maps to the SAME skill row, so re-publishing an updated extract
- * from the same brain UPSERTS the existing row (idempotent) instead of
+ * from the same mind UPSERTS the existing row (idempotent) instead of
  * creating duplicate rows in Supabase.
  */
-export function buildSkillId(brainId: string, version = "v1"): string {
-  return `${brainId}-skill-${version}`;
+export function buildSkillId(mindId: string, version = "v1"): string {
+  return `${mindId}-skill-${version}`;
 }
 
 /**
- * Extract SkillStep[] from a brain's nodes.
+ * Extract SkillStep[] from a mind's nodes.
  *
  * Each outcome node becomes one SkillStep. Question nodes are skipped
  * (they're decision points, not actions). The order field is the
- * node's position in the brain's traversal order — we use the order
- * they come back from IDB since brains don't store explicit ordering.
+ * node's position in the mind's traversal order — we use the order
+ * they come back from IDB since minds don't store explicit ordering.
  */
-function extractStepsFromBrain(brain: Brain | undefined, nodes: Node[]): SkillStep[] {
-  if (!brain || !nodes.length) return [];
+function extractStepsFromMind(mind: Mind | undefined, nodes: Node[]): SkillStep[] {
+  if (!mind || !nodes.length) return [];
   return nodes
     .filter((n) => n.node_type === "outcome" && (n.result_text || n.next_steps))
     .map((n, idx) => ({
       order: idx + 1,
       action: n.result_text || n.next_steps || "",
       tool: undefined,
-      why: n.question_text || brain.title,
+      why: n.question_text || mind.title,
       errorIfSkipped: undefined,
       yesOutcome: undefined,
       noOutcome: undefined,
@@ -84,7 +84,7 @@ interface SupabaseSkillRow {
   author_name: string;
   author_years_experience: number | null;
   steps: SkillStep[];
-  source_brain_id: string | null;
+  source_mind_id: string | null;
   status: "private" | "in_review" | "published";
   reviewer_id: string | null;
   published_at: string | null;
@@ -103,7 +103,7 @@ function toSupabaseRow(skill: SkillEntry): SupabaseSkillRow {
     author_name: skill.authorName,
     author_years_experience: skill.authorYearsExperience ?? null,
     steps: skill.steps,
-    source_brain_id: skill.sourceBrainId ?? null,
+    source_mind_id: skill.sourceMindId ?? null,
     status: skill.status,
     reviewer_id: skill.reviewerId ?? null,
     published_at: skill.publishedAt ? new Date(skill.publishedAt).toISOString() : null,
@@ -122,7 +122,7 @@ export interface PublicSkillSearchResult {
   author_name: string;
   author_years_experience: number | null;
   status: string;
-  source_brain_id: string | null;
+  source_mind_id: string | null;
 }
 
 export function useSkills() {
@@ -145,40 +145,40 @@ export function useSkills() {
   });
 
   /**
-   * Create a SkillEntry from an existing brain. Extracts the brain's
+   * Create a SkillEntry from an existing mind. Extracts the mind's
    * outcome nodes into SkillStep[]. The new skill starts with
    * status='private' so only the author can see it until they
    * submit for review.
    */
-  const createSkillFromBrain = useMutation({
+  const createSkillFromMind = useMutation({
     mutationFn: async (input: {
-      brainId: string;
+      mindId: string;
       skillMetadata: Partial<Pick<SkillEntry, "domain" | "make" | "model" | "year" | "part" | "title" | "authorName" | "authorYearsExperience">>;
     }): Promise<SkillEntry> => {
-      const brain = await idb.get<Brain>("brains", input.brainId);
-      const nodes = await idb.getAllByIndex<Node>("nodes", "brain_id", input.brainId);
-      const steps = extractStepsFromBrain(brain, nodes);
+      const mind = await idb.get<Mind>("minds", input.mindId);
+      const nodes = await idb.getAllByIndex<Node>("nodes", "mind_id", input.mindId);
+      const steps = extractStepsFromMind(mind, nodes);
 
       if (steps.length === 0) {
-        throw new Error("This brain has no outcome nodes — add some decision outcomes before extracting a skill.");
+        throw new Error("This mind has no outcome nodes — add some decision outcomes before extracting a skill.");
       }
 
       const now = Date.now();
       const skill: SkillEntry = {
-        // Deterministic: same brain + version → same row. Re-publishing
+        // Deterministic: same mind + version → same row. Re-publishing
         // updates the existing skill instead of duplicating it.
-        id: buildSkillId(input.brainId),
-        domain: input.skillMetadata.domain || brain?.category || "general",
+        id: buildSkillId(input.mindId),
+        domain: input.skillMetadata.domain || mind?.category || "general",
         make: input.skillMetadata.make,
         model: input.skillMetadata.model,
         year: input.skillMetadata.year,
         part: input.skillMetadata.part,
         version: "v1",
-        title: input.skillMetadata.title || brain?.title || "Untitled skill",
+        title: input.skillMetadata.title || mind?.title || "Untitled skill",
         authorName: input.skillMetadata.authorName || "Me",
         authorYearsExperience: input.skillMetadata.authorYearsExperience,
         steps,
-        sourceBrainId: input.brainId,
+        sourceMindId: input.mindId,
         status: "private",
         createdAt: now,
       };
@@ -189,7 +189,7 @@ export function useSkills() {
       void queryClient.invalidateQueries({ queryKey });
       toast({
         title: "Skill created",
-        description: `"${skill.title}" extracted from brain with ${skill.steps.length} steps. Status: private.`,
+        description: `"${skill.title}" extracted from mind with ${skill.steps.length} steps. Status: private.`,
       });
     },
     onError: (err: Error) => {
@@ -288,7 +288,7 @@ export function useSkills() {
       void queryClient.invalidateQueries({ queryKey: publicQueryKey });
       toast({
         title: "Skill published",
-        description: `"${skill.title}" is now public and searchable by other users building brains.`,
+        description: `"${skill.title}" is now public and searchable by other users building minds.`,
       });
     },
     onError: (err: Error) => {
@@ -303,7 +303,7 @@ export function useSkills() {
   /**
    * Search public skills from Supabase via the three-layer search
    * endpoint. Used by NodeEditor when a user wants to insert a skill
-   * reference into their own brain — they can find any published skill
+   * reference into their own mind — they can find any published skill
    * by any author.
    */
   const searchPublic = useMutation({
@@ -354,7 +354,7 @@ export function useSkills() {
             author_name: s.authorName,
             author_years_experience: s.authorYearsExperience ?? null,
             status: s.status,
-            source_brain_id: s.sourceBrainId ?? null,
+            source_mind_id: s.sourceMindId ?? null,
           }));
       }
     },
@@ -373,7 +373,7 @@ export function useSkills() {
   return {
     skills,
     isLoading,
-    createSkillFromBrain: createSkillFromBrain.mutateAsync,
+    createSkillFromMind: createSkillFromMind.mutateAsync,
     submitForReview: submitForReview.mutateAsync,
     approveAndPublish: approveAndPublish.mutateAsync,
     searchPublic: searchPublic.mutateAsync,

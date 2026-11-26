@@ -20,7 +20,7 @@
 # this script.
 
 set -euo pipefail
-cd /home/z/my-project/BRAIN-DRAIN-latest-
+cd /home/z/my-project/MindSpool-latest-
 
 LOG=/tmp/bd-server.log
 HEALTH_URL=http://localhost:3000/api/healthz

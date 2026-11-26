@@ -3,7 +3,7 @@
  *
  * Mirrors the skills route pattern. Habits are behavior-loop templates
  * (newRoutine + anchorHabit + timing + reward) that can be referenced
- * from brain nodes via Node.habitNote.
+ * from mind nodes via Node.habitNote.
  *
  * Lifecycle:
  *   1. Author creates a habit locally (IDB) with status='private'

@@ -15,7 +15,7 @@ import {
 interface BranchManagerSidebarProps {
   isOpen: boolean;
   onClose: () => void;
-  brainId: string;
+  mindId: string;
   branches: Branch[];
   activeBranch: string;
   onSwitchBranch: (branchId: string) => void;

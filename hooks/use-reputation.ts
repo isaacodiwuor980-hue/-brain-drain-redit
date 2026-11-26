@@ -20,7 +20,7 @@ export function useReputation() {
           streak: 0,
           lastActiveDate: "",
           totalMissionsCompleted: 0,
-          totalBrainsCreated: 0,
+          totalMindsCreated: 0,
           totalCheckIns: 0,
           badges: []
         };
@@ -58,7 +58,7 @@ export function useReputation() {
           streak: 0,
           lastActiveDate: "",
           totalMissionsCompleted: 0,
-          totalBrainsCreated: 0,
+          totalMindsCreated: 0,
           totalCheckIns: 0,
           badges: [],
         };
@@ -75,13 +75,13 @@ export function useReputation() {
 
       // Update specific counters
       if (type === "mission_completed") updatedRep.totalMissionsCompleted++;
-      if (type === "brain_created") updatedRep.totalBrainsCreated++;
+      if (type === "mind_created") updatedRep.totalMindsCreated++;
       if (type === "check_in") updatedRep.totalCheckIns++;
 
       // Compute badges
       const newBadges = [...rep.badges];
-      if (updatedRep.totalBrainsCreated >= 1 && !newBadges.includes("First Brain")) {
-        newBadges.push("First Brain");
+      if (updatedRep.totalMindsCreated >= 1 && !newBadges.includes("First Mind")) {
+        newBadges.push("First Mind");
       }
       if (updatedRep.streak >= 7 && !newBadges.includes("Streak 7")) {
         newBadges.push("Streak 7");

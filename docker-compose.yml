@@ -1,5 +1,5 @@
 # ═══════════════════════════════════════════════════════════════════════════
-# Brain Drain — docker-compose for local production-like runs
+# MindSpool — docker-compose for local production-like runs
 # ═══════════════════════════════════════════════════════════════════════════
 # Usage:
 #   docker compose up --build

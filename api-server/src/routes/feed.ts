@@ -28,7 +28,7 @@ interface PostRow {
   post_type: string;
   event: unknown;
   media_urls: string[] | null;
-  brain_id: string | null;
+  mind_id: string | null;
   repost_count: number;
   created_at: string;
   comment_count: number;
@@ -312,7 +312,7 @@ async function fetchFeedPage(
   // apply local personalization signals.
   const rows = await supabase.get<PostRow>("posts", {
     select: `
-      id,user_id,topic_id,content,post_type,event,media_urls,brain_id,
+      id,user_id,topic_id,content,post_type,event,media_urls,mind_id,
       repost_count,created_at,comment_count,
       topic:topics(name),
       author:profiles(display_name,avatar_url)
@@ -352,7 +352,7 @@ async function fetchFeedPage(
       postType: normalizePostType(row.post_type),
       event: row.event,
       mediaUrls: row.media_urls || [],
-      brainId: row.brain_id,
+      mindId: row.mind_id,
       repostCount: row.repost_count,
       createdAt: new Date(row.created_at).getTime(),
       commentCount: row.comment_count || 0,

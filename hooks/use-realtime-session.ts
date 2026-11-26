@@ -47,8 +47,8 @@ export function useRealtimeSession(sessionId: string | null) {
       } else {
         const fallback: RealtimeSession = {
           id: sessionId,
-          title: "Live Brain Synthesis Session",
-          brainId: "brain-1",
+          title: "Live Mind Synthesis Session",
+          mindId: "mind-1",
           hostUserId: currentUserId,
           status: "active",
           activeNodeId: "root",

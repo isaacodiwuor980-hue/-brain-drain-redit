@@ -61,7 +61,7 @@ export function HomeFeed() {
   const currentUserId = userIdOr(user);
   const currentDisplayName = displayNameOr(user);
   // B3: the Following view gets its own honest empty state instead of the
-  // For-You dry state (whose "Share Your First Brain" CTA makes no sense
+  // For-You dry state (whose "Share Your First Mind" CTA makes no sense
   // under Following). Keyed on feed EMPTINESS, not auth: guests may carry an
   // anonymous Firebase session (user non-null), and signed-in users with no
   // follows need the same message.
@@ -305,7 +305,7 @@ export function HomeFeed() {
     // Filter out hidden posts (user clicked "Hide Post" in PostCard).
     let hiddenIds: string[] = [];
     try {
-      const raw = localStorage.getItem("brainDrain_hiddenPosts");
+      const raw = localStorage.getItem("MindSpool_hiddenPosts");
       if (raw) hiddenIds = JSON.parse(raw) as string[];
     } catch { /* ignore */ }
     const visiblePosts = hiddenIds.length > 0 ? posts.filter(p => !hiddenIds.includes(p.id)) : posts;
@@ -484,7 +484,7 @@ export function HomeFeed() {
             ME
           </div>
           <div className="flex-1 text-muted-foreground text-[14px]">
-            What's on your mind? Share a decision brain...
+            What's on your mind? Share a decision mind...
           </div>
           <button
             type="button"
@@ -600,8 +600,8 @@ export function HomeFeed() {
               </div>
               <h3 className="font-bold text-lg text-foreground">Your Knowledge Feed Awaits</h3>
               <p className="text-sm text-muted-foreground leading-relaxed">
-                Brain Drain is a human knowledge engine. Every post can have a
-                structured decision Brain attached. Readers vote every comment
+                MindSpool is a human knowledge engine. Every post can have a
+                structured decision Mind attached. Readers vote every comment
                 up or down and classify it House or Mouth — the strongest
                 reasoning rises into a living consensus library.
               </p>
@@ -610,7 +610,7 @@ export function HomeFeed() {
               </p>
               <div className="flex flex-col gap-2 pt-2">
                 <Button onClick={() => openCreator("post")}>
-                  <PenSquare className="w-4 h-4 mr-2" /> Share Your First Brain
+                  <PenSquare className="w-4 h-4 mr-2" /> Share Your First Mind
                 </Button>
                 <Button variant="outline" onClick={() => openCreator("question")}>
                   <CircleHelp className="w-4 h-4 mr-2" /> Ask the Community

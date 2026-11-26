@@ -11,13 +11,13 @@
 # is already running, it just verifies health and exits.
 
 set -u
-cd /home/z/my-project/BRAIN-DRAIN-latest-
+cd /home/z/my-project/MindSpool-latest-
 
 HEALTH_URL=http://localhost:3000/api/healthz
 # Logs persist under the project dir so they SURVIVE container recycles.
 # /tmp is wiped on every recycle — writing logs there made crash diagnosis
 # impossible (the log was gone by the time anyone looked). Verified 2026-11-14.
-LOG_DIR=/home/z/my-project/BRAIN-DRAIN-latest-/logs
+LOG_DIR=/home/z/my-project/MindSpool-latest-/logs
 mkdir -p "$LOG_DIR" 2>/dev/null
 WRAPPER_LOG="$LOG_DIR/bd-wrapper.log"
 SERVER_LOG="$LOG_DIR/bd-server.log"
@@ -37,7 +37,7 @@ if [ -z "$WRAPPER_PID" ]; then
   # ppid=1 is outside the reaper's descendant walk and survives forever.
   # Verified: 2026-10-29 — wrapper + node survived across tool calls
   # with plain `setsid &` dying instantly at command end.
-  bash -c 'setsid bash scripts/keep-server-alive.sh </dev/null >>/home/z/my-project/BRAIN-DRAIN-latest-/logs/bd-wrapper.log 2>&1 & exit 0'
+  bash -c 'setsid bash scripts/keep-server-alive.sh </dev/null >>/home/z/my-project/MindSpool-latest-/logs/bd-wrapper.log 2>&1 & exit 0'
   sleep 2
   WRAPPER_PID=$(pgrep -f "keep-server-alive" 2>/dev/null | head -1)
   if [ -z "$WRAPPER_PID" ]; then
@@ -52,7 +52,7 @@ if [ -z "$WRAPPER_PID" ]; then
   else
     echo "⚠ Wrapper started (PID $WRAPPER_PID, ppid=$W_PPID) — NOT orphaned;"
     echo "  it will be reaped when this command ends. Retrying orphan launch…"
-    bash -c 'setsid bash scripts/keep-server-alive.sh </dev/null >>/home/z/my-project/BRAIN-DRAIN-latest-/logs/bd-wrapper.log 2>&1 & exit 0'
+    bash -c 'setsid bash scripts/keep-server-alive.sh </dev/null >>/home/z/my-project/MindSpool-latest-/logs/bd-wrapper.log 2>&1 & exit 0'
     sleep 2
     WRAPPER_PID=$(pgrep -f "keep-server-alive" 2>/dev/null | head -1)
     W_PPID=$(ps -o ppid= -p "$WRAPPER_PID" 2>/dev/null | tr -d ' ')

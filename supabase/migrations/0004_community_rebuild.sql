@@ -213,15 +213,15 @@ comment on table public.mentors is
 -- 6. recall_events
 -- ===========================================================================
 -- Spaced-repetition recall events. Each event records a user's attempt to
--- recall a piece of knowledge (brain node) at a scheduled interval. Used
+-- recall a piece of knowledge (mind node) at a scheduled interval. Used
 -- to compute the next interval (SM-2 algorithm variant).
 
 create table if not exists public.recall_events (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,
-  -- The brain node being recalled. Loose reference (no FK) because brain
+  -- The mind node being recalled. Loose reference (no FK) because mind
   -- nodes may be deleted by the user; we keep the recall history.
-  brain_id uuid,
+  mind_id uuid,
   -- Topic context (for recall across topic-study sessions).
   topic_id text references public.topics(id) on delete set null,
   -- Quality of recall on the 0-5 SM-2 scale:
@@ -243,9 +243,9 @@ create index if not exists recall_events_user_next_idx
   on public.recall_events(user_id, next_recall_at)
   where next_recall_at > now();
 
-create index if not exists recall_events_user_brain_idx
-  on public.recall_events(user_id, brain_id, recalled_at desc)
-  where brain_id is not null;
+create index if not exists recall_events_user_mind_idx
+  on public.recall_events(user_id, mind_id, recalled_at desc)
+  where mind_id is not null;
 
 comment on table public.recall_events is
   'Spaced-repetition recall events (SM-2). Each event records a recall attempt and the next scheduled recall time.';
@@ -336,7 +336,7 @@ create policy "recall_events_self_read" on public.recall_events
 -- account. These only seed if the posts table is empty (idempotent).
 
 insert into public.topics (id, name, description, category, "order")
-select 'seed-neuroscience', 'Neuroscience', 'Brain, behavior and cognition.', 'Science', 100
+select 'seed-neuroscience', 'Neuroscience', 'Mind, behavior and cognition.', 'Science', 100
 where not exists (select 1 from public.topics where id = 'seed-neuroscience');
 
 insert into public.topics (id, name, description, category, "order")

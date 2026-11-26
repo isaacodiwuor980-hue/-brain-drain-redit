@@ -5,7 +5,7 @@ import { idb } from "@/lib/db";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { BrainCircuit, UserRound, Mail, Lock, User as UserIcon, Loader2 } from "lucide-react";
+import { UserRound, Mail, Lock, User as UserIcon, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { OnboardingTour } from "@/components/onboarding/OnboardingTour";
 
@@ -23,9 +23,9 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType>({} as AuthContextType);
 
-const GUEST_STORAGE_KEY = "brain-builder-guest";
+const GUEST_STORAGE_KEY = "mind-builder-guest";
 const GUEST_PROFILE_ID = "guest-profile";
-const ONBOARDED_KEY = "brain-drain-onboarded";
+const ONBOARDED_KEY = "MindSpool-onboarded";
 
 function makeGuestProfile(uid: string): UserProfile {
   return {
@@ -580,11 +580,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return (
       <div className="h-screen w-full flex flex-col items-center justify-center bg-background gap-4">
         <div className="relative">
-          <BrainCircuit className="w-12 h-12 text-primary animate-pulse" />
+          <img src="/logo.png" alt="MindSpool" className="w-12 h-12 animate-pulse object-contain" />
         </div>
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <Loader2 className="w-3 h-3 animate-spin" />
-          <span>Warming up your brain…</span>
+          <span>Warming up your mind…</span>
         </div>
       </div>
     );
@@ -596,9 +596,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         <OnboardingTour
           onFinish={finishOnboarding}
           onTrySample={async () => {
-            // Flag the app to open a sample brain once the guest lands.
+            // Flag the app to open a sample mind once the guest lands.
             try {
-              sessionStorage.setItem("brain-drain-open-sample", "1");
+              sessionStorage.setItem("MindSpool-open-sample", "1");
             } catch {
               // ignore storage errors (private mode)
             }
@@ -682,13 +682,13 @@ function SignInScreen({
     <div className="h-screen w-full flex flex-col items-center justify-center bg-background p-6 overflow-y-auto">
       <div className="max-w-md w-full bg-card border rounded-[16px] p-8 text-center shadow-lg">
         <div className="w-16 h-16 bg-primary/10 text-primary rounded-[16px] flex items-center justify-center mx-auto mb-6">
-          <BrainCircuit className="w-8 h-8" />
+          <img src="/logo.png" alt="MindSpool" className="w-8 h-8 object-contain" />
         </div>
-        <h1 className="text-2xl font-bold mb-2">Welcome to Brain Drain</h1>
+        <h1 className="text-2xl font-bold mb-2">Welcome to MindSpool</h1>
         <p className="text-sm font-semibold text-primary mb-1">The Next Human LLM</p>
         <p className="text-muted-foreground mb-6 text-sm leading-relaxed">
           A human knowledge engine where experts drain their reasoning into
-          structured decision brains. Readers vote every comment up or down
+          structured decision minds. Readers vote every comment up or down
           and classify it House or Mouth — the strongest reasoning rises
           into a living consensus library.
         </p>

@@ -1,69 +1,69 @@
-import type { Brain, Node } from "../types";
+import type { Mind, Node } from "../types";
 import { api, ApiError } from "../api-client";
 
-export interface CloudBrain extends Brain {
+export interface CloudMind extends Mind {
   authorId?: string | null;
   isPublic?: boolean;
 }
 
-export interface ListBrainsResponse {
-  brains: CloudBrain[];
+export interface ListMindsResponse {
+  minds: CloudMind[];
   hasMore: boolean;
   source: string;
 }
 
-export interface BrainDetailResponse {
-  brain: CloudBrain;
+export interface MindDetailResponse {
+  mind: CloudMind;
   nodes: Node[];
   source: string;
 }
 
-export interface UpsertBrainInput {
-  brain: Omit<Brain, "created_at"> & {
+export interface UpsertMindInput {
+  mind: Omit<Mind, "created_at"> & {
     is_public?: boolean;
     is_favorite?: boolean;
   };
   nodes: Node[];
 }
 
-export function isBrainsError(error: unknown, status?: number): error is ApiError {
+export function isMindsError(error: unknown, status?: number): error is ApiError {
   return error instanceof ApiError && (status === undefined || error.status === status);
 }
 
-export async function listBrains(
+export async function listMinds(
   options: { mine?: boolean; limit?: number; offset?: number; signal?: AbortSignal } = {},
-): Promise<ListBrainsResponse> {
+): Promise<ListMindsResponse> {
   const params = new URLSearchParams();
   if (options.mine) params.set("mine", "true");
   if (options.limit) params.set("limit", String(options.limit));
   if (options.offset) params.set("offset", String(options.offset));
   const qs = params.toString();
-  return api.get<ListBrainsResponse>(`/api/brains${qs ? `?${qs}` : ""}`, {
+  return api.get<ListMindsResponse>(`/api/minds${qs ? `?${qs}` : ""}`, {
     signal: options.signal,
     retries: 1,
   });
 }
 
-export async function getBrain(
+export async function getMind(
   id: string,
   signal?: AbortSignal,
-): Promise<BrainDetailResponse> {
-  return api.get<BrainDetailResponse>(`/api/brains/${encodeURIComponent(id)}`, {
+): Promise<MindDetailResponse> {
+  return api.get<MindDetailResponse>(`/api/minds/${encodeURIComponent(id)}`, {
     signal,
     retries: 1,
   });
 }
 
-export async function saveBrain(
-  input: UpsertBrainInput,
+export async function saveMind(
+  input: UpsertMindInput,
   authToken?: string | null,
 ): Promise<void> {
   await api.post(
-    "/api/brains",
+    "/api/minds",
     {
-      brain: {
-        ...input.brain,
-        is_public: input.brain.is_public ?? false,
+      mind: {
+        ...input.mind,
+        is_public: input.mind.is_public ?? false,
       },
       nodes: input.nodes,
     },
@@ -73,11 +73,11 @@ export async function saveBrain(
   );
 }
 
-export async function deleteBrain(
+export async function deleteMind(
   id: string,
   authToken?: string | null,
 ): Promise<void> {
-  await api.request(`/api/brains/${encodeURIComponent(id)}`, {
+  await api.request(`/api/minds/${encodeURIComponent(id)}`, {
     method: "DELETE",
     headers: authToken ? { Authorization: `Bearer ${authToken}` } : undefined,
   });
