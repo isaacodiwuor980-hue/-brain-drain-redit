@@ -21,35 +21,35 @@ beforeEach(async()=>{
 afterEach(async()=>{await act(async()=>root.unmount());client.clear();el.remove();});
 describe("feed query cache privacy",()=>{
   it("does not read or rewrite unscoped local posts when fetching the feed",async()=>{
-    await vi.waitFor(()=>expect(client.getQueryData(["posts","foryou",null])).toBeDefined());
+    await vi.waitFor(()=>expect(client.getQueryData(["posts","foryou",null,"cursor-v1"])).toBeDefined());
     expect(m.getAll).not.toHaveBeenCalled();
     expect(m.putAll).not.toHaveBeenCalled();
-    expect(JSON.stringify(client.getQueryData(["posts","foryou",null]))).toContain("server");
+    expect(JSON.stringify(client.getQueryData(["posts","foryou",null,"cursor-v1"]))).toContain("server");
   });
   it("does not include an unverified local-only post in an online feed",async()=>{
     m.getAll.mockResolvedValue([{...cached,id:"local-private",content:"sensitive cached draft"}]);
-    await act(async()=>{await client.refetchQueries({queryKey:["posts","foryou",null]});});
-    const data=JSON.stringify(client.getQueryData(["posts","foryou",null]));
+    await act(async()=>{await client.refetchQueries({queryKey:["posts","foryou",null,"cursor-v1"]});});
+    const data=JSON.stringify(client.getQueryData(["posts","foryou",null,"cursor-v1"]));
     expect(data).not.toContain("sensitive cached draft"); expect(data).toContain("server");
   });
   it("hides unverified cached posts when the server cannot be reached",async()=>{
     m.getAll.mockResolvedValue([{...cached,id:"local-private",content:"sensitive cached draft"}]);
     m.fetchFeed.mockRejectedValueOnce(new Error("offline"));
-    await act(async()=>{await client.refetchQueries({queryKey:["posts","foryou",null]});});
-    const data=JSON.stringify(client.getQueryData(["posts","foryou",null]));
+    await act(async()=>{await client.refetchQueries({queryKey:["posts","foryou",null,"cursor-v1"]});});
+    const data=JSON.stringify(client.getQueryData(["posts","foryou",null,"cursor-v1"]));
     expect(data).not.toContain("sensitive cached draft");
   });
 
   it("redacts the fallback query result when cloud fetch fails",async()=>{
-    await vi.waitFor(()=>expect(client.getQueryData(["posts","foryou",null])).toBeDefined());
+    await vi.waitFor(()=>expect(client.getQueryData(["posts","foryou",null,"cursor-v1"])).toBeDefined());
     m.fetchFeed.mockRejectedValueOnce(new Error("offline"));
-    await act(async()=>{await client.refetchQueries({queryKey:["posts","foryou",null]});});
-    const data=JSON.stringify(client.getQueryData(["posts","foryou",null]));
+    await act(async()=>{await client.refetchQueries({queryKey:["posts","foryou",null,"cursor-v1"]});});
+    const data=JSON.stringify(client.getQueryData(["posts","foryou",null,"cursor-v1"]));
     expect(data).not.toContain("other-account");expect(data).not.toContain("upvote");expect(data).not.toContain("downvote");
   });
   it("does not place voter identities or totals into the shared query result",async()=>{
-    await vi.waitFor(()=>expect(client.getQueryData(["posts","foryou",null])).toBeDefined());
-    const data=JSON.stringify(client.getQueryData(["posts","foryou",null]));
+    await vi.waitFor(()=>expect(client.getQueryData(["posts","foryou",null,"cursor-v1"])).toBeDefined());
+    const data=JSON.stringify(client.getQueryData(["posts","foryou",null,"cursor-v1"]));
     expect(data).not.toContain("other-account");expect(data).not.toContain("upvote");expect(data).not.toContain("downvote");
     expect(cached.userReactions.upvote).toEqual(["other-account"]);
   });

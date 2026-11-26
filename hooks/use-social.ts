@@ -27,6 +27,7 @@ import { mayStartVote } from "../lib/online-vote-policy";
 import { votingAvailable } from "../lib/vote-availability";
 import { hideCachedVoteDetailsV1 } from "../lib/vote-display-privacy";
 import { maySendPostAs } from "../lib/post-owner-safety";
+import type { FeedCursor } from "../lib/feed-cursor";
 
 /** Posts fetched per page. Matches the server max (feed.ts limit.max = 50). */
 const PAGE_SIZE = 30;
@@ -40,6 +41,7 @@ const PAGE_SIZE = 30;
 interface FeedPage {
   posts: Post[];
   hasMore: boolean;
+  nextCursor?: FeedCursor | null;
 }
 
 /**
@@ -76,11 +78,11 @@ export function useSocial(mode: "foryou" | "following" = "foryou", topicId: stri
   const [feedFailed, setFeedFailed] = useState(false);
 
   const query = useInfiniteQuery<FeedPage>({
-    queryKey: ["posts", mode, topicId],
+    queryKey: ["posts", mode, topicId, "cursor-v1"],
     staleTime: 30_000,
-    initialPageParam: 0,
+    initialPageParam: null as FeedCursor | null,
     queryFn: async ({ pageParam, signal }) => {
-      const offset = pageParam as number;
+      const cursor = pageParam as FeedCursor | null;
 
       // apiEnabled: empty base URL means SAME-ORIGIN (production serves /api
       // from this host) — see lib/env.ts. Local-only builds set VITE_LOCAL_ONLY=1.
@@ -93,7 +95,7 @@ export function useSocial(mode: "foryou" | "following" = "foryou", topicId: stri
       try {
         // B10: forward React Query's signal so switching modes/topics
         // cancels the in-flight request instead of racing it.
-        const response = await fetchFeed({ mode, topic: topicId, limit: PAGE_SIZE, offset, signal });
+        const response = await fetchFeed({ mode, topic: topicId, limit: PAGE_SIZE, cursor, signal });
         // Cloud fetch succeeded — clear any previously-surfaced failure.
         setFeedFailed(false);
         // Do not rewrite the unscoped device cache from a feed read. It may
@@ -103,9 +105,9 @@ export function useSocial(mode: "foryou" | "following" = "foryou", topicId: stri
           // cache is the For-You universe (cold-start seeds, demo posts and
           // everything ever cached); merging it here would show content from
           // people the user does not follow.
-          return { posts: hideCachedVoteDetailsV1(response.posts), hasMore: response.hasMore };
+          return { posts: hideCachedVoteDetailsV1(response.posts), hasMore: response.hasMore, nextCursor: response.nextCursor };
         }
-        return { posts: hideCachedVoteDetailsV1(response.posts), hasMore: response.hasMore };
+        return { posts: hideCachedVoteDetailsV1(response.posts), hasMore: response.hasMore, nextCursor: response.nextCursor };
       } catch (error) {
         // Cached posts cannot establish current visibility or ownership.
         // Preserve them on device but do not render them as feed results.
@@ -120,9 +122,8 @@ export function useSocial(mode: "foryou" | "following" = "foryou", topicId: stri
         return { posts: [], hasMore: false };
       }
     },
-    // B4: cursor = next offset while the server says there is more.
-    getNextPageParam: (lastPage, allPages) =>
-      lastPage.hasMore ? allPages.length * PAGE_SIZE : undefined,
+    // Keep the exact server timestamp (including microseconds) for keyset paging.
+    getNextPageParam: (lastPage) => lastPage.hasMore ? lastPage.nextCursor ?? undefined : undefined,
   });
 
   // Flatten fetched pages into a deduped list; offline visibility is unknown.

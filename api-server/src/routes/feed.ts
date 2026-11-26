@@ -4,6 +4,7 @@ import { supabase, SupabaseError } from "../lib/supabase";
 import { optionalAuth, requireAuth } from "../middleware/auth";
 import { requireMappedIdentity } from "../middleware/identity-map";
 import { requireServerFeature } from "../middleware/server-feature-flag";
+import { isFeedCursor, isFeedCursorTimestamp, type FeedCursor } from "../../../lib/feed-cursor";
 
 const router: IRouter = Router();
 
@@ -20,7 +21,10 @@ const FeedQuerySchema = z.object({
     .optional(),
   limit: z.coerce.number().int().min(1).max(50).default(20),
   offset: z.coerce.number().int().min(0).default(0),
-});
+  cursorCreatedAt: z.string().refine(isFeedCursorTimestamp).optional(),
+  cursorId: z.string().regex(/^[A-Za-z0-9_-]{1,120}$/).optional(),
+}).refine(data => (data.cursorCreatedAt === undefined) === (data.cursorId === undefined) &&
+  (data.cursorId === undefined || data.offset === 0));
 
 interface PostRow {
   id: string;
@@ -44,7 +48,7 @@ interface CachedFeed {
   posts: Array<Record<string, unknown>>;
   hasMore: boolean;
   repostsByPost: Record<string, number>;
-  cachedAt: number;
+  nextCursor: FeedCursor | null;
 }
 
 /**
@@ -112,9 +116,10 @@ router.get("/feed/following-v2", (_req, res, next) => { res.setHeader("Cache-Con
         res.status(502).json({ error: "Feed data source unavailable" }); return;
       }
       if (ids.length === 0) { res.json({ posts: [], hasMore: false, source: "following" }); return; }
-      const { topic, limit, offset } = parsed.data;
-      const page = await fetchFeedPage("following", topic, limit, offset, ids, false);
-      res.json({ posts: await renderFeedPosts(page), hasMore: page.hasMore, source: "following" });
+      const { topic, limit, offset, cursorId, cursorCreatedAt } = parsed.data;
+      const cursor = cursorId && cursorCreatedAt ? {id:cursorId,createdAt:cursorCreatedAt} : null;
+      const page = await fetchFeedPage("following", topic, limit, offset, ids, false, cursor);
+      res.json({ posts: await renderFeedPosts(page), hasMore: page.hasMore, nextCursor: page.nextCursor, source: "following" });
     } catch {
       // Do not return or log upstream payloads which may contain user data.
       res.status(502).json({ error: "Feed data source unavailable" });
@@ -127,7 +132,8 @@ router.get("/feed", (_req, res, next) => { res.setHeader("Cache-Control", "no-st
     res.status(400).json({ error: "Invalid feed query" });
     return;
   }
-  const { mode, topic, limit, offset } = parsed.data;
+  const { mode, topic, limit, offset, cursorId, cursorCreatedAt } = parsed.data;
+  const cursor = cursorId && cursorCreatedAt ? {id:cursorId,createdAt:cursorCreatedAt} : null;
 
   // The legacy follow graph stores text subjects while posts are UUID-owned.
   // No verified binding or graph provenance exists, so neither a guessed join
@@ -146,10 +152,10 @@ router.get("/feed", (_req, res, next) => { res.setHeader("Cache-Control", "no-st
   // no-store header also prevents compliant intermediaries from caching them.
 
   try {
-    const fresh = await fetchFeedPage(mode, topic, limit, offset);
+    const fresh = await fetchFeedPage(mode, topic, limit, offset, null, true, cursor);
     const posts = await renderFeedPosts(fresh);
     res.header("X-Feed-Cache", "MISS");
-    res.json({ posts, hasMore: fresh.hasMore, source: mode });
+    res.json({ posts, hasMore: fresh.hasMore, nextCursor: fresh.nextCursor, source: mode });
   } catch (error) {
     if (error instanceof SupabaseError) {
       req.log?.error?.({ status: error.status }, "Feed query failed");
@@ -173,9 +179,15 @@ async function fetchFeedPage(
   offset: number,
   followeeIds: string[] | null = null,
   includeTags = true,
+  cursor: FeedCursor | null = null,
 ): Promise<CachedFeed> {
   const filters: Record<string, string> = {};
   if (topic) filters.topic_id = `eq.${topic}`;
+  if (cursor) {
+    // Both fields have already passed strict validation; do not interpolate
+    // arbitrary user strings into PostgREST expression syntax.
+    filters.or = `(created_at.lt."${cursor.createdAt}",and(created_at.eq."${cursor.createdAt}",id.gt."${cursor.id}"))`;
+  }
   // B3: when rendering the Following feed, restrict to the caller's follow
   // graph (PostgREST in.() filter). null = no restriction (For You).
   if (followeeIds) {
@@ -199,6 +211,10 @@ async function fetchFeedPage(
 
   const page = rows.slice(0, limit);
   const postIds = page.map((r) => r.id);
+  const hasMore = rows.length > limit;
+  const last = page[page.length - 1];
+  const nextCursor = hasMore && last ? {id:last.id,createdAt:last.created_at} : null;
+  if (hasMore && !isFeedCursor(nextCursor)) throw new SupabaseError("Invalid feed cursor", 502);
   // Database contents can be malformed or supplied by other writers. Never
   // interpolate unchecked values into a PostgREST in-list filter.
   if (postIds.some(id => typeof id !== "string" || !/^[A-Za-z0-9_-]{1,120}$/.test(id))) {
@@ -241,9 +257,9 @@ async function fetchFeedPage(
       authorAvatar: row.author?.avatar_url,
       topicName: row.topic?.name,
     })),
-    hasMore: rows.length > limit,
+    hasMore,
     repostsByPost,
-    cachedAt: Date.now(),
+    nextCursor,
   };
 }
 
