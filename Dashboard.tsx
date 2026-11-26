@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { Brain, BrainData } from "@/lib/types";
 import { useDatabase } from "@/hooks/use-database";
-import { useReputation } from "@/hooks/use-reputation";
 import { useToast } from "@/hooks/use-toast";
 import { BrainCard } from "./BrainCard";
 import { BrainDrawer } from "./BrainDrawer";
@@ -12,12 +11,11 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Search, Plus, Network, Share, Download, PlayCircle } from "lucide-react";
-import { idb } from "@/lib/db";
+import { collectLocalBrainExport } from "@/lib/brain-local-export";
 import { SampleBrainLibrary } from "@/components/ui/SampleBrainLibrary";
 
 export function Dashboard() {
   const { brains, isLoading, saveBrainData, deleteBrain, exportData, getBrainData, refresh } = useDatabase();
-  const { addXPEvent } = useReputation();
   const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState("");
   
@@ -65,6 +63,38 @@ export function Dashboard() {
     return () => window.removeEventListener("bd:open-brain-wizard", openWizardFromMenu);
   }, []);
 
+  /**
+   * BUG FIX (404-ish dead end): RuntimeEngine's "Open in editor" button sent
+   * the user to `/library?brainId=<id>`, but nothing in the library read that
+   * param — the click landed on the generic Brains grid with the brain
+   * nowhere in sight, looking like a broken link. Open that brain's drawer
+   * (or launch it if the brain has no nodes to edit) once data is loaded.
+   */
+  useEffect(() => {
+    if (brains.length === 0) return;
+    let targetId: string | null = null;
+    try {
+      targetId = new URLSearchParams(window.location.search).get("brainId");
+    } catch {
+      targetId = null;
+    }
+    if (!targetId) return;
+    const match = brains.find((b) => b.id === targetId);
+    // Consume the param either way so a stale id can't re-open later.
+    window.history.replaceState({}, "", window.location.pathname);
+    if (match) {
+      setSelectedBrain(match);
+      setIsDrawerOpen(true);
+    } else {
+      toast({
+        title: "Brain not found",
+        description: "That brain isn't in your library on this device anymore.",
+        variant: "destructive",
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- one-shot deep-link consumption keyed on brains arriving; including toast would re-run on identity churn.
+  }, [brains]);
+
   const filteredBrains = brains.filter(b => 
     (b.title || "").toLowerCase().includes((searchQuery || "").toLowerCase()) || 
     (b.category || "").toLowerCase().includes((searchQuery || "").toLowerCase())
@@ -95,7 +125,6 @@ export function Dashboard() {
 
   const handleSampleAdded = async (data: BrainData) => {
     await saveBrainData(data);
-    await addXPEvent("brain_created", 10, "Tried a sample brain");
     toast({
       title: "Sample added",
       description: `"${data.brain.title}" is in your library. You can edit or run it anytime.`,
@@ -147,7 +176,6 @@ export function Dashboard() {
       }
 
       await saveBrainData({ brain: newBrain, nodes: newNodes });
-      await addXPEvent("brain_created", 30, "Forked a brain");
 
       toast({ title: "Brain forked", description: "Brain forked and saved to your library." });
       setIsForkOpen(false);
@@ -176,7 +204,7 @@ export function Dashboard() {
           />
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="sm" onClick={() => void exportData().catch((error) => toast({ title: "Export failed", description: error instanceof Error ? error.message : "Could not export data.", variant: "destructive" }))} title="Export" aria-label="Export brains">
+          <Button variant="ghost" size="sm" onClick={() => { if (!window.confirm("Export browser brains and nodes? This may include data from more than one account on this device. Cloud data and other local stores are not included; this is not a complete backup.")) return; void exportData().catch(() => toast({ title: "Export failed", description: "Export could not be completed. Check your downloads before retrying.", variant: "destructive" })); }} title="Export local brains" aria-label="Export local brains">
             <Share className="w-4 h-4" />
           </Button>
           <Button variant="ghost" size="sm" onClick={() => setIsImportOpen(true)} title="Import" aria-label="Import brains">
@@ -266,9 +294,8 @@ export function Dashboard() {
         onUpdated={refresh}
         onFork={(b) => { setIsDrawerOpen(false); openForkDialog(b); }}
         onExport={(b) => {
-          // Simple single export
-          idb.getAllByIndex("nodes", "brain_id", b.id).then(nodes => {
-            const exportObj = { brains: [b], nodes };
+          if (!window.confirm("Export this browser's local brain? Its ownership may not be verified, and cloud data is not included.")) return;
+          collectLocalBrainExport(b.id).then(exportObj => {
             const blob = new Blob([JSON.stringify(exportObj, null, 2)], { type: "application/json" });
             const url = URL.createObjectURL(blob);
             const a = document.createElement("a");

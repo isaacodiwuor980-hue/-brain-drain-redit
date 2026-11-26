@@ -1,5 +1,7 @@
 # Deployment Guide — Brain Drain
 
+> **Historical examples, not a release runbook.** Do not execute these commands as-is: the live schema and migration ledger differ from repository SQL, recovery and effective permissions are unverified, and the user selected Netlify rather than the hosting examples below. `0001_initial_schema.sql` must not be applied blindly. See `NETLIFY_DEPLOYMENT_REHEARSAL.md` and `LAUNCH_REMEDIATION_EXECUTION_PLAN.md`. No deployment, resource creation or live migration is authorized by this document.
+
 ## Pre-deploy Checklist
 
 - [ ] `.env` populated with production values (see `.env.example`)
@@ -7,7 +9,7 @@
 - [ ] `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` set (or confirmed local-only)
 - [ ] `FIREBASE_PROJECT_ID` set
 - [ ] `CORS_ORIGIN` set to the production domain
-- [ ] Supabase migration `0001_initial_schema.sql` applied
+- [ ] Live schema/history reconciled; forward migration plan reviewed and individually approved (do not blindly apply `0001`)
 - [ ] Firestore rules deployed (`firebase deploy --only firestore:rules`)
 - [ ] DNS + SSL configured for the production domain
 

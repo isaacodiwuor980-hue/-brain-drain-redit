@@ -6,15 +6,16 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { trackEvent } from "@/lib/analytics";
 import { idb } from "@/lib/db";
-import { Brain, Topic, Post, getPostUpvoteCount } from "@/lib/types";
-import { useLocation } from "wouter";
+import { collectLocalBrainExport } from "@/lib/brain-local-export";
+import { Brain, Topic, Post, SkillEntry } from "@/lib/types";
+import { useLocation, useSearch } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { RuntimeEngine } from "@/components/RuntimeEngine";
 import { BrainDrawer } from "@/components/BrainDrawer";
-import { useSkills } from "@/hooks/use-skills";
 import { useUserSearch, useFollowUser } from "@/hooks/use-discover";
 import { safeStorage } from "@/lib/safe-storage";
+import { deleteBrainData } from "@/lib/delete-brain";
 
 export function SearchPage() {
   // Lazy init from URL `q` param + persisted recent searches — both are
@@ -42,17 +43,35 @@ export function SearchPage() {
   const [activeTab, setActiveTab] = useState("all");
   const inputRef = useRef<HTMLInputElement>(null);
   const [, setLocation] = useLocation();
+  const search = useSearch();
   const { toast } = useToast();
+
+  /**
+   * BUG FIX (dead query param): /profile?userId=<id> was accepted by the
+   * router but ProfilePage only ever reads the CURRENT user from auth — the
+   * "Active Contributors" rail linked to it and every click landed on your
+   * own profile. Those links now point here with a `q` param, so the search
+   * box must follow wouter location changes: wouter does not remount a page
+   * for a search-only change, so a mount-time initializer alone would leave
+   * a stale query when the user clicks a second contributor.
+   */
+  useEffect(() => {
+    try {
+      const q = new URLSearchParams(search).get("q");
+      if (q !== null) setQuery(q);
+    } catch {
+      /* malformed URL — keep the current query */
+    }
+  }, [search]);
 
   // Search Results State
   const [brains, setBrains] = useState<Brain[]>([]);
   const [topics, setTopics] = useState<Topic[]>([]);
-  const [posts, setPosts] = useState<Post[]>([]);
+  const [posts] = useState<Post[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
-  // Part 2 Task 6: Skills search (local IDB — server API is also available
-  // via /api/v1/search/skills but we search local IDB for instant results).
-  const { skills } = useSkills();
+  // Cached skills may contain private brain-derived steps and lack account scoping.
+  const [skills] = useState<SkillEntry[]>([]);
 
   // Phase 4 — server-side user search (fires when query is 3+ chars).
   const userSearch = useUserSearch(query);
@@ -68,14 +87,10 @@ export function SearchPage() {
     async function loadData() {
       setIsLoading(true);
       try {
-        const [allBrains, allTopics, allPosts] = await Promise.all([
-          idb.getAll<Brain>("brains"),
-          idb.getAll<Topic>("topics"),
-          idb.getAll<Post>("posts"),
-        ]);
-        setBrains(allBrains || []);
+        // Shared local records have no reliable current visibility or owner.
+        // Do not display them as search results until authorization is verified.
+        const allTopics = await idb.getAll<Topic>("topics");
         setTopics(allTopics || []);
-        setPosts(allPosts || []);
       } catch (err) {
         console.error("Failed to load search index data", err);
       } finally {
@@ -119,8 +134,8 @@ export function SearchPage() {
   };
 
   const exportBrain = (b: Brain) => {
-    idb.getAllByIndex("nodes", "brain_id", b.id).then(nodes => {
-      const exportObj = { brains: [b], nodes };
+    if (!window.confirm("Export this browser's local brain? Its ownership may not be verified, and cloud data is not included.")) return;
+    collectLocalBrainExport(b.id).then(exportObj => {
       const blob = new Blob([JSON.stringify(exportObj, null, 2)], { type: "application/json" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -134,9 +149,9 @@ export function SearchPage() {
   };
 
   const deleteBrain = async (brainId: string) => {
-    await idb.delete("brains", brainId);
+    const result = await deleteBrainData(brainId);
     setBrains(prev => prev.filter(b => b.id !== brainId));
-    setIsDrawerOpen(false);
+    return result;
   };
 
   // Filtered collections
@@ -235,6 +250,8 @@ export function SearchPage() {
           )}
         </form>
       </div>
+
+      <p role="status" className="mt-2 text-sm text-muted-foreground">Brain and post search is temporarily unavailable while privacy is reviewed. Skill search is also paused. Existing data is retained.</p>
 
       {!query ? (
         <div className="mt-4">
@@ -441,7 +458,6 @@ export function SearchPage() {
                             {post.content}
                           </p>
                           <div className="flex items-center gap-3 text-xs text-muted-foreground pt-1">
-                            <span>▲ {getPostUpvoteCount(post)}</span>
                             <span>💬 {post.commentCount || 0}</span>
                             {post.type && <span className="uppercase text-[10px] bg-muted px-1.5 py-0.5 rounded font-mono">{post.type}</span>}
                           </div>
@@ -583,7 +599,6 @@ export function SearchPage() {
                       {post.content}
                     </p>
                     <div className="flex items-center gap-4 text-xs text-muted-foreground pt-1">
-                      <span>▲ {getPostUpvoteCount(post)} Upvotes</span>
                       <span>💬 {post.commentCount || 0} Comments</span>
                       {post.type && <span className="uppercase text-[10px] bg-muted px-2 py-0.5 rounded font-mono">{post.type}</span>}
                     </div>

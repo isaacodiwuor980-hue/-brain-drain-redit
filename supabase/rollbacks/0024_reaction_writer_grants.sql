@@ -1,0 +1,4 @@
+-- REVIEW ONLY; intentionally not executable. Regranting direct reaction
+-- writes reopens the versioning bypass; leaving access revoked can break
+-- current vote and other paths. Rollback needs an independently reviewed
+-- writer inventory, safe replacement, verified backup and explicit approval.

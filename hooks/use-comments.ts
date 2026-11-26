@@ -2,7 +2,8 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { idb } from "@/lib/db";
 import { trackEvent } from "@/lib/analytics";
 import { Comment, Post } from "@/lib/types";
-import { countSourceLinks, computeSourceLinkReputation } from "@/lib/hive-mind";
+import { countSourceLinks } from "@/lib/hive-mind";
+import { votingAvailable } from "@/lib/vote-availability";
 
 const STORE = "comments";
 
@@ -63,7 +64,7 @@ export function useComments(postId?: string) {
     return roots;
   };
 
-  const { mutateAsync: addComment } = useMutation({
+  const { mutateAsync: addCommentMutation } = useMutation({
     // Optimistic UI: pre-write the new comment into the React Query cache so
     // it appears in the thread BEFORE the IDB write resolves.
     onMutate: async (variables: {
@@ -139,22 +140,6 @@ export function useComments(postId?: string) {
         // will be reconciled on the next refetch.
       }
 
-      // Award +1 reputation per source link.
-      const repDelta = computeSourceLinkReputation(content);
-      if (repDelta > 0) {
-        try {
-          const rep = await idb.get<{ id: string; xp: number; level: number; streak: number; lastActiveDate: string; totalMissionsCompleted: number; totalBrainsCreated: number; totalCheckIns: number; badges: string[] }>("reputation", "me");
-          if (rep) {
-            await idb.put("reputation", {
-              ...rep,
-              xp: rep.xp + repDelta,
-            });
-          }
-        } catch {
-          // Best-effort — reputation update is non-critical.
-        }
-      }
-
       await trackEvent("comment_created", {
         postId: targetPostId,
         isReply: Boolean(parentId),
@@ -192,7 +177,7 @@ export function useComments(postId?: string) {
    * would be a per-user map; in this local-first build it's a single
    * field (the "me" user).
    */
-  const { mutateAsync: voteComment } = useMutation({
+  const { mutateAsync: voteCommentMutation } = useMutation({
     onMutate: async ({ id, direction, postId: targetPostId }) => {
       // Optimistic UI — update the cache instantly so the user sees
       // their vote register with zero latency. If the mutation fails,
@@ -360,13 +345,14 @@ export function useComments(postId?: string) {
     },
   });
 
-  /** House vote — classify a comment as institutional / verifiable evidence. */
+  // The old local vote fields are neither account-scoped nor synchronized;
+  // do not run optimistic mutations or analytics while voting is disabled.
+  const voteComment = (args: { id: string; postId: string; direction: "up" | "down" }) =>
+    votingAvailable() ? voteCommentMutation(args) : Promise.reject(new Error("Voting temporarily unavailable"));
   const voteHouse = (args: { id: string; postId: string }) =>
-    voteClassification({ ...args, classification: "house" as const });
-
-  /** Mouth vote — classify a comment as crowd sentiment / lived experience. */
+    votingAvailable() ? voteClassification({ ...args, classification: "house" as const }) : Promise.reject(new Error("Voting temporarily unavailable"));
   const voteMouth = (args: { id: string; postId: string }) =>
-    voteClassification({ ...args, classification: "mouth" as const });
+    votingAvailable() ? voteClassification({ ...args, classification: "mouth" as const }) : Promise.reject(new Error("Voting temporarily unavailable"));
 
   /**
    * Pin a single reply per thread — the post author anchors the "definitive"
@@ -443,6 +429,10 @@ export function useComments(postId?: string) {
    * voteMouth). Old records may still carry a `stream` property in
    * local data; it is ignored everywhere.
    */
+
+  // Reject before React Query's optimistic callbacks, IndexedDB or analytics.
+  const addComment = (args: { postId: string; parentId: string | null; content: string; authorName: string; isConfidential?: boolean }) =>
+    args.isConfidential ? Promise.reject(new Error("Confidential replies are unavailable")) : addCommentMutation(args);
 
   return {
     comments,

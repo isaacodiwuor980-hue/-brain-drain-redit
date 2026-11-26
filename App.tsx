@@ -5,13 +5,6 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/lib/theme";
 import { AppShell } from "@/components/layout/AppShell";
-// Note: ShareBrainModal, ReportBugModal, and NotFound are kept as eager
-// imports. They were tried as lazy chunks, but the lazy wrapper machinery
-// added ~5KB to the entry chunk while the modals themselves only totaled
-// ~4.4KB gzipped — a net loss on first paint. Eager is the right call
-// here; the AppShell AlertDialog (a larger radix primitive) IS lazy
-// because that one's savings exceed the wrapper cost.
-import { ShareBrainModal } from "@/components/ShareBrainModal";
 import { ReportBugModal } from "./ReportBugModal";
 import { useShortcuts } from "@/hooks/use-shortcuts";
 import { useMissionReminders } from "@/hooks/use-mission-reminders";
@@ -25,7 +18,6 @@ import NotFound from "@/pages/not-found";
 import { reportError } from "@/lib/error-monitor";
 import { safeStorage } from "@/lib/safe-storage";
 import { unregisterStaleServiceWorkers } from "@/lib/sw-cleanup";
-import { runHiveMindMaintenance } from "@/lib/hive-mind";
 import { setQueryClientRef } from "@/lib/analytics";
 
 const QUERY_RETRY_ATTEMPTS = 1;
@@ -56,6 +48,17 @@ const OnboardingFlow = lazy(() => import("@/components/onboarding/OnboardingFlow
 const MessagesPage = lazy(() => import("@/pages/MessagesPage").then(module => ({ default: module.MessagesPage })));
 const NotificationsPage = lazy(() => import("@/pages/NotificationsPage").then(module => ({ default: module.NotificationsPage })));
 const CommunityPage = lazy(() => import("@/pages/CommunityPage").then(module => ({ default: module.CommunityPage })));
+// ShareBrainModal is lazy on purpose: unlike the other modals it now renders
+// the reasoning tree (the receiver gets a rich preview before forking), which
+// would pull graph rendering code into first paint for every visitor — the
+// vast majority of whom never open a #share= link.
+const ShareBrainModal = lazy(() =>
+  import("@/components/ShareBrainModal").then((m) => ({ default: m.ShareBrainModal })),
+);
+// PHASE 3 — ⌘K palette, code-split so it never touches first paint.
+const CommandPalette = lazy(() =>
+  import("@/components/ui/command-palette").then((m) => ({ default: m.CommandPalette })),
+);
 
 function PageLoader() {
   return (
@@ -322,12 +325,12 @@ function RouteErrorBoundary({ children }: { children: ReactNode }) {
 }
 
 function Router() {
-  useShortcuts();
+  const { paletteOpen, setPaletteOpen } = useShortcuts();
   usePrefetch();
   useMissionReminders();
   useSessionAnalytics();
   useRouteAnalytics();
-  
+
   return (
     <AppShell>
       <Suspense fallback={<PageLoader />}>
@@ -352,6 +355,20 @@ function Router() {
           </Switch>
         </RouteErrorBoundary>
       </Suspense>
+
+      {/* Command palette — mounted once, outside Suspense so opening it never
+          unmounts the current route. */}
+      <Suspense fallback={null}>
+        <CommandPalette
+          open={paletteOpen}
+          onOpenChange={setPaletteOpen}
+          onOpenBrain={(brainId) => {
+            // Deep-link into the library; Dashboard consumes ?brainId.
+            setPaletteOpen(false);
+            window.location.assign(`/library?brainId=${encodeURIComponent(brainId)}`);
+          }}
+        />
+      </Suspense>
     </AppShell>
   );
 }
@@ -364,15 +381,6 @@ function App() {
     // burning CPU on a timer.
     setQueryClientRef(queryClient);
     return () => setQueryClientRef(null);
-  }, []);
-
-  useEffect(() => {
-    // Run Hive-Mind maintenance on app boot: 14-day pruning, 30-day
-    // fossilization, thread fork checks, 90-day reactivation.
-    // Each check is rate-limited by its own localStorage timestamp
-    // so calling on every boot is safe — only runs when due.
-    void runHiveMindMaintenance();
-    // No cleanup — maintenance is fire-and-forget.
   }, []);
 
   // PREVIEW FIX: Do NOT register a service worker when running inside an
@@ -405,7 +413,9 @@ function App() {
             <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
               <Router />
             </WouterRouter>
-            <ShareBrainModal />
+            <Suspense fallback={null}>
+              <ShareBrainModal />
+            </Suspense>
             <GlobalBugModalManager />
             <Toaster />
           </AuthProvider>

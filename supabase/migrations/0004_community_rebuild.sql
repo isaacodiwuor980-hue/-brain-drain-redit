@@ -239,9 +239,10 @@ create table if not exists public.recall_events (
   recalled_at timestamptz not null default now()
 );
 
+-- Filter by next_recall_at at query time; now() is not immutable and cannot
+-- appear in an index predicate. The full index also covers overdue events.
 create index if not exists recall_events_user_next_idx
-  on public.recall_events(user_id, next_recall_at)
-  where next_recall_at > now();
+  on public.recall_events(user_id, next_recall_at);
 
 create index if not exists recall_events_user_brain_idx
   on public.recall_events(user_id, brain_id, recalled_at desc)

@@ -472,7 +472,13 @@ export function openDB(): Promise<IDBDatabase> {
     };
   });
 
-  return dbPromise;
+  // A failed open must not poison the cached connection for the rest of the
+  // session. Only clear the same attempt, not a newer connection.
+  const attempt = dbPromise;
+  void attempt.catch(() => {
+    if (dbPromise === attempt) dbPromise = null;
+  });
+  return attempt;
 }
 
 /**
@@ -487,6 +493,150 @@ export function resetDBConnection() {
 }
 
 export const idb = {
+  /** Read brain and node stores in one transaction without storage fallback.
+   * A single-brain export rejects a missing or metadata-only record. */
+  async readBrainExportSnapshot<TBrain extends { id: string; __cloudMetadataOnly?: boolean }, TNode>(brainId?: string): Promise<{ brains: TBrain[]; nodes: TNode[] }> {
+    if (brainId !== undefined && (typeof brainId !== "string" || !brainId)) throw new Error("Invalid brain ID");
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(["brains", "nodes"], "readonly");
+      const brains = tx.objectStore("brains");
+      const nodes = tx.objectStore("nodes");
+      const brainRequest = brainId === undefined ? brains.getAll() : brains.get(brainId);
+      const nodeRequest = brainId === undefined ? nodes.getAll() : nodes.index("brain_id").getAll(brainId);
+      let found: TBrain[] = [];
+      let foundNodes: TNode[] = [];
+      brainRequest.onsuccess = () => {
+        found = brainId === undefined ? brainRequest.result as TBrain[] : brainRequest.result === undefined ? [] : [brainRequest.result as TBrain];
+      };
+      nodeRequest.onsuccess = () => { foundNodes = nodeRequest.result as TNode[]; };
+      tx.oncomplete = () => {
+        if (brainId !== undefined && (!found.length || found[0].__cloudMetadataOnly)) {
+          reject(new Error("Complete local brain data is unavailable for export.")); return;
+        }
+        resolve({ brains: found, nodes: foundNodes });
+      };
+      tx.onerror = () => reject(tx.error ?? new Error("Local export read failed"));
+      tx.onabort = () => reject(tx.error ?? new Error("Local export read aborted"));
+    });
+  },
+
+  /** Persist a local-first brain and its nodes atomically. Unlike cache writes,
+   * this must reject when storage is unavailable: no cloud write backs it up. */
+  async saveBrainWithNodes(brain: { id: string }, nodes: Array<{ id: string; brain_id: string }>): Promise<void> {
+    if (!brain.id || nodes.some(n => !n.id || n.brain_id !== brain.id) || new Set(nodes.map(n => n.id)).size !== nodes.length) {
+      throw new Error("Invalid brain or node identifiers");
+    }
+    const db = await openDB();
+    return new Promise<void>((resolve, reject) => {
+      const tx = db.transaction(["brains", "nodes"], "readwrite");
+      let failure: unknown;
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(failure ?? tx.error ?? new Error("Could not save brain"));
+      tx.onabort = () => reject(failure ?? tx.error ?? new Error("Brain save was aborted"));
+      const nodeStore = tx.objectStore("nodes");
+      const write = () => {
+        try {
+          // A user save is authoritative local data, never a cloud-only stub.
+          const localBrain = { ...brain } as typeof brain & { __cloudMetadataOnly?: boolean };
+          delete localBrain.__cloudMetadataOnly;
+          tx.objectStore("brains").put(localBrain);
+          for (const node of nodes) nodeStore.put(node);
+        } catch (error) { failure = error; tx.abort(); }
+      };
+      if (nodes.length === 0) { write(); return; }
+      let remaining = nodes.length;
+      for (const node of nodes) {
+        const request = nodeStore.get(node.id);
+        request.onsuccess = () => {
+          const previous = request.result as { brain_id?: string } | undefined;
+          if (previous && previous.brain_id !== brain.id) {
+            failure = new Error("Local node ownership conflict");
+            tx.abort(); return;
+          }
+          remaining -= 1;
+          if (remaining === 0) write();
+        };
+      }
+    });
+  },
+
+  /** Delete a brain and its nodes in one durable transaction. */
+  async deleteBrainWithNodes(brainId: string): Promise<void> {
+    const db = await openDB();
+    return new Promise<void>((resolve, reject) => {
+      const tx = db.transaction(["brains", "nodes"], "readwrite");
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error ?? new Error("Could not delete brain."));
+      tx.onabort = () => reject(tx.error ?? new Error("Brain deletion was aborted."));
+      tx.objectStore("brains").delete(brainId);
+      const cursor = tx.objectStore("nodes").index("brain_id").openCursor(brainId);
+      cursor.onsuccess = () => {
+        if (cursor.result) {
+          cursor.result.delete();
+          cursor.result.continue();
+        }
+      };
+    });
+  },
+
+  /** Cache previously unseen cloud records without replacing local edits.
+   * The existence check and insert share a transaction with competing writes. */
+  async cacheNewBrains<T extends { id: string }>(brains: T[]): Promise<void> {
+    if (brains.length === 0) return;
+    await withStorageFallback("cacheNewBrains", async () => {
+      const db = await openDB();
+      return new Promise<void>((resolve, reject) => {
+        const tx = db.transaction("brains", "readwrite");
+        const store = tx.objectStore("brains");
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+        tx.onabort = () => reject(tx.error ?? new Error("Cloud cache transaction aborted"));
+        for (const brain of new Map(brains.map((item) => [item.id, item])).values()) {
+          const request = store.get(brain.id);
+          request.onsuccess = () => {
+            if (request.result === undefined) store.add({ ...brain, __cloudMetadataOnly: true });
+          };
+        }
+      });
+    }, undefined);
+  },
+
+  /** Hydrate only an unchanged metadata-only stub, never a concurrent local edit.
+   * Adding nodes (rather than upserting) prevents collisions with other brains. */
+  async hydrateCloudBrain(
+    expected: { id: string; __cloudMetadataOnly?: boolean },
+    brain: { id: string },
+    nodes: Array<{ id: string; brain_id: string }>,
+  ): Promise<boolean> {
+    if (brain.id !== expected.id || nodes.some((node) => node.brain_id !== brain.id)) {
+      throw new Error("Cloud brain data does not match the requested brain.");
+    }
+    const db = await openDB();
+    return new Promise<boolean>((resolve, reject) => {
+      const tx = db.transaction(["brains", "nodes"], "readwrite");
+      const brainStore = tx.objectStore("brains");
+      const nodeStore = tx.objectStore("nodes");
+      let hydrated = false;
+      tx.oncomplete = () => resolve(hydrated);
+      tx.onerror = () => reject(tx.error ?? new Error("Could not cache cloud brain."));
+      tx.onabort = () => reject(tx.error ?? new Error("Cloud brain cache was aborted."));
+      const current = brainStore.get(expected.id);
+      current.onsuccess = () => {
+        if (!current.result?.__cloudMetadataOnly || JSON.stringify(current.result) !== JSON.stringify(expected)) return;
+        const count = nodeStore.index("brain_id").count(expected.id);
+        count.onsuccess = () => {
+          if (count.result !== 0) return;
+          const localBrain = { ...brain } as typeof brain & { __cloudMetadataOnly?: boolean };
+          delete localBrain.__cloudMetadataOnly;
+          brainStore.put(localBrain);
+          for (const node of nodes) nodeStore.add(node);
+          hydrated = true;
+        };
+      };
+    });
+  },
+
   async get<T>(storeName: string, key: string): Promise<T | undefined> {
     return withStorageFallback(`get(${storeName})`, async () => {
       const db = await openDB();
@@ -498,6 +648,36 @@ export const idb = {
         request.onerror = () => reject(request.error);
       });
     }, undefined);
+  },
+
+  /** A missing record is undefined; storage errors are never converted to absence. */
+  async getStrict<T>(storeName: string, key: string): Promise<T | undefined> {
+    const db = await openDB();
+    return new Promise<T | undefined>((resolve, reject) => {
+      const tx = db.transaction(storeName, "readonly");
+      const request = tx.objectStore(storeName).get(key);
+      let result: T | undefined;
+      request.onsuccess = () => { result = request.result; };
+      request.onerror = () => reject(request.error ?? new Error("Local read failed"));
+      tx.oncomplete = () => resolve(result);
+      tx.onerror = () => reject(tx.error ?? new Error("Local read failed"));
+      tx.onabort = () => reject(tx.error ?? new Error("Local read aborted"));
+    });
+  },
+
+  /** Read local export data without converting storage failures into empty lists. */
+  async getAllStrict<T>(storeName: string): Promise<T[]> {
+    const db = await openDB();
+    return new Promise<T[]>((resolve, reject) => {
+      const tx = db.transaction(storeName, "readonly");
+      const request = tx.objectStore(storeName).getAll();
+      let result: T[];
+      request.onsuccess = () => { result = request.result; };
+      request.onerror = () => reject(request.error ?? new Error("Local read failed"));
+      tx.oncomplete = () => resolve(result);
+      tx.onerror = () => reject(tx.error ?? new Error("Local read failed"));
+      tx.onabort = () => reject(tx.error ?? new Error("Local read aborted"));
+    });
   },
 
   async getAll<T>(storeName: string): Promise<T[]> {
@@ -525,6 +705,18 @@ export const idb = {
         request.onerror = () => reject(request.error);
       });
     }, []);
+  },
+
+  /** Authoritative local writes must fail if persistence is unavailable. */
+  async putStrict<T = unknown>(storeName: string, value: T): Promise<void> {
+    const db = await openDB();
+    return new Promise<void>((resolve, reject) => {
+      const tx = db.transaction(storeName, "readwrite");
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error ?? new Error("Local write failed"));
+      tx.onabort = () => reject(tx.error ?? new Error("Local write aborted"));
+      tx.objectStore(storeName).put(value);
+    });
   },
 
   async put<T = unknown>(storeName: string, value: T): Promise<void> {
@@ -617,6 +809,20 @@ export const idb = {
         tx.onabort = () => reject(tx.error);
       });
     }, undefined);
+  },
+
+  /** Clear IndexedDB in one transaction; never treat blocked storage as success. */
+  async clearAllStrict(): Promise<void> {
+    const db = await openDB();
+    const names = Array.from(db.objectStoreNames);
+    if (names.length === 0) return;
+    return new Promise<void>((resolve, reject) => {
+      const tx = db.transaction(names, "readwrite");
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error ?? new Error("Local clear failed"));
+      tx.onabort = () => reject(tx.error ?? new Error("Local clear aborted"));
+      for (const name of names) tx.objectStore(name).clear();
+    });
   },
 
   /**

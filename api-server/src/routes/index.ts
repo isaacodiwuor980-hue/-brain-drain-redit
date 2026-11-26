@@ -4,7 +4,9 @@ import eventsRouter from "./events";
 import recommendationsRouter from "./recommendations";
 import clientErrorsRouter from "./client-errors";
 import feedRouter from "./feed";
+import feedPrivacyRouter from "./feed-privacy";
 import postsRouter from "./posts";
+import voteStateV2Router from "./vote-state-v2";
 import topicsRouter from "./topics";
 import brainsRouter from "./brains";
 import dataApiRouter from "./data-api";
@@ -17,17 +19,23 @@ import personalityRouter from "./personality";
 import expertsRouter from "./experts";
 import mentorsRouter from "./mentors";
 import recallRouter from "./recall";
+import meRouter from "./me";
+import tsrgStatusRouter from "./tsrg-status";
 
 const router: IRouter = Router();
 
 router.use(healthRouter);
+router.use(meRouter);
+router.use(tsrgStatusRouter);
 router.use(eventsRouter);
 // Phase 3: intelligence router removed (uncalled /intelligence/summary endpoint).
 // The analytics-store helpers it used are still available for internal callers.
 router.use(recommendationsRouter);
 router.use(clientErrorsRouter);
 router.use(feedRouter);
+router.use(feedPrivacyRouter);
 router.use(postsRouter);
+router.use(voteStateV2Router);
 router.use(topicsRouter);
 router.use(brainsRouter);
 // Phase 3: verify + provenance routers removed (501 stubs that advertised

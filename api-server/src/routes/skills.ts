@@ -10,17 +10,31 @@
  * All writes require Firebase auth. Reads of published skills are public.
  * Reads of private/in_review skills require the requester to be the author.
  */
-import { Router, type IRouter } from "express";
+import { Router, type IRouter, type Response } from "express";
 import { z } from "zod";
 import { supabase, SupabaseError } from "../lib/supabase";
 import { logger } from "../lib/logger";
 import { optionalAuth, requireAuth } from "../middleware/auth";
+import { lookupMappedIdentity } from "../middleware/identity-map";
 import type { VerifiedAuth } from "../lib/firebase-auth";
 
 const router: IRouter = Router();
 
+// Firebase subjects and Supabase UUIDs are different identity domains.
+async function verifiedOwner(subject: string, res: Response): Promise<string | null> {
+  try {
+    const uid = await lookupMappedIdentity(subject);
+    if (!uid) { res.set("Cache-Control", "no-store").status(403).json({ error: "Identity mapping required" }); return null; }
+    return uid.toLowerCase();
+  } catch {
+    res.set("Cache-Control", "no-store").status(503).json({ error: "Identity service unavailable" });
+    return null;
+  }
+}
+
+
 const SkillRowSchema = z.object({
-  id: z.string().min(1),
+  id: z.string().min(1).max(120).regex(/^[A-Za-z0-9_-]+$/),
   domain: z.string().min(1),
   make: z.string().nullable().optional(),
   model: z.string().nullable().optional(),
@@ -64,6 +78,16 @@ export interface SkillRow {
   updated_at?: string;
 }
 
+/** Public projection: do not expose unverified brain links or internal IDs. */
+function publicSkill(skill: SkillRow, includeSteps = false) {
+  return {
+    id: skill.id, title: skill.title, domain: skill.domain, make: skill.make,
+    model: skill.model, year: skill.year, part: skill.part, version: skill.version,
+    author_name: skill.author_name, author_years_experience: skill.author_years_experience,
+    status: skill.status, ...(includeSteps ? { steps: skill.steps } : {}),
+  };
+}
+
 /**
  * GET /api/v1/skills/:id — fetch a single skill.
  * Public if status='published'; otherwise requires auth + author match.
@@ -91,16 +115,18 @@ router.get("/v1/skills/:id", optionalAuth, async (req, res) => {
     const skill = rows[0];
     // Public skills are readable by anyone.
     if (skill.status === "published") {
-      res.json(skill);
+      res.json(publicSkill(skill, true));
       return;
     }
     // Private/in_review skills require the requester to be the author.
     const auth: VerifiedAuth | undefined = req.auth;
-    if (!auth || auth.uid !== skill.author_id) {
-      res.status(403).json({ error: "Not authorized to view this skill" });
-      return;
+    if (!auth) { res.status(403).json({ error: "Not authorized to view this skill" }); return; }
+    const owner = await verifiedOwner(auth.uid, res);
+    if (!owner) return;
+    if (owner !== skill.author_id?.toLowerCase()) {
+      res.status(403).json({ error: "Not authorized to view this skill" }); return;
     }
-    res.json(skill);
+    res.set("Cache-Control", "no-store").json(skill);
   } catch (err) {
     // B-9 fix: previously every error (including Supabase outages / 500s)
     // was converted to 404, masking real failures and making debugging
@@ -108,11 +134,11 @@ router.get("/v1/skills/:id", optionalAuth, async (req, res) => {
     // failure); everything else → 500 (logged). 404 is reserved for the
     // genuine "row not found" case handled above.
     if (err instanceof SupabaseError) {
-      logger.warn({ err, status: err.status }, "Skill fetch failed (Supabase)");
+      logger.warn({ status: err.status }, "Skill fetch failed (Supabase)");
       res.status(502).json({ error: "Skill storage unavailable" });
       return;
     }
-    logger.error({ err }, "Skill fetch failed (unexpected)");
+    logger.error("Skill fetch failed (unexpected)");
     res.status(500).json({ error: "Failed to fetch skill" });
   }
 });
@@ -123,7 +149,7 @@ router.get("/v1/skills/:id", optionalAuth, async (req, res) => {
  */
 router.get("/v1/skills", optionalAuth, async (req, res) => {
   if (!supabase.isConfigured()) {
-    res.json({ skills: [], source: "local-only" });
+    res.set("Cache-Control", "no-store").status(503).json({ error: "Skill storage unavailable" });
     return;
   }
   try {
@@ -134,17 +160,17 @@ router.get("/v1/skills", optionalAuth, async (req, res) => {
       filters.domain = `eq.${req.query.domain}`;
     }
     const rows = await supabase.get<SkillRow>("skills", {
-      select: "id,title,domain,make,model,year,part,version,author_name,author_years_experience,status,source_brain_id",
+      select: "id,title,domain,make,model,year,part,version,author_name,author_years_experience,status",
       filters,
       order: { column: "published_at", ascending: false },
       limit,
     });
-    res.json({ skills: rows, source: "supabase" });
-  } catch (err) {
-    // Skills table may not exist yet (migration 0002 not run).
-    // Return empty list instead of crashing the server.
-    logger.warn({ err }, "Skill list failed — table may not exist");
-    res.json({ skills: [], source: "supabase-unavailable", error: "Skills table not yet deployed" });
+    // Defense in depth: the service-role client bypasses RLS.
+    res.json({ skills: rows.filter((row) => row.status === "published").map((row) => publicSkill(row)), source: "supabase" });
+  } catch {
+    // An unavailable store is not evidence that the list is empty.
+    logger.warn("Skill list unavailable");
+    res.set("Cache-Control", "no-store").status(503).json({ error: "Skill storage unavailable" });
   }
 });
 
@@ -167,23 +193,33 @@ router.put("/v1/skills", requireAuth, async (req, res) => {
     res.status(400).json({ error: "Invalid skill payload", details: parsed.error.flatten() });
     return;
   }
-  const row = {
-    ...parsed.data,
-    author_id: auth.uid,
-    updated_at: new Date().toISOString(),
-  };
+  // A client-supplied reviewer/status is not verified moderation or identity.
+  // Existing published skills remain readable; new publication stays paused.
+  if (parsed.data.status === "published") {
+    res.set("Cache-Control", "no-store").status(503).json({ error: "Skill publishing is temporarily unavailable" });
+    return;
+  }
+  const owner = await verifiedOwner(auth.uid, res);
+  if (!owner) return;
+  const row = { ...parsed.data, author_id: owner, updated_at: new Date().toISOString() };
   try {
-    await supabase.insert("skills", row, "resolution=merge-duplicates");
-    logger.info({ skillId: row.id, authorId: auth.uid }, "Skill upserted to Supabase");
+    // Never use merge-duplicates with service-role authority: it could replace
+    // another author's row. Insert first, then update only an owned conflict.
+    try {
+      await supabase.insert("skills", row);
+    } catch (err) {
+      if (!(err instanceof SupabaseError) || err.status !== 409) throw err;
+      const updated = await supabase.updateMatchingIds("skills", { id: row.id, author_id: owner }, row);
+      if (updated.length !== 1 || updated[0] !== row.id) {
+        res.status(403).json({ error: "Skill ownership conflict" });
+        return;
+      }
+    }
     res.json({ ok: true, skill: row });
   } catch (err) {
-    if (err instanceof SupabaseError) {
-      logger.error({ err, status: err.status, body: err.body }, "Skill upsert failed (Supabase)");
-      res.status(502).json({ error: "Supabase rejected the skill", details: err.body });
-    } else {
-      logger.error({ err }, "Skill upsert failed");
-      res.status(500).json({ error: "Failed to publish skill" });
-    }
+    // Do not expose upstream error bodies, identity or record content.
+    if (err instanceof SupabaseError) res.status(502).json({ error: "Supabase rejected the skill" });
+    else res.status(500).json({ error: "Failed to publish skill" });
   }
 });
 
@@ -206,6 +242,8 @@ router.delete("/v1/skills/:id", requireAuth, async (req, res) => {
     res.status(400).json({ error: "Invalid skill id" });
     return;
   }
+  const owner = await verifiedOwner(auth.uid, res);
+  if (!owner) return;
   try {
     // Verify ownership before delete.
     const rows = await supabase.get<SkillRow>("skills", {
@@ -217,15 +255,20 @@ router.delete("/v1/skills/:id", requireAuth, async (req, res) => {
       res.status(404).json({ error: "Skill not found" });
       return;
     }
-    if (rows[0].author_id !== auth.uid) {
+    if (rows[0].author_id?.toLowerCase() !== owner) {
       res.status(403).json({ error: "Not authorized to delete this skill" });
       return;
     }
-    await supabase.delete("skills", { id: `eq.${id}` });
+    // Recheck ownership on the delete itself to close the probe/write race.
+    const deleted = await supabase.deleteMatchingIds("skills", { id, author_id: owner });
+    if (deleted.length !== 1 || deleted[0] !== id) {
+      res.status(409).json({ error: "Skill changed or is no longer available" }); return;
+    }
     res.json({ ok: true });
   } catch (err) {
-    logger.error({ err }, "Skill delete failed");
-    res.status(500).json({ error: "Failed to delete skill" });
+    // Database bodies can contain private record details; never log or return them.
+    if (err instanceof SupabaseError) res.status(502).json({ error: "Skill storage unavailable" });
+    else res.status(500).json({ error: "Failed to delete skill" });
   }
 });
 

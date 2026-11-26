@@ -31,7 +31,7 @@ export function isBrainsError(error: unknown, status?: number): error is ApiErro
 }
 
 export async function listBrains(
-  options: { mine?: boolean; limit?: number; offset?: number; signal?: AbortSignal } = {},
+  options: { mine?: boolean; limit?: number; offset?: number; signal?: AbortSignal; authToken?: string | null } = {},
 ): Promise<ListBrainsResponse> {
   const params = new URLSearchParams();
   if (options.mine) params.set("mine", "true");
@@ -40,6 +40,8 @@ export async function listBrains(
   const qs = params.toString();
   return api.get<ListBrainsResponse>(`/api/brains${qs ? `?${qs}` : ""}`, {
     signal: options.signal,
+    cache: "no-store",
+    headers: options.authToken ? { Authorization: `Bearer ${options.authToken}` } : undefined,
     retries: 1,
   });
 }
@@ -47,9 +49,12 @@ export async function listBrains(
 export async function getBrain(
   id: string,
   signal?: AbortSignal,
+  authToken?: string | null,
 ): Promise<BrainDetailResponse> {
   return api.get<BrainDetailResponse>(`/api/brains/${encodeURIComponent(id)}`, {
     signal,
+    cache: "no-store",
+    headers: authToken ? { Authorization: `Bearer ${authToken}` } : undefined,
     retries: 1,
   });
 }

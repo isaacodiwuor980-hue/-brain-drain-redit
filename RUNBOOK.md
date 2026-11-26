@@ -147,8 +147,38 @@ gunzip -c backups/backup-20251008-030000.sql.gz | psql "$SUPABASE_DB_URL"
 
 ---
 
+## Atomic brain-save rollout (migration 0005)
+
+The API now requires `public.save_brain_atomic` from `supabase/migrations/0005_atomic_brain_save.sql`. **Apply the reviewed migration before deploying this API build**; without it, cloud brain saves fail closed with a 502. Local saves are a separate path.
+
+1. Back up the database and verify a restore procedure. Check that the deployed schema matches the migration and that Firebase subjects map to Supabase `auth.users` UUIDs; this migration does not create that mapping.
+2. In an isolated staging project, apply the migration and exercise valid saves, malformed references, two users with colliding brain/node IDs, simultaneous updates, and failure rollback. Confirm that `anon` and `authenticated` cannot execute the function and that the API's service role can.
+3. After review, deploy the migration, then the API. Monitor 4xx/5xx responses and verify a disposable authenticated save and read.
+4. Roll back the API first. Only after no API instances call the function, remove it with `DROP FUNCTION public.save_brain_atomic(uuid, jsonb, jsonb);` if required. Rolling back restores the previous non-atomic write behavior, so restrict untrusted writes until a safe replacement is available.
+
+The repository's PGlite tests are useful regression checks but do not replace staged multi-session/PostgREST and identity integration testing. No database migration was applied by the agent.
+
+
+---
+
+## Reaction preview and online status (local scaffolding)
+
+- `0007_identity_reactions_flags.sql` adds `reactions.reaction_tier_source` (source marker, not a tier value), `user_identity_map`, default-off `server_feature_flags`, and a service-role toggle function. `0008_set_post_reaction.sql` adds a separate desired-state setter. Their real deployment status, schema compatibility and effective grants must be verified before any use.
+- `0009_reaction_preview.sql` adds `preview_reaction_state(uuid,text,text)`, a read-only preview of the 0008 setter. It is **not wired** to the API and is not a preview of the existing toggle route. It has no usable concurrency token or tier semantics. Do not use it for live shadow testing. After removing any future consumers, rollback is `DROP FUNCTION public.preview_reaction_state(uuid,text,text);` — review dependencies and obtain authorization first. No row data is modified by creating or dropping this function.
+- `GET /api/tsrg/status` returns a boolean using the `experimental_tsrg_feed` database flag, defaults to false on missing configuration, row or errors, and sends `Cache-Control: no-store`. The client polls when its opt-in is enabled. This is **only a soft switch for cooperating online clients**; older and offline clients, suspended tabs and polling latency prevent an absolute kill switch. It is not an authorization control.
+- Before applying any migration: require an isolated staging project, verified backups and restore plan, explicit approval, deployed-schema and permissions inspection, and staged tests; no migration has been applied by this session. Reverting 0007 tables/column deletes data and requires a separately authorized backup and rollback plan. Avoid production deployment until all dependencies, including brain-save migration 0005 and identity mapping, are verified.
+
+---
+
 ## Contact
 
 - **Repo:** [GitHub URL]
 - **Status page:** [status URL]
 - **On-call:** [PagerDuty URL]
+
+
+## Brain identity mapping integration — rollout blocker
+
+Local code now requires the `0007` `user_identity_map` mapping for protected brain list, private read, save and delete operations; save passes the mapped UUID to the `0005` RPC. Unmapped subjects fail closed and identity lookup outages return 503. Public reads remain available without a mapping. **Do not deploy this code until** the deployed schema and both migrations are verified, mapping provisioning and recovery are reviewed, active users have verified mappings, and isolated staging tests pass for two users, no mapping, outages, existing data and concurrency. `0007`/`0005` have not been deployed by this work. This changes previous behavior for users without mappings and can block them from their cloud data. Never create mappings by guessing email or treating a Firebase subject as a Supabase UUID.
+
+Roll back API code only after assessing the prior version's ownership and non-atomic write risks; do not drop mapping rows or database functions without a reviewed backup and explicit authorization. Preserve local data and expose failures to users. See `PRODUCTION_READINESS_ROADMAP.md` and `NEXT_SESSION_STAGING_CHECKLIST.md`.

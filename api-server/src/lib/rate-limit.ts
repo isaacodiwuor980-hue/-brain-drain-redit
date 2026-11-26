@@ -4,6 +4,8 @@ import { config } from "./config";
 interface RateLimitOptions {
   windowMs: number;
   max: number;
+  /** Distinct budgets must not share Redis keys across limiter tiers. */
+  namespace?: "read" | "write" | "auth";
 }
 
 interface Bucket {
@@ -82,7 +84,8 @@ export function createInMemoryLimiter({ windowMs, max }: RateLimitOptions): Rate
  * behind a load balancer enforces a single budget per IP. Takes an injected
  * client so the path is unit-testable without a live Redis instance.
  *
- * Exported for direct unit testing.
+ * Legacy helper retained for compatibility and existing unit tests. It uses
+ * non-atomic INCR/EXPIRE and must not be used by the runtime factory.
  */
 export function createRedisLimiter(client: RedisLike, { windowMs, max }: RateLimitOptions): RateLimiter {
   const windowSec = Math.ceil(windowMs / 1000);
@@ -111,6 +114,42 @@ export function createRedisLimiter(client: RedisLike, { windowMs, max }: RateLim
   };
 }
 
+/** Runtime Redis limiter. A single script increments and repairs/sets expiry
+ * atomically, so a dropped connection cannot leave a permanent counter. */
+export function createAtomicRedisLimiter(
+  client: { eval(script: string, numKeys: number, key: string, seconds: number): Promise<unknown> },
+  { windowMs, max, namespace = "read" }: RateLimitOptions,
+): RateLimiter {
+  const windowSec = Math.ceil(windowMs / 1000);
+  const script = `
+    local count = redis.call('INCR', KEYS[1])
+    local ttl = redis.call('TTL', KEYS[1])
+    if ttl < 0 then
+      redis.call('EXPIRE', KEYS[1], ARGV[1])
+      ttl = redis.call('TTL', KEYS[1])
+    end
+    return {count, ttl}
+  `;
+  return async function rateLimit(req, res, next) {
+    const ip = req.ip || req.socket?.remoteAddress || "unknown";
+    const key = `rl:v2:${namespace}:${ip}`;
+    try {
+      const result = await client.eval(script, 1, key, windowSec);
+      if (!Array.isArray(result) || result.length !== 2 ||
+          !Number.isSafeInteger(result[0]) || result[0] < 1 ||
+          !Number.isSafeInteger(result[1]) || result[1] < 0) {
+        throw new Error("Invalid rate-limit response");
+      }
+      const [count, ttl] = result as [number, number];
+      setHeaders(res, max, Math.max(0, max - count), Math.ceil(Date.now() / 1000) + ttl);
+      if (count > max) { reject(res); return; }
+      next();
+    } catch {
+      throw new Error("Redis rate-limit lookup failed");
+    }
+  };
+}
+
 /**
  * Factory used by app.ts. Picks Redis (lazy-init, dynamic import so the
  * `ioredis` dep is only required when REDIS_URL is set) and falls back to
@@ -122,8 +161,8 @@ export function createRateLimiter(opts: RateLimitOptions): RateLimiter {
   if (!redisUrl) return memory;
 
   // Lazy: connect on first request so server boot never blocks on Redis.
-  let clientPromise: Promise<RedisLike | null> | null = null;
-  const getClient = async (): Promise<RedisLike | null> => {
+  let clientPromise: Promise<import("ioredis").default | null> | null = null;
+  const getClient = async (): Promise<import("ioredis").default | null> => {
     if (clientPromise) return clientPromise;
     clientPromise = (async () => {
       try {
@@ -148,7 +187,7 @@ export function createRateLimiter(opts: RateLimitOptions): RateLimiter {
   return async function rateLimit(req, res, next) {
     const client = await getClient();
     if (!client) return memory(req, res, next);
-    const primary = createRedisLimiter(client, opts);
+    const primary = createAtomicRedisLimiter(client, opts);
     try {
       await primary(req, res, next);
     } catch {

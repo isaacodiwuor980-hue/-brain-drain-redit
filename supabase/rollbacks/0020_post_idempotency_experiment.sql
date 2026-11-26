@@ -1,0 +1,6 @@
+-- REVIEW ONLY; intentionally non-executable.
+-- Stopping or dropping an idempotency service/receipt table can turn retries
+-- into duplicate writes or resurrect deleted content. Reverting consumers and
+-- receipt lifecycle requires a separate approved operational plan, retained
+-- privacy-aware recovery data, verified backups, retention/deletion rules and
+-- tested forward recovery. No production deployment or rollback is authorized.

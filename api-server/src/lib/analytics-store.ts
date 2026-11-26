@@ -136,8 +136,9 @@ export async function storeAnalyticsEvents(events: AnalyticsEvent[]) {
       await appendEventsToSupabase(events);
       currentStorageMode = "supabase";
       return { storageMode: currentStorageMode };
-    } catch (error) {
-      console.warn("Supabase analytics storage failed; falling back", error);
+    } catch {
+      // Database error bodies may contain submitted activity data.
+      console.warn("Supabase analytics storage failed; falling back");
     }
   }
 
@@ -150,8 +151,8 @@ export async function storeAnalyticsEvents(events: AnalyticsEvent[]) {
     await appendEventsToFile(events);
     currentStorageMode = "file";
     return { storageMode: currentStorageMode };
-  } catch (error) {
-    console.warn("File analytics storage failed; using memory only", error);
+  } catch {
+    console.warn("File analytics storage failed; using memory only");
     currentStorageMode = "memory";
     return { storageMode: currentStorageMode };
   }

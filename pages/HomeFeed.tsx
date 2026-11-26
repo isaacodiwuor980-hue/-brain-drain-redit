@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo, useCallback, lazy, Suspense } from "react";
+import { useEffect, useState, useMemo, useCallback, useRef, lazy, Suspense } from "react";
 import { useSocial } from "@/hooks/use-social";
 import { useTopics } from "@/hooks/use-topics";
 import { PostCard } from "@/components/feed/PostCard";
@@ -7,18 +7,24 @@ import { FloatingCreateButton } from "@/components/ui/CreateExperienceModal";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { CircleHelp, MessageSquare, PenSquare, BrainCircuit, X } from "lucide-react";
-import { Post, PostType, Topic } from "@/lib/types";
+import { Post, PostType } from "@/lib/types";
 import { useCommunities } from "@/hooks/use-communities";
 import { MomentumWidget } from "@/components/momentum/MomentumWidget";
 import { useLocation } from "wouter";
 import { trackEvent } from "@/lib/analytics";
-import { getPostUpvoteCount } from "@/lib/types";
 import { useAuth } from "@/components/auth/AuthContext";
 import { userIdOr, displayNameOr } from "@/lib/user-data";
-import { FeedMode, rankHomeFeedPosts, rankRelatedTopics } from "@/lib/recommendations";
+import type { FeedMode } from "@/lib/recommendations";
+import { selectChronologicalHomePosts } from "@/lib/home-feed-chronological";
 import { triggerHaptic } from "@/lib/device";
-import { useAnalyticsEvents } from "@/hooks/use-recommendations";
 import { useToast } from "@/hooks/use-toast";
+import { QuickDecision } from "@/components/ui/quick-decision";
+import { useDatabase } from "@/hooks/use-database";
+import { instantiateSample, SAMPLE_BRAINS } from "@/lib/sample-brains";
+import { ReasoningTree } from "@/components/ui/reasoning-tree";
+import { ConfidenceBadge } from "@/components/ui/confidence-badge";
+import { computeConfidence } from "@/lib/reasoning-view";
+import { ViewErrorBoundary } from "@/components/ui/view-error-boundary";
 
 import { DailyChallengesSection } from "@/feed/DailyChallengesSection";
 import { LiveSessionBanner } from "@/feed/LiveSessionBanner";
@@ -26,7 +32,6 @@ import { PeopleYouMayKnow } from "@/feed/PeopleYouMayKnow";
 import { FindFriendsFromContacts } from "@/feed/FindFriendsFromContacts";
 import { FindFriendsFromGmail } from "@/feed/FindFriendsFromGmail";
 import {
-  COLD_START_POSTS,
   shouldShowColdStartBanner,
   dismissColdStartBanner,
 } from "@/lib/cold-start-content";
@@ -36,30 +41,54 @@ import {
 // paint. Suspense fallback preserves layout height to avoid CLS.
 const StoriesBar = lazy(() => import("@/feed/StoriesBar").then(m => ({ default: m.StoriesBar })));
 
-const NeuralGraph = lazy(() => import("@/components/NeuralGraph").then(m => ({ default: m.NeuralGraph })));
 const PostCreator = lazy(() => import("@/components/feed/PostCreator").then((module) => ({ default: module.PostCreator })));
 
-// Helper to seed data if empty
-const SEED_TOPICS: Topic[] = [
-  { id: "t1", name: "Engineering", description: "Software and Hardware", followerCount: 1200 },
-  { id: "t2", name: "Philosophy", description: "Deep thoughts", followerCount: 800 },
-  { id: "t3", name: "React", description: "UI Framework", followerCount: 2000 }
-];
+// A complete, bundled sample brain used to demonstrate structured reasoning
+// on the feed itself (no network, no auth, no IndexedDB).
+const FEATURED_BRAIN =
+  SAMPLE_BRAINS.find((s) => s.id === "sample-laptop") ?? SAMPLE_BRAINS[0];
 
 export function HomeFeed() {
   // B3: activeFeed must live ABOVE useSocial — the Following tab now drives
   // a real server query (mode=following) instead of only re-ranking locally.
   const [activeFeed, setActiveFeed] = useState<FeedMode>("foryou");
-  const { posts, isLoading, addPost, reactToPost, refreshPosts, feedFailed, refetchFeed, fetchNextPage, hasNextPage, isFetchingNextPage } = useSocial(activeFeed, null);
-  const { topics, addTopic, refreshTopics } = useTopics();
+  const { posts, isLoading, addPost, reactToPost, feedFailed, refetchFeed, fetchNextPage, hasNextPage, isFetchingNextPage } = useSocial(activeFeed, null);
+  const { topics } = useTopics();
   const { communities } = useCommunities();
-  const { data: analyticsEvents = [] } = useAnalyticsEvents();
   const [location, setLocation] = useLocation();
   const { toast } = useToast();
   // Phase 2: real user identity.
   const { user } = useAuth();
   const currentUserId = userIdOr(user);
   const currentDisplayName = displayNameOr(user);
+  // PHASE 3 — instant value: persisted brain library + sample templates so a
+  // first-time visitor can run a real decision tree without signing in.
+  const { saveBrainData } = useDatabase();
+  const quickDecisionSaving = useRef(false);
+
+  const handleQuickDecisionSave = useCallback(
+    async (index: number) => {
+      if (quickDecisionSaving.current) throw new Error("Another save is in progress.");
+      const sample = SAMPLE_BRAINS[index];
+      if (!sample) throw new Error("Sample not found.");
+      quickDecisionSaving.current = true;
+      try {
+        // The hook reports that cloud saving is paused after the local transaction.
+        await saveBrainData(instantiateSample(sample));
+      } catch (error) {
+        console.error("Quick decision save failed", error);
+        toast({
+          title: "Could not save",
+          description: "Your run is still on screen — try again in a moment.",
+          variant: "destructive",
+        });
+        throw error;
+      } finally {
+        quickDecisionSaving.current = false;
+      }
+    },
+    [saveBrainData, toast],
+  );
   // B3: the Following view gets its own honest empty state instead of the
   // For-You dry state (whose "Share Your First Brain" CTA makes no sense
   // under Following). Keyed on feed EMPTINESS, not auth: guests may carry an
@@ -67,35 +96,12 @@ export function HomeFeed() {
   // follows need the same message.
   const isFollowingEmpty = activeFeed === "following" && !isLoading && posts.length === 0;
   
-  const graphData = useMemo(() => {
-    const nodes = topics.map(t => ({ id: t.id, name: t.name }));
-    const links: { source: string; target: string }[] = [];
-    
-    const userTopics: Record<string, Set<string>> = {};
-    const validTopicIds = new Set(topics.map(t => t.id));
-    posts.forEach(post => {
-      if (!userTopics[post.userId]) userTopics[post.userId] = new Set();
-      if (validTopicIds.has(post.topicId)) {
-        userTopics[post.userId].add(post.topicId);
-      }
-    });
-    
-    Object.values(userTopics).forEach(set => {
-      const arr = Array.from(set);
-      for (let i = 0; i < arr.length; i++) {
-        for (let j = i + 1; j < arr.length; j++) {
-          links.push({ source: arr[i], target: arr[j] });
-        }
-      }
-    });
-    
-    return { nodes, links };
-  }, [posts, topics]);
+  const featuredBrainConfidence = useMemo(
+    () => computeConfidence(FEATURED_BRAIN.brain, FEATURED_BRAIN.nodes),
+    [],
+  );
 
   const [selectedTopicId, setSelectedTopicId] = useState<string | null>(null);
-  // FRAGMENT C: Reddit-style sort modes.
-  type FeedSort = "hot" | "new" | "top" | "rising";
-  const [sortMode] = useState<FeedSort>("hot");
   const [isCreatorOpen, setIsCreatorOpen] = useState(false);
   const [creatorPostType, setCreatorPostType] = useState<PostType>("post");
   const [selectedQuestionForAnswer, setSelectedQuestionForAnswer] = useState<{
@@ -132,8 +138,6 @@ export function HomeFeed() {
     return () => window.removeEventListener("bd:open-composer", openComposerFromMenu);
   }, [openComposerFromMenu]);
 
-  const [isSeeding, setIsSeeding] = useState(false);
-
   // Extract all question posts to feed into the Answer picker
   const existingQuestionsList = useMemo(() => {
     return posts
@@ -155,44 +159,6 @@ export function HomeFeed() {
       });
   }, [posts, topics, currentDisplayName, currentUserId]);
 
-  useEffect(() => {
-    const seedData = async () => {
-      // B3: seeding is a For-You cold-start concern. On the Following view
-      // posts are cloud-only (legitimately empty for new users) — seeding
-      // here would loop forever: seeds land in the For-You universe,
-      // Following never sees them, posts.length stays 0 → re-seed → ∞.
-      // That loop was the fuel of the 401/429 rate-limit cascade before the
-      // guest local-only fix.
-      if (activeFeed === "following") return;
-      if (isLoading || isSeeding || (posts.length > 0 && topics.length > 0)) return;
-
-      setIsSeeding(true);
-      try {
-        if (topics.length === 0) {
-          for (const topic of SEED_TOPICS) await addTopic(topic);
-        }
-        if (posts.length === 0) {
-          // Phase 5 — seed with the full 12-post cold-start pool so the
-          // feed is never blank for new users. Mixes across all 6 topics.
-          for (const post of COLD_START_POSTS) await addPost(post);
-        }
-        await refreshTopics();
-        await refreshPosts();
-      } catch (error) {
-        console.error("Failed to seed the home feed", error);
-        toast({
-          title: "Feed setup failed",
-          description: "We could not load starter content. Please refresh and try again.",
-          variant: "destructive",
-        });
-      } finally {
-        setIsSeeding(false);
-      }
-    };
-    void seedData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- seeding must only re-trigger on feed/topic/loading state, not on the stable mutation identities (addPost/addTopic/refreshPosts/refreshTopics); listing them would re-seed on every mutation refetch.
-  }, [activeFeed, posts.length, topics.length, isLoading, isSeeding, toast]);
-
   // Phase 5 — Cold-start banner state. Shown when user follows <3 topics
   // and hasn't dismissed it explicitly.
   const [showColdStartBanner, setShowColdStartBanner] = useState(false);
@@ -207,16 +173,6 @@ export function HomeFeed() {
 
   const [displayLimit, setDisplayLimit] = useState(5);
   const [observerRef, setObserverRef] = useState<HTMLDivElement | null>(null);
-
-  // A clock value read in an effect (not during render) so the "rising" sort
-  // and any time-relative filtering stay pure during render. Refreshed on a
-  // 60s timer — the only consumer is a 24h "recent" threshold, so sub-minute
-  // staleness is behaviorally equivalent to the previous per-render Date.now().
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => {
-    const id = setInterval(() => setNow(Date.now()), 60_000);
-    return () => clearInterval(id);
-  }, []);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- legitimate event-driven reset: reset displayLimit to 5 when the feed mode or selected topic changes; refactoring to derived state would change behavior (displayLimit is user-incremented via IntersectionObserver).
@@ -236,10 +192,8 @@ export function HomeFeed() {
     void trackEvent("topic_selected", { topicId: topicId || "all" });
   };
 
-  const recommendedTopics = useMemo(
-    () => rankRelatedTopics(posts, topics, analyticsEvents),
-    [posts, topics, analyticsEvents],
-  );
+  // Avoid learning topic preferences from local behavioral events.
+  const recommendedTopics = topics.slice(0, 5);
 
   useEffect(() => {
     if (typeof IntersectionObserver === "undefined") return undefined;
@@ -289,70 +243,40 @@ export function HomeFeed() {
     await addPost(post);
   }, [addPost]);
 
-  // Memoize the displayed posts list so we don't re-run the full O(N log N)
-  // rankHomeFeedPosts sort + analytics-event iteration on every render /
-  // scroll tick. Re-runs only when the inputs change (posts, topics,
-  // analyticsEvents, activeFeed, selectedTopicId, displayLimit, AND
-  // location — so in-page navigation to /?postId=... is picked up).
+  // This is ordering only, not a proof of visibility or topic authorization.
   const displayedPosts = useMemo(() => {
     const searchParams = new URLSearchParams(
-      typeof location === "string" && location.includes("?")
-        ? location.split("?")[1] ?? ""
-        : ""
+      typeof location === "string" && location.includes("?") ? location.split("?")[1] ?? "" : ""
     );
-    const postIdFromUrl = searchParams.get("postId");
-
-    // Filter out hidden posts (user clicked "Hide Post" in PostCard).
+    const postId = searchParams.get("postId");
     let hiddenIds: string[] = [];
     try {
       const raw = localStorage.getItem("brainDrain_hiddenPosts");
       if (raw) hiddenIds = JSON.parse(raw) as string[];
     } catch { /* ignore */ }
     const visiblePosts = hiddenIds.length > 0 ? posts.filter(p => !hiddenIds.includes(p.id)) : posts;
+    return selectChronologicalHomePosts(visiblePosts, selectedTopicId, postId, displayLimit);
+  }, [posts, selectedTopicId, displayLimit, location]);
 
-    let allDisplayedPosts = postIdFromUrl
-      ? visiblePosts.filter(p => p.id === postIdFromUrl)
-      : rankHomeFeedPosts({
-          posts: visiblePosts,
-          topics,
-          events: analyticsEvents,
-          mode: activeFeed,
-          selectedTopicId,
-        });
-
-    // FRAGMENT C: Apply Reddit-style sort mode on top of the ranked feed.
-    if (!postIdFromUrl) {
-      if (sortMode === "new") {
-        allDisplayedPosts = [...allDisplayedPosts].sort((a, b) => b.createdAt - a.createdAt);
-      } else if (sortMode === "top") {
-        allDisplayedPosts = [...allDisplayedPosts].sort((a, b) =>
-          (getPostUpvoteCount(b) + (b.commentCount || 0) * 2) -
-          (getPostUpvoteCount(a) + (a.commentCount || 0) * 2)
-        );
-      } else if (sortMode === "rising") {
-        // Rising = high velocity: posts < 24h old with above-median engagement.
-        const dayMs = 24 * 60 * 60 * 1000;
-        const recent = allDisplayedPosts.filter(p => now - p.createdAt < dayMs);
-        if (recent.length > 0) {
-          const medianEngagement = recent.sort((a, b) =>
-            getPostUpvoteCount(a) - getPostUpvoteCount(b)
-          )[Math.floor(recent.length / 2)];
-          const threshold = getPostUpvoteCount(medianEngagement);
-          allDisplayedPosts = recent
-            .filter(p => getPostUpvoteCount(p) >= threshold)
-            .sort((a, b) => getPostUpvoteCount(b) - getPostUpvoteCount(a));
-        }
-      }
-      // "hot" = default gravity ranking from rankHomeFeedPosts (no re-sort)
-    }
-
-    return allDisplayedPosts.slice(0, displayLimit);
-  }, [posts, topics, analyticsEvents, activeFeed, selectedTopicId, displayLimit, location, sortMode, now]);
-
-  if (isLoading || isSeeding) {
+  if (isLoading) {
+    // PHASE 1/3 — the old loading state was a wall of skeletons: on Slow 3G
+    // (or a cold IDB open) a first-time visitor stared at grey boxes with no
+    // way to do anything. The instant-value card renders FIRST — it needs no
+    // network, auth, or IndexedDB — and the feed skeletons fill in below it.
     return (
-      <div className="max-w-2xl mx-auto min-h-screen border-x border-border/50 bg-background/50 p-4 space-y-4">
-        {[1, 2, 3].map((i) => <PostSkeleton key={i} />)}
+      <div className="max-w-2xl mx-auto min-h-screen border-x border-border/50 bg-background/50">
+        <div className="px-3 pt-3">
+          <QuickDecision
+            onSaveBrain={handleQuickDecisionSave}
+            onCreateOwn={() => {
+              window.dispatchEvent(new CustomEvent("bd:open-brain-wizard"));
+              setLocation("/library?create=brain");
+            }}
+          />
+        </div>
+        <div className="p-4 space-y-4" aria-busy="true" aria-label="Loading your feed">
+          {[1, 2, 3].map((i) => <PostSkeleton key={i} />)}
+        </div>
       </div>
     );
   }
@@ -360,6 +284,9 @@ export function HomeFeed() {
   return (
     <div className="max-w-2xl mx-auto min-h-screen border-x border-border/50 bg-background/50">
       
+      <div className="px-3 pt-2 md:hidden">
+        <a href="#home-posts" className="inline-flex min-h-11 items-center rounded-full px-3 text-sm font-medium text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">Jump to posts ↓</a>
+      </div>
       <div className="bg-background pt-4 border-b border-border/40">
         <Suspense fallback={<div className="h-24" aria-hidden="true" />}>
           <StoriesBar />
@@ -368,17 +295,40 @@ export function HomeFeed() {
 
       <MomentumWidget />
 
-      {/* Feed fetch failure banner — shows when /api/feed failed (non-auth)
-          and we are showing cached/seed fallback. Dismissible; Retry refetches. */}
+      {/* PHASE 3 — frictionless onboarding: run a REAL decision brain here,
+          above the fold, before any feed data, auth prompt, or IDB read. */}
+      <div className="px-3 pt-3">
+        <QuickDecision
+          onSaveBrain={handleQuickDecisionSave}
+          onCreateOwn={() => {
+            setCreatorPostType("post");
+            setSelectedQuestionForAnswer(null);
+            // The brain wizard lives in the library; the event handles the
+            // "already there" case and the query param handles navigation.
+            window.dispatchEvent(new CustomEvent("bd:open-brain-wizard"));
+            setLocation("/library?create=brain");
+          }}
+          onExploreSamples={() => {
+            try {
+              sessionStorage.setItem("brain-drain-open-sample", "1");
+            } catch {
+              /* private mode — the library still opens normally */
+            }
+            setLocation("/library");
+          }}
+        />
+      </div>
+
+      {/* A failed feed fetch does not make unverified cached posts safe. */}
       {feedFailed && (
         <div className="mx-3 mt-3 rounded-xl border border-destructive/30 bg-destructive/5 p-3" role="alert">
           <div className="flex items-start gap-3">
             <div className="flex-1">
               <p className="text-sm font-medium text-foreground">
-                Couldn’t load the latest posts from the server.
+                {activeFeed === "following" ? "Following is temporarily unavailable." : "Couldn’t load the latest posts from the server."}
               </p>
               <p className="text-xs text-muted-foreground mt-0.5">
-                Showing saved posts for now. Check your connection and retry.
+                {activeFeed === "following" ? "Account identity and follow relationships are being verified." : "Saved posts are hidden until their visibility can be verified. Check your connection and retry."}
               </p>
             </div>
             <button
@@ -398,10 +348,10 @@ export function HomeFeed() {
           <div className="flex items-start gap-3">
             <div className="flex-1">
               <p className="text-sm font-medium text-foreground">
-                Discovering posts for you — follow topics to personalize.
+                Browse recent posts and explore topics.
               </p>
               <p className="mt-0.5 text-xs text-muted-foreground">
-                Showing curated starter content. Follow 3+ topics to tune your feed.
+                Personalized feed ranking is currently unavailable.
               </p>
             </div>
             <button
@@ -423,7 +373,7 @@ export function HomeFeed() {
         <FindFriendsFromGmail />
       </div>
 
-      <div className="sticky top-0 z-20 bg-background/85 backdrop-blur-xl border-b border-border/40">
+      <div className="sticky top-[calc(3.5rem+env(safe-area-inset-top))] md:top-0 z-20 bg-background/85 backdrop-blur-xl border-b border-border/40">
         <Tabs value={activeFeed} onValueChange={handleFeedChange} className="w-full">
           <TabsList aria-label="Feed view" className="bg-transparent w-full h-12 flex p-0 border-b-0">
             <TabsTrigger value="foryou" className="flex-1 h-full relative data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:text-foreground data-[state=active]:font-bold rounded-none px-4 pb-0 text-[15px] font-medium text-muted-foreground hover:bg-muted/15 transition-all cursor-pointer">
@@ -444,12 +394,7 @@ export function HomeFeed() {
             </TabsTrigger>
           </TabsList>
         </Tabs>
-        {/* Sort mode chips (Hot/New/Top/Rising) intentionally removed from
-            the home feed UI per the dry-state design goal — the app should
-            feel calm and natural, not like an engagement-optimised Reddit
-            feed. The sortMode state and ranking logic are preserved for
-            future use (e.g. the Topics page can surface them as needed);
-            the home feed just always renders in the default "hot" order. */}
+
       </div>
 
       {/* Topic filter chips removed — the homepage now feels like a
@@ -523,7 +468,7 @@ export function HomeFeed() {
         </div>
       </div>
 
-      <div className="flex flex-col gap-4 p-2 sm:p-4 pb-24">
+      <div id="home-posts" tabIndex={-1} className="scroll-mt-[calc(7rem+env(safe-area-inset-top))] flex flex-col gap-4 p-2 sm:p-4 pb-6 focus:outline-none">
         {displayedPosts.length > 0 ? (
           <>
             {displayedPosts.map(post => {
@@ -543,6 +488,11 @@ export function HomeFeed() {
                     containIntrinsicSize: '600px',
                   }}
                 >
+                  {/* Per-post boundary: ONE malformed post (bad sanitized
+                      HTML, missing media, corrupt timestamp) used to throw
+                      during render and blank the ENTIRE feed. Now only that
+                      row is replaced by a retry chip. */}
+                  <ViewErrorBoundary label="post" compact>
                   <PostCard
                     post={post}
                     onReact={reactToPost}
@@ -562,6 +512,7 @@ export function HomeFeed() {
                       });
                     }}
                   />
+                  </ViewErrorBoundary>
                 </div>
               );
             })}
@@ -574,17 +525,14 @@ export function HomeFeed() {
           </>
         ) : isFollowingEmpty ? (
           <div className="p-8 text-center">
-            {/* B3: Following empty view — honest empty state instead of
-                silently reusing For-You content. */}
+            {/* Do not present the paused feed as an empty follow graph. */}
             <div className="max-w-md mx-auto space-y-4">
               <div className="w-16 h-16 rounded-full bg-primary/10 text-primary flex items-center justify-center mx-auto">
                 <BrainCircuit className="w-8 h-8" />
               </div>
-              <h3 className="font-bold text-lg text-foreground">Following is quiet</h3>
+              <h3 className="font-bold text-lg text-foreground">Following is temporarily unavailable</h3>
               <p className="text-sm text-muted-foreground leading-relaxed">
-                {currentUserId
-                  ? "Posts from the people you follow will appear here. Follow more voices to fill this feed."
-                  : "Sign in and follow the thinkers you trust — their reasoning will collect here."}
+                The following feed is paused while account identity and follow relationships are verified.
               </p>
             </div>
           </div>
@@ -642,10 +590,28 @@ export function HomeFeed() {
             </div>
           </div>
 
+          {/* PHASE 3 — "Neural Framework" used to be a random force-graph of
+              topics: pretty, non-deterministic, and zero information about
+              anyone's reasoning. It now shows an actual decision brain's
+              reasoning tree + confidence, teasering the core product value. */}
           <div className="p-6 border-t border-border/50">
-            <h3 className="font-semibold text-lg mb-4">Neural Framework</h3>
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <h3 className="text-lg font-semibold">Reasoning, not walls of text</h3>
+                <p className="text-xs text-muted-foreground">
+                  Every brain renders as a visual tree, a step-by-step walkthrough, or an interactive run.
+                </p>
+              </div>
+              <ConfidenceBadge confidence={featuredBrainConfidence} />
+            </div>
             <Suspense fallback={<div className="h-64 animate-pulse bg-muted rounded-[16px]" />}>
-              <NeuralGraph nodes={graphData.nodes} links={graphData.links} />
+              <ViewErrorBoundary label="reasoning tree" compact>
+                <ReasoningTree
+                  brain={FEATURED_BRAIN.brain}
+                  nodes={FEATURED_BRAIN.nodes}
+                  onNodeClick={() => setLocation("/library")}
+                />
+              </ViewErrorBoundary>
             </Suspense>
           </div>
         </>

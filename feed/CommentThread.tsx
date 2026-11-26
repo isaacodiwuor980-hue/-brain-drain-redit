@@ -37,6 +37,8 @@ import { Comment } from "@/lib/types";
 import { computeCommentRank } from "@/lib/hive-mind";
 import { useAuth } from "@/components/auth/AuthContext";
 import { displayNameOr, userIdOr } from "@/lib/user-data";
+import { votingAvailable } from "@/lib/vote-availability";
+import { visibleCommentsWhilePrivacyUnverified } from "@/lib/confidential-comment-safety";
 
 interface CommentThreadProps {
   postId: string;
@@ -73,6 +75,7 @@ export function CommentThread({
   postAuthorId,
   currentUserId: currentUserIdProp,
 }: CommentThreadProps) {
+  const votesEnabled = votingAvailable();
   // Phase 2: real user identity. Falls back to "me" for guest mode.
   const { user } = useAuth();
   const currentUserId = currentUserIdProp ?? userIdOr(user);
@@ -98,7 +101,7 @@ export function CommentThread({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const [isConfidentialReply, setIsConfidentialReply] = useState(false);
-  const [sortMode, setSortMode] = useState<SortMode>("gravity");
+  const [sortMode, setSortMode] = useState<SortMode>("newest");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState("");
   const { toast } = useToast();
@@ -111,11 +114,9 @@ export function CommentThread({
   // render"). Now the useMemo is always called; the early return just
   // changes what gets rendered.
 
-  // Filter confidential comments at the source.
-  const visibleComments: Comment[] = comments.filter((c) => {
-    if (!c.isConfidential) return true;
-    return c.authorId === currentUserId || postAuthorId === currentUserId || c.authorId === postAuthorId;
-  });
+  // Shared local records cannot prove current-account access. Keep stored
+  // confidential replies intact but do not display them, even to the author.
+  const visibleComments: Comment[] = visibleCommentsWhilePrivacyUnverified(comments);
 
   // Build ONE tree (rivers removed). Deps are [comments] only —
   // buildCommentTree is a pure function of its input, so its identity
@@ -133,7 +134,10 @@ export function CommentThread({
   // buildCommentTree order (pinned-first, newest).
   const sortedRoots = useMemo(() => {
     const sorted = [...tree];
-    if (sortMode === "gravity") {
+    if (!votesEnabled && sortMode !== "qa") {
+      // Avoid inferring cached vote totals through rank while voting is paused.
+      sorted.sort((a, b) => b.createdAt - a.createdAt);
+    } else if (sortMode === "gravity") {
       sorted.sort((a, b) => computeCommentRank(b) - computeCommentRank(a));
     } else if (sortMode === "newest") {
       sorted.sort((a, b) => b.createdAt - a.createdAt);
@@ -163,10 +167,7 @@ export function CommentThread({
       sorted.sort((a, b) => b.children.length - a.children.length);
     }
     return sorted;
-  }, [tree, sortMode]);
-
-  // Fossilized comments (rendered at the crown as a Consensus Summary Block).
-  const fossilized = visibleComments.filter((c) => c.isFossilized);
+  }, [tree, sortMode, votesEnabled]);
 
   // Now safe to early-return — all hooks above have been called.
   if (isLoadingComments) {
@@ -242,7 +243,7 @@ export function CommentThread({
   const handleDelete = async (node: CommentWithChildren) => {
     try {
       await deleteComment({ id: node.id, postId, restore: false });
-      toast({ title: "Reply deleted", description: "Hidden from the thread. Restore from the menu." });
+      toast({ title: "Reply hidden", description: "The reply and its thread are hidden here. Recovery is not yet available." });
     } catch (error) {
       toast({ title: "Couldn't delete reply", description: error instanceof Error ? error.message : "Please try again.", variant: "destructive" });
     }
@@ -291,7 +292,7 @@ export function CommentThread({
 
     return (
       <div className="flex flex-col mt-2 group" style={{ paddingLeft: `${paddingLeft}rem` }}>
-        <div className={`flex gap-3 relative rounded-lg ${node.isFossilized ? "hive-fossilized p-3" : ""}`}>
+        <div className="flex gap-3 relative rounded-lg">
           <div className="flex flex-col items-center shrink-0">
             <Avatar className="w-8 h-8 border z-10 bg-background">
               <AvatarFallback className="text-[12px] bg-muted font-medium">
@@ -308,7 +309,6 @@ export function CommentThread({
               <span className="text-[12px] text-muted-foreground ml-2 shrink-0">
                 {formatDistanceToNow(node.createdAt, { addSuffix: true }).replace('about ', '').replace(' minutes', 'm').replace(' hours', 'h').replace(' days', 'd')}
                 {node.editedAt && <span className="italic text-[10px] ml-1">· edited</span>}
-                {node.isFossilized && <span className="ml-1 text-amber-500 font-semibold text-[10px]">· FOSSILIZED</span>}
               </span>
             </div>
 
@@ -342,55 +342,53 @@ export function CommentThread({
 
             <div className="flex items-center justify-between pt-1.5 pb-0.5 -ml-2 gap-2">
               <div className="flex items-center gap-1.5 flex-wrap">
-                {/* Reddit/Quora-style upvote / net-score / downvote cluster.
-                    The net score (upvotes - downvotes) is the primary quality
-                    signal for the gravity ranking formula. Tapping the active
-                    direction again removes the vote (toggle off). */}
+                {/* Vote controls omit visible totals; this is not an API privacy boundary. */}
                 <div className="flex items-center gap-0.5 rounded-full bg-muted/30 py-0.5 px-0.5">
                   <Button
                     variant="ghost"
                     size="sm"
-                    className={`h-6 w-6 p-0 rounded-full active:scale-90 ${node.myVote === "up" ? "text-emerald-500 bg-emerald-500/10 hover:bg-emerald-500/20" : "text-muted-foreground hover:text-emerald-500 hover:bg-emerald-500/10"}`}
+                    className={`h-6 w-6 p-0 rounded-full active:scale-90 ${votesEnabled && node.myVote === "up" ? "text-emerald-500 bg-emerald-500/10 hover:bg-emerald-500/20" : "text-muted-foreground hover:text-emerald-500 hover:bg-emerald-500/10"}`}
                     onClick={() => { triggerHaptic("light"); void voteComment({ id: node.id, direction: "up", postId }).catch((e) => toast({ title: "Couldn't vote", description: e instanceof Error ? e.message : "", variant: "destructive" })); }}
-                    aria-label="Upvote"
-                    aria-pressed={node.myVote === "up"}
+                    aria-label={votesEnabled ? "Upvote" : "Voting temporarily unavailable"}
+                    disabled={!votesEnabled}
+                    title={!votesEnabled ? "Voting temporarily unavailable" : undefined}
+                    aria-pressed={votesEnabled && node.myVote === "up"}
                   >
-                    <ArrowBigUp className={`w-3.5 h-3.5 ${node.myVote === "up" ? "fill-current" : ""}`} />
+                    <ArrowBigUp className={`w-3.5 h-3.5 ${votesEnabled && node.myVote === "up" ? "fill-current" : ""}`} />
                   </Button>
-                  <span className={`text-[12px] font-bold tabular-nums min-w-[1.5em] text-center ${(node.upvotes ?? 0) - (node.downvotes ?? 0) > 0 ? "text-emerald-500" : (node.upvotes ?? 0) - (node.downvotes ?? 0) < 0 ? "text-red-500" : "text-muted-foreground"}`}>
-                    {(node.upvotes ?? 0) - (node.downvotes ?? 0)}
-                  </span>
                   <Button
                     variant="ghost"
                     size="sm"
-                    className={`h-6 w-6 p-0 rounded-full active:scale-90 ${node.myVote === "down" ? "text-red-500 bg-red-500/10 hover:bg-red-500/20" : "text-muted-foreground hover:text-red-500 hover:bg-red-500/10"}`}
+                    className={`h-6 w-6 p-0 rounded-full active:scale-90 ${votesEnabled && node.myVote === "down" ? "text-red-500 bg-red-500/10 hover:bg-red-500/20" : "text-muted-foreground hover:text-red-500 hover:bg-red-500/10"}`}
                     onClick={() => { triggerHaptic("light"); void voteComment({ id: node.id, direction: "down", postId }).catch((e) => toast({ title: "Couldn't vote", description: e instanceof Error ? e.message : "", variant: "destructive" })); }}
-                    aria-label="Downvote"
-                    aria-pressed={node.myVote === "down"}
+                    aria-label={votesEnabled ? "Downvote" : "Voting temporarily unavailable"}
+                    disabled={!votesEnabled}
+                    title={!votesEnabled ? "Voting temporarily unavailable" : undefined}
+                    aria-pressed={votesEnabled && node.myVote === "down"}
                   >
-                    <ArrowBigDown className={`w-3.5 h-3.5 ${node.myVote === "down" ? "fill-current" : ""}`} />
+                    <ArrowBigDown className={`w-3.5 h-3.5 ${votesEnabled && node.myVote === "down" ? "fill-current" : ""}`} />
                   </Button>
                 </div>
                 {/* House / Mouth classification votes — rivers made emergent:
                     readers classify each comment instead of the author
                     declaring a stream at entry. Mutually exclusive. */}
-                <Button variant="ghost" size="sm" className={`h-7 px-2 gap-1.5 rounded-full transition-all active:scale-90 ${node.myHouseVote ? "text-indigo-500 bg-indigo-500/10 hover:bg-indigo-500/20" : "text-muted-foreground hover:text-indigo-500 hover:bg-muted/50"}`}
-                  title="House view — institutional / verifiable evidence"
+                <Button variant="ghost" size="sm" className={`h-7 px-2 gap-1.5 rounded-full transition-all active:scale-90 ${votesEnabled && node.myHouseVote ? "text-indigo-500 bg-indigo-500/10 hover:bg-indigo-500/20" : "text-muted-foreground hover:text-indigo-500 hover:bg-muted/50"}`}
+                  disabled={!votesEnabled}
+                  title={votesEnabled ? "House view — institutional / verifiable evidence" : "Voting temporarily unavailable"}
                   onClick={() => { triggerHaptic("light"); void voteHouse({ id: node.id, postId }).catch((e) => toast({ title: "Couldn't vote", description: e instanceof Error ? e.message : "", variant: "destructive" })); }}
                   aria-label="House view vote"
-                  aria-pressed={node.myHouseVote}
+                  aria-pressed={votesEnabled && !!node.myHouseVote}
                 >
                   <Landmark className="w-3.5 h-3.5" />
-                  {(node.houseVotes ?? 0) > 0 && <span className="text-[12px] font-medium tabular-nums">{node.houseVotes}</span>}
                 </Button>
-                <Button variant="ghost" size="sm" className={`h-7 px-2 gap-1.5 rounded-full transition-all active:scale-90 ${node.myMouthVote ? "text-orange-500 bg-orange-500/10 hover:bg-orange-500/20" : "text-muted-foreground hover:text-orange-500 hover:bg-muted/50"}`}
-                  title="Word of mouth — crowd sentiment / lived experience"
+                <Button variant="ghost" size="sm" className={`h-7 px-2 gap-1.5 rounded-full transition-all active:scale-90 ${votesEnabled && node.myMouthVote ? "text-orange-500 bg-orange-500/10 hover:bg-orange-500/20" : "text-muted-foreground hover:text-orange-500 hover:bg-muted/50"}`}
+                  disabled={!votesEnabled}
+                  title={votesEnabled ? "Word of mouth — crowd sentiment / lived experience" : "Voting temporarily unavailable"}
                   onClick={() => { triggerHaptic("light"); void voteMouth({ id: node.id, postId }).catch((e) => toast({ title: "Couldn't vote", description: e instanceof Error ? e.message : "", variant: "destructive" })); }}
                   aria-label="Word of mouth vote"
-                  aria-pressed={node.myMouthVote}
+                  aria-pressed={votesEnabled && !!node.myMouthVote}
                 >
                   <Users className="w-3.5 h-3.5" />
-                  {(node.mouthVotes ?? 0) > 0 && <span className="text-[12px] font-medium tabular-nums">{node.mouthVotes}</span>}
                 </Button>
                 <Button variant="ghost" size="sm" className="h-7 px-2.5 text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-full active:scale-90"
                   onClick={() => { triggerHaptic("selection"); setReplyToId(isReplying ? null : node.id); setIsConfidentialReply(false); if (isEditing) cancelEdit(); }}>
@@ -445,7 +443,7 @@ export function CommentThread({
                   <div className="flex-1 flex flex-col gap-2">
                     <Textarea value={inlineContent} onChange={(e) => setInlineContent(e.target.value)} placeholder="Reply..." className="min-h-[50px] text-[14px] resize-none py-2 px-3 bg-transparent border border-border/50 rounded-xl" autoFocus />
                     <div className="flex items-center justify-between flex-wrap gap-2">
-                      <button type="button" onClick={() => setIsConfidentialReply((v) => !v)} className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold transition-all active:scale-95 ${isConfidentialReply ? "bg-amber-500/15 text-amber-600 border border-amber-500/40" : "text-muted-foreground hover:text-foreground hover:bg-muted/50 border border-transparent"}`}>
+                      <button type="button" disabled title="Confidential replies are unavailable" className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold transition-all active:scale-95 ${isConfidentialReply ? "bg-amber-500/15 text-amber-600 border border-amber-500/40" : "text-muted-foreground hover:text-foreground hover:bg-muted/50 border border-transparent"}`}>
                         {isConfidentialReply ? <Lock className="w-3 h-3" /> : <Shield className="w-3 h-3" />} {isConfidentialReply ? "Confidential" : "Public"}
                       </button>
                       <div className="flex gap-2">
@@ -479,43 +477,17 @@ export function CommentThread({
 
   return (
     <div className="pt-4">
-      {/* Fossilized Consensus Summary Block (crown of the post) */}
-      {fossilized.length > 0 && (
-        <div className="mb-4 p-4 rounded-xl border-2 border-amber-500/30 bg-gradient-to-br from-amber-500/5 to-amber-500/2">
-          <div className="flex items-center gap-2 mb-3">
-            <span className="text-amber-500 text-lg">🔒</span>
-            <h3 className="text-sm font-bold text-amber-600 dark:text-amber-400 tracking-wide uppercase">Verified Community Wiki</h3>
-            <span className="text-[11px] text-muted-foreground">Consensus Summary Block · {fossilized.length} entries</span>
-          </div>
-          <div className="space-y-2">
-            {fossilized.map((c) => {
-              return (
-                <div key={c.id} className="hive-fossilized p-3 rounded-lg">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="text-[11px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">Verified</span>
-                    <span className="text-[11px] text-muted-foreground">· {c.authorName}</span>
-                    {(c.sourceLinks ?? 0) > 0 && (
-                      <span className="text-[11px] text-blue-500 font-semibold inline-flex items-center gap-0.5"><LinkIcon className="w-2.5 h-2.5" />{c.sourceLinks}</span>
-                    )}
-                  </div>
-                  <p className="text-[14px] text-foreground/90 leading-relaxed">{c.content}</p>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
+      <p className="text-xs text-muted-foreground mb-3">Confidential replies are unavailable. Existing confidential replies remain stored but are hidden here.</p>
       {/* Sort toggle */}
       {visibleComments.length > 1 && (
         <div className="flex items-center justify-end mb-2">
           <div className="inline-flex items-center gap-1 text-[12px] text-muted-foreground">
             <ArrowDownUp className="w-3.5 h-3.5" />
             <span className="font-medium">Sort:</span>
-            <button type="button" onClick={() => setSortMode("gravity")} className={`px-2 py-0.5 rounded-full font-semibold transition-colors ${sortMode === "gravity" ? "bg-foreground/10 text-foreground" : "hover:bg-muted/50 hover:text-foreground"}`}>Gravity</button>
+            <button type="button" disabled={!votesEnabled} title={!votesEnabled ? "Vote-based sorting temporarily unavailable" : undefined} onClick={() => setSortMode("gravity")} className={`px-2 py-0.5 rounded-full font-semibold transition-colors ${sortMode === "gravity" ? "bg-foreground/10 text-foreground" : "hover:bg-muted/50 hover:text-foreground"}`}>Gravity</button>
             <button type="button" onClick={() => setSortMode("newest")} className={`px-2 py-0.5 rounded-full font-semibold transition-colors ${sortMode === "newest" ? "bg-foreground/10 text-foreground" : "hover:bg-muted/50 hover:text-foreground"}`}>Newest</button>
-            <button type="button" onClick={() => setSortMode("top")} className={`px-2 py-0.5 rounded-full font-semibold transition-colors ${sortMode === "top" ? "bg-foreground/10 text-foreground" : "hover:bg-muted/50 hover:text-foreground"}`}>Top</button>
-            <button type="button" onClick={() => setSortMode("controversial")} className={`px-2 py-0.5 rounded-full font-semibold transition-colors ${sortMode === "controversial" ? "bg-foreground/10 text-foreground" : "hover:bg-muted/50 hover:text-foreground"}`}>Controversial</button>
+            <button type="button" disabled={!votesEnabled} title={!votesEnabled ? "Vote-based sorting temporarily unavailable" : undefined} onClick={() => setSortMode("top")} className={`px-2 py-0.5 rounded-full font-semibold transition-colors ${sortMode === "top" ? "bg-foreground/10 text-foreground" : "hover:bg-muted/50 hover:text-foreground"}`}>Top</button>
+            <button type="button" disabled={!votesEnabled} title={!votesEnabled ? "Vote-based sorting temporarily unavailable" : undefined} onClick={() => setSortMode("controversial")} className={`px-2 py-0.5 rounded-full font-semibold transition-colors ${sortMode === "controversial" ? "bg-foreground/10 text-foreground" : "hover:bg-muted/50 hover:text-foreground"}`}>Controversial</button>
             <button type="button" onClick={() => setSortMode("qa")} className={`px-2 py-0.5 rounded-full font-semibold transition-colors ${sortMode === "qa" ? "bg-foreground/10 text-foreground" : "hover:bg-muted/50 hover:text-foreground"}`}>Q&A</button>
           </div>
         </div>
@@ -534,7 +506,7 @@ export function CommentThread({
               className="min-h-[50px] text-[14px] resize-none py-2 px-3 bg-transparent border border-border/50 rounded-xl"
             />
             <div className="flex justify-between items-center flex-wrap gap-2">
-              <button type="button" onClick={() => setIsConfidentialReply((v) => !v)} className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold transition-all active:scale-95 ${isConfidentialReply ? "bg-amber-500/15 text-amber-600 border border-amber-500/40" : "text-muted-foreground hover:text-foreground hover:bg-muted/50 border border-transparent"}`}>
+              <button type="button" disabled title="Confidential replies are unavailable" className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold transition-all active:scale-95 ${isConfidentialReply ? "bg-amber-500/15 text-amber-600 border border-amber-500/40" : "text-muted-foreground hover:text-foreground hover:bg-muted/50 border border-transparent"}`}>
                 {isConfidentialReply ? <Lock className="w-3 h-3" /> : <Shield className="w-3 h-3" />} {isConfidentialReply ? "Confidential" : "Public"}
               </button>
               <Button type="submit" size="sm" className="rounded-full px-4 font-semibold" disabled={!content.trim()}>Post</Button>

@@ -1,0 +1,12 @@
+-- LOCAL SYNTHETIC REVIEW ONLY; DO NOT APPLY TO ANY CLOUD PROJECT.
+-- The existing posts/reactions API directly mutates reactions using the service
+-- role. Revoking these grants live would break it and may affect other systems.
+-- This only revokes explicit table privileges for one role. It does not revoke
+-- inherited or column grants, table ownership, superuser privileges, privileged
+-- functions, triggers, other roles or direct clients. Existing SECURITY DEFINER
+-- reaction RPCs can still bypass the proposed versioned vote path. The new RPC
+-- also lets a service caller choose a subject, so it is not identity proof.
+-- An approved complete inventory, trusted ownership, all-writer migration,
+-- verified backup/recovery, rollback and tests are prerequisites. This is not
+-- a production fix and must not be deployed merely because local tests pass.
+REVOKE INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER ON public.reactions FROM service_role;

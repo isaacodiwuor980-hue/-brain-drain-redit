@@ -1,0 +1,20 @@
+import { afterEach, expect, it, vi } from "vitest";
+vi.mock("./config", () => ({config:{firebase:{projectId:"rotation-test"}}}));
+import { verifyFirebaseToken } from "./firebase-auth";
+afterEach(()=>{vi.unstubAllGlobals();vi.useRealTimers();});
+it("does not trust an expired cached key removed from a successful JWKS refresh",async()=>{
+  vi.useFakeTimers(); vi.setSystemTime(new Date("2026-01-01T00:00:00Z"));
+  const keys=await crypto.subtle.generateKey({name:"RSASSA-PKCS1-v1_5",modulusLength:2048,publicExponent:new Uint8Array([1,0,1]),hash:"SHA-256"},true,["sign","verify"]);
+  const jwk=await crypto.subtle.exportKey("jwk",keys.publicKey);
+  const fetchMock=vi.fn().mockResolvedValueOnce(new Response(JSON.stringify({keys:[{...jwk,kid:"synthetic-rotation-key"}]}),{status:200,headers:{"cache-control":"max-age=1"}})).mockResolvedValueOnce(new Response(JSON.stringify({keys:[]}),{status:200,headers:{"cache-control":"max-age=1"}}));
+  vi.stubGlobal("fetch",fetchMock);
+  const encode=(value:unknown)=>Buffer.from(JSON.stringify(value)).toString("base64url");
+  const now=Math.floor(Date.now()/1000);
+  const input=`${encode({alg:"RS256",kid:"synthetic-rotation-key"})}.${encode({iss:"https://securetoken.google.com/rotation-test",aud:"rotation-test",sub:"synthetic",iat:now,exp:now+300})}`;
+  const signature=await crypto.subtle.sign("RSASSA-PKCS1-v1_5",keys.privateKey,new TextEncoder().encode(input));
+  const token=`${input}.${Buffer.from(signature).toString("base64url")}`;
+  expect((await verifyFirebaseToken(token)).uid).toBe("synthetic");
+  vi.setSystemTime(Date.now()+2000);
+  await expect(verifyFirebaseToken(token)).rejects.toThrow("Firebase public key not found");
+  expect(fetchMock).toHaveBeenCalledTimes(2);
+});

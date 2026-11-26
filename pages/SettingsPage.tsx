@@ -13,13 +13,14 @@ import { Textarea } from "@/components/ui/textarea";
 import { idb } from "@/lib/db";
 import { AdminGateDialog } from "@/components/ui/admin-gate-dialog";
 import { refreshLocalData } from "@/lib/data-maintenance";
+import { collectLocalExport } from "@/lib/local-data-export";
+import { clearLocalAnalytics, getLocalAnalyticsControl, LOCAL_ANALYTICS_CHANGE, setLocalAnalyticsEnabled } from "@/lib/local-analytics-control";
 
 interface SavedSettings {
   displayName: string;
   bio: string;
   notifications: boolean;
   privateProfile: boolean;
-  dataCollection: boolean;
 }
 
 const DEFAULT_SETTINGS: SavedSettings = {
@@ -27,7 +28,6 @@ const DEFAULT_SETTINGS: SavedSettings = {
   bio: "",
   notifications: true,
   privateProfile: false,
-  dataCollection: true,
 };
 
 export function SettingsPage() {
@@ -41,7 +41,28 @@ export function SettingsPage() {
   const [bio, setBio] = useState(savedSettings.bio);
   const [notifications, setNotifications] = useState(savedSettings.notifications);
   const [privateProfile, setPrivateProfile] = useState(savedSettings.privateProfile);
-  const [dataCollection, setDataCollection] = useState(savedSettings.dataCollection);
+  const [localActivity, setLocalActivity] = useState<boolean | null>(null);
+  const [activityBusy, setActivityBusy] = useState(false);
+  useEffect(() => {
+    let mounted = true;
+    const refresh = () => { void getLocalAnalyticsControl().then(value => { if (mounted) setLocalActivity(value.enabled); }).catch(() => { if (mounted) setLocalActivity(null); }); };
+    const onStorage = (event: StorageEvent) => { if (event.key === null || event.key === LOCAL_ANALYTICS_CHANGE) refresh(); };
+    refresh(); window.addEventListener(LOCAL_ANALYTICS_CHANGE, refresh); window.addEventListener("storage", onStorage);
+    return () => { mounted = false; window.removeEventListener(LOCAL_ANALYTICS_CHANGE, refresh); window.removeEventListener("storage", onStorage); };
+  }, []);
+  const changeLocalActivity = async (enabled: boolean) => {
+    setActivityBusy(true);
+    try { await setLocalAnalyticsEnabled(enabled); setLocalActivity(enabled); }
+    catch { setLocalActivity(null); toast({ title: "Could not save activity setting", description: "Browser storage is unavailable. No change was confirmed.", variant: "destructive" }); }
+    finally { setActivityBusy(false); }
+  };
+  const clearLocalActivity = async () => {
+    if (!confirm("Clear saved activity on this browser? This cannot be undone. Cloud records and other devices are not affected.")) return;
+    setActivityBusy(true);
+    try { await clearLocalAnalytics(); toast({ title: "Local activity cleared", description: "Only activity stored by this browser was cleared. Cloud records and other devices were not changed." }); }
+    catch { toast({ title: "Could not clear activity", description: "Browser storage is unavailable. No deletion was confirmed.", variant: "destructive" }); }
+    finally { setActivityBusy(false); }
+  };
   const [activeSection, setActiveSection] = useState("appearance");
   // Compress the long-tail settings sections so the page is scannable at a
   // glance. The Account + Appearance sections are essential and stay open by
@@ -72,7 +93,6 @@ export function SettingsPage() {
         if (privacy) {
           if (typeof privacy.notifications === "boolean") next.notifications = privacy.notifications;
           if (typeof privacy.privateProfile === "boolean") next.privateProfile = privacy.privateProfile;
-          if (typeof privacy.dataCollection === "boolean") next.dataCollection = privacy.dataCollection;
         }
       } catch {
         // Best-effort; defaults are fine.
@@ -83,7 +103,6 @@ export function SettingsPage() {
       setBio(next.bio);
       setNotifications(next.notifications);
       setPrivateProfile(next.privateProfile);
-      setDataCollection(next.dataCollection);
     };
     void hydrate();
     return () => {
@@ -116,8 +135,7 @@ export function SettingsPage() {
     displayName !== savedSettings.displayName ||
     bio !== savedSettings.bio ||
     notifications !== savedSettings.notifications ||
-    privateProfile !== savedSettings.privateProfile ||
-    dataCollection !== savedSettings.dataCollection;
+    privateProfile !== savedSettings.privateProfile;
 
   useEffect(() => {
     window.__isAppDirty = isDirty;
@@ -131,7 +149,6 @@ export function SettingsPage() {
     setBio(savedSettings.bio);
     setNotifications(savedSettings.notifications);
     setPrivateProfile(savedSettings.privateProfile);
-    setDataCollection(savedSettings.dataCollection);
     toast({
       title: "Changes Discarded",
       description: "Settings reverted to their previously saved state.",
@@ -145,22 +162,21 @@ export function SettingsPage() {
       bio,
       notifications,
       privateProfile,
-      dataCollection,
     };
     try {
       // Persist profile fields through the auth layer (Firestore for signed-in
       // users, IndexedDB for guests). Privacy toggles are stored locally.
       await updateProfileData({ displayName: displayName.trim() || "Builder", bio });
-      try {
-        await idb.put("settings", {
-          id: "privacy-settings",
-          notifications,
-          privateProfile,
-          dataCollection,
-        });
-      } catch {
-        // Privacy preferences are best-effort; profile save is the priority.
-      }
+      // Preserve legacy fields, including an earlier saved-off activity
+      // preference, until the separate activity control is explicitly set.
+      // These are authoritative local preferences, not a disposable cache.
+      const previous = await idb.getStrict<Record<string, unknown>>("settings", "privacy-settings");
+      await idb.putStrict("settings", {
+        ...previous,
+        id: "privacy-settings",
+        notifications,
+        privateProfile,
+      });
       setSavedSettings(next);
       toast({
         title: "Settings saved",
@@ -170,7 +186,7 @@ export function SettingsPage() {
       console.error("Failed to save settings", error);
       toast({
         title: "Save failed",
-        description: "Could not save your settings. Please try again.",
+        description: "Some changes may not have been saved. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -214,27 +230,43 @@ export function SettingsPage() {
   };
 
   const handleExportAccountData = async () => {
-    const stores = ["profile", "settings", "posts", "topics", "brains", "nodes", "missions", "milestones", "comments", "conversations", "messages", "notifications", "communities", "checkins", "pathways", "books", "analytics_events"];
-    const data: Record<string, unknown> = {};
-
-    for (const store of stores) {
-      try {
-        data[store] = await idb.getAll(store);
-      } catch {
-        data[store] = [];
-      }
+    try {
+      const data = await collectLocalExport();
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = `brain-builder-local-export-${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(url);
+      toast({ title: "Local export ready", description: "Selected browser data only; cloud data and other local stores are not included." });
+    } catch {
+      toast({ title: "Local export failed", description: "Browser data could not be read. No complete export was created.", variant: "destructive" });
     }
+  };
 
-    const blob = new Blob([JSON.stringify({ exportedAt: new Date().toISOString(), data }, null, 2)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement("a");
-    anchor.href = url;
-    anchor.download = `brain-builder-export-${new Date().toISOString().slice(0, 10)}.json`;
-    document.body.appendChild(anchor);
-    anchor.click();
-    document.body.removeChild(anchor);
-    URL.revokeObjectURL(url);
-    toast({ title: "Export ready", description: "Your local account data export has been downloaded." });
+  const handleClearLocalData = async () => {
+    if (!confirm("Clear this browser's local data? This cannot be undone and may remove unsynced work. Your account and cloud data will NOT be deleted.")) return;
+    try {
+      // Stop pending activity sends in this tab before wiping its preference.
+      // A browser storage clear also notifies other tabs where supported.
+      window.dispatchEvent(new Event(LOCAL_ANALYTICS_CHANGE));
+      await idb.clearAllStrict();
+      window.dispatchEvent(new Event(LOCAL_ANALYTICS_CHANGE));
+      let browserStorageCleared = true;
+      try { localStorage.clear(); } catch { browserStorageCleared = false; }
+      try { sessionStorage.clear(); } catch { browserStorageCleared = false; }
+      toast({
+        title: browserStorageCleared ? "Local data cleared" : "Local data partly cleared",
+        description: browserStorageCleared ? "Browser data was cleared. Your account and cloud data were not deleted. Reloading..." : "IndexedDB was cleared, but some browser storage could not be cleared. Your account and cloud data were not deleted.",
+        ...(browserStorageCleared ? {} : { variant: "destructive" as const }),
+      });
+      if (browserStorageCleared) setTimeout(() => window.location.reload(), 1000);
+    } catch {
+      toast({ title: "Could not clear local data", description: "Browser storage could not be cleared. Your account and cloud data were not deleted.", variant: "destructive" });
+    }
   };
 
   return (
@@ -426,7 +458,7 @@ export function SettingsPage() {
                 <div className="p-6 flex items-center justify-between">
                   <div className="space-y-0.5">
                     <h3 className="font-medium">Push Notifications</h3>
-                    <p className="text-sm text-muted-foreground">Receive alerts for mentions and new followers.</p>
+                    <p className="text-sm text-muted-foreground">Saved preference only; it does not control push notifications yet.</p>
                   </div>
                   <Switch checked={notifications} onCheckedChange={setNotifications} />
                 </div>
@@ -434,23 +466,28 @@ export function SettingsPage() {
                 <div className="p-6 flex items-center justify-between">
                   <div className="space-y-0.5">
                     <h3 className="font-medium">Private Profile</h3>
-                    <p className="text-sm text-muted-foreground">Only approved followers can see your posts and brains.</p>
+                    <p className="text-sm text-muted-foreground">Saved preference only; it does not restrict profile, post, or brain visibility.</p>
                   </div>
                   <Switch checked={privateProfile} onCheckedChange={setPrivateProfile} />
                 </div>
 
-                <div className="p-6 flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <h3 className="font-medium">Analytics &amp; Telemetry</h3>
-                    <p className="text-sm text-muted-foreground">Help us improve by sending anonymous usage data.</p>
+                <div className="p-6 space-y-4">
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="space-y-1">
+                      <h3 id="local-activity-label" className="font-medium flex items-center gap-2"><Shield className="w-4 h-4 text-primary" aria-hidden="true" /> Activity on this browser</h3>
+                      <p id="local-activity-description" className="text-sm text-muted-foreground">When off, this browser stops saving and sending app activity events and stops using saved activity for recommendations. Your followed topics still affect the feed.</p>
+                    </div>
+                    <Switch aria-labelledby="local-activity-label" aria-describedby="local-activity-description" checked={localActivity === true} disabled={localActivity === null || activityBusy} onCheckedChange={value => void changeLocalActivity(value)} />
                   </div>
-                  <Switch checked={dataCollection} onCheckedChange={setDataCollection} />
+                  {localActivity === null && <p role="status" className="text-sm text-muted-foreground">Activity setting unavailable on this browser.</p>}
+                  <p className="text-sm text-muted-foreground">This applies to this browser, including anyone using it. It does not delete activity already sent, control other devices, or stop other analytics services. Previously saved activity is kept until you clear it and can be used again if you turn this on.</p>
+                  <Button variant="outline" disabled={activityBusy} onClick={() => void clearLocalActivity()}>Clear saved browser activity</Button>
                 </div>
               </CardContent>
             </Card>
             ) : (
               <p className="text-sm text-muted-foreground italic px-1 py-2 leading-relaxed">
-                {notifications ? "Notifications on" : "Notifications off"} • {privateProfile ? "Private profile" : "Public profile"} • {dataCollection ? "Telemetry on" : "Telemetry off"}. <span className="not-italic font-medium text-foreground/70">Tap to expand.</span>
+                Manage browser activity and view the limitations of other privacy preferences. <span className="not-italic font-medium text-foreground/70">Tap to expand.</span>
               </p>
             )}
           </section>
@@ -473,7 +510,7 @@ export function SettingsPage() {
             {expandedSections.advanced && (
             <div className="space-y-2">
               <Button onClick={() => void handleExportAccountData()} variant="outline" className="w-full justify-between h-14 px-6 font-normal">
-                <span>Export Account Data</span>
+                <span>Export selected local data</span>
                 <ChevronRight className="w-5 h-5 text-muted-foreground" />
               </Button>
               <Button onClick={() => setIsRefreshOpen(true)} variant="outline" className="w-full justify-between h-14 px-6 font-normal">
@@ -483,19 +520,12 @@ export function SettingsPage() {
                 </span>
                 <ChevronRight className="w-5 h-5 text-muted-foreground" />
               </Button>
-              <Button onClick={() => {
-                if (confirm("Are you sure you want to delete your account? This will clear your local data. This cannot be undone.")) {
-                  void idb.clearAll().then(() => {
-                    try { localStorage.clear(); } catch {}
-                    try { sessionStorage.clear(); } catch {}
-                    toast({ title: "Account deleted", description: "All local data has been cleared. Reloading..." });
-                    setTimeout(() => window.location.reload(), 1000);
-                  });
-                }
-              }} variant="outline" className="w-full justify-between h-14 px-6 font-normal text-destructive hover:text-destructive hover:bg-destructive/10">
-                <span>Delete Account</span>
+              <p className="px-1 text-xs text-muted-foreground">The export contains selected browser data only and may include data from other accounts on this device. It does not include cloud data.</p>
+              <Button onClick={() => void handleClearLocalData()} variant="outline" className="w-full justify-between h-14 px-6 font-normal text-destructive hover:text-destructive hover:bg-destructive/10">
+                <span>Clear local browser data</span>
                 <ChevronRight className="w-5 h-5 text-destructive/50" />
               </Button>
+              <p className="px-1 text-xs text-muted-foreground">Clearing local data does not delete your account or cloud data. A complete account deletion process is not yet available here.</p>
             </div>
             )}
           </section>

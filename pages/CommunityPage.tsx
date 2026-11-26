@@ -2,7 +2,6 @@ import { useState } from "react";
 import { useLocation } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useCommunities } from "@/hooks/use-communities";
-import { useReputation } from "@/hooks/use-reputation";
 import { useAuth } from "@/components/auth/AuthContext";
 import { userIdOr, displayNameOr } from "@/lib/user-data";
 import { useMessages } from "@/hooks/use-messages";
@@ -42,16 +41,7 @@ function useCheckins() {
     }
   });
 
-  const { mutateAsync: updateCheckin } = useMutation({
-    mutationFn: async (checkin: CircleCheckIn) => {
-      await idb.put("checkins", checkin);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["checkins"] });
-    }
-  });
-
-  return { checkins, addCheckin, updateCheckin };
+  return { checkins, addCheckin };
 }
 
 /**
@@ -59,16 +49,19 @@ function useCheckins() {
  * for the given roomId via the library_entries index, and exposes a mutate
  * to add a new synthesis entry (curated by a Curator / signed by Steward).
  */
+// Local Room entries have no verified account, audience or role binding.
+const ROOM_LIBRARY_ENABLED = false;
 function useRoomLibrary(roomId: string | undefined) {
   const queryClient = useQueryClient();
   const { data: entries = [] } = useQuery<LibraryEntry[]>({
     queryKey: ["library_entries", roomId],
-    enabled: !!roomId,
+    enabled: ROOM_LIBRARY_ENABLED && !!roomId,
     queryFn: () => idb.getAllByIndex<LibraryEntry>("library_entries", "roomId", roomId as string),
   });
 
   const { mutateAsync: addLibraryEntry } = useMutation({
     mutationFn: async (entry: LibraryEntry) => {
+      if (!ROOM_LIBRARY_ENABLED) throw new Error("Room library is paused pending access verification.");
       await idb.put("library_entries", entry);
     },
     onSuccess: () => {
@@ -78,45 +71,6 @@ function useRoomLibrary(roomId: string | undefined) {
 
   return { entries, addLibraryEntry };
 }
-
-/**
- * Quora-style toggle vote for circle check-ins — replaces the old
- * always-increment buttons (every tap was +1, up/down stacked, no
- * un-vote). Mirrors togglePostReaction semantics: mutual exclusion,
- * click the active vote again to remove it. My-state lives on the
- * record (myUpvote/myDownvote) since this build is local-first.
- */
-function toggleCheckinVote(c: CircleCheckIn, direction: "up" | "down"): CircleCheckIn {
-  const up = c.myUpvote ?? false;
-  const down = c.myDownvote ?? false;
-  const upvotes = c.upvotes ?? 0;
-  const downvotes = c.downvotes ?? 0;
-  if (direction === "up") {
-    if (up) return { ...c, upvotes: Math.max(0, upvotes - 1), myUpvote: false };
-    return {
-      ...c,
-      upvotes: upvotes + 1,
-      myUpvote: true,
-      downvotes: down ? Math.max(0, downvotes - 1) : downvotes,
-      myDownvote: false,
-    };
-  }
-  if (down) return { ...c, downvotes: Math.max(0, downvotes - 1), myDownvote: false };
-  return {
-    ...c,
-    downvotes: downvotes + 1,
-    myDownvote: true,
-    upvotes: up ? Math.max(0, upvotes - 1) : upvotes,
-    myUpvote: false,
-  };
-}
-
-/**
- * Room migration: role + visibility derivation lives in lib/room-logic.ts
- * so the core semantics are unit-testable without rendering React.
- */
-
-
 
 /**
  * B/C/D: Membership-state-aware button.
@@ -235,8 +189,7 @@ function MembershipButton({
 
 export function CommunityPage() {
   const { communities, joinCommunity, leaveCommunity, cancelJoinRequest, isJoining, isLeaving, isCancelling } = useCommunities();
-  const { checkins, addCheckin, updateCheckin } = useCheckins();
-  const { addXPEvent } = useReputation();
+  const { checkins, addCheckin } = useCheckins();
   const { addConversation, addMessage } = useMessages();
   const { toast } = useToast();
   const [, setLocation] = useLocation();
@@ -392,8 +345,7 @@ export function CommunityPage() {
         createdAt: Date.now()
       });
 
-      await addXPEvent("check_in", 25, "Daily Momentum Check-In");
-      toast({ title: "Checked in!", description: "+25 XP earned for check-in." });
+      toast({ title: "Checked in!", description: "Points are temporarily paused." });
       setCheckinMessage("");
       setMoodScore(0);
     } catch (error) {
@@ -417,8 +369,7 @@ export function CommunityPage() {
         createdAt: Date.now()
       });
 
-      await addXPEvent("check_in", 25, "Room Check-In");
-      toast({ title: "Checked in to Room!", description: "+25 XP earned." });
+      toast({ title: "Checked in to Room!", description: "Points are temporarily paused." });
       setCheckinMessage("");
       setMoodScore(0);
     } catch (error) {
@@ -437,12 +388,7 @@ export function CommunityPage() {
   const { entries: libraryEntries, addLibraryEntry } = useRoomLibrary(activeComm?.id);
   const commCheckins = checkins
     .filter(c => c.circleId === selectedCommunity)
-    .sort((a, b) => {
-      const scoreA = (a.upvotes || 0) - (a.downvotes || 0);
-      const scoreB = (b.upvotes || 0) - (b.downvotes || 0);
-      if (scoreA !== scoreB) return scoreB - scoreA;
-      return b.createdAt - a.createdAt;
-    })
+    .sort((a, b) => b.createdAt - a.createdAt)
     .slice(0, 5);
 
   const moodEmojis = [
@@ -1120,16 +1066,7 @@ export function CommunityPage() {
                           topicId: c.circleId || "community",
                           content: `${moodEmoji} ${c.message || "Checked in"}`,
                           postType: "post",
-                          reactions: {
-                            upvote: c.upvotes || 0,
-                            downvote: c.downvotes || 0,
-                            repost: 0,
-                          },
-                          userReactions: c.myUpvote
-                            ? { upvote: [currentUserId] }
-                            : c.myDownvote
-                              ? { downvote: [currentUserId] }
-                              : {},
+                          reactions: { repost: 0 },
                           commentCount: c.replies?.length || 0,
                           repostCount: 0,
                           createdAt: c.createdAt,
@@ -1141,17 +1078,7 @@ export function CommunityPage() {
                           <PostCard
                             key={c.id}
                             post={post}
-                            onReact={(_postId: string, type: string) => {
-                              // Check-in votes must update the CHECKIN record —
-                              // reactToPost would idb.get("posts", …) and throw
-                              // POST_NOT_FOUND for every check-in card.
-                              if (type !== "upvote" && type !== "downvote") return;
-                              void Promise.resolve(
-                                updateCheckin(toggleCheckinVote(c, type === "upvote" ? "up" : "down")),
-                              ).catch((error: unknown) =>
-                                toast({ title: "Couldn't update check-in", description: error instanceof Error ? error.message : "Please try again.", variant: "destructive" })
-                              );
-                            }}
+                            onReact={() => { /* Voting is unavailable for check-ins too. */ }}
                             authorName={post.authorName}
                           />
                         );
@@ -1162,7 +1089,9 @@ export function CommunityPage() {
 
                 {/* Phase 7: Room Library — curated, versioned synthesis.
                     Listed for everyone; only Curators/Stewards can add. */}
-                <div className="space-y-4 mt-8">
+                {!ROOM_LIBRARY_ENABLED ? (
+                  <p className="mt-8 text-sm text-muted-foreground" role="status">Room library is paused while access and ownership are verified. Existing entries remain on this device.</p>
+                ) : <div className="space-y-4 mt-8">
                   <h4 className="font-semibold flex items-center gap-2 border-b pb-2">
                     <BookOpen className="w-4 h-4" /> Library
                   </h4>
@@ -1254,7 +1183,7 @@ export function CommunityPage() {
                       </Button>
                     </div>
                   )}
-                </div>
+                </div>}
               </div>
             </>
           )}

@@ -26,7 +26,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { idb } from "@/lib/db";
 import { env } from "@/lib/env";
-import { getAuthToken } from "@/lib/auth-token";
 import { useToast } from "@/hooks/use-toast";
 import type { SkillEntry, SkillStep, Brain, Node } from "@/lib/types";
 
@@ -68,47 +67,8 @@ function extractStepsFromBrain(brain: Brain | undefined, nodes: Node[]): SkillSt
     }));
 }
 
-/**
- * Shape matching the Supabase public.skills table row.
- * Used for upserting on publish.
- */
-interface SupabaseSkillRow {
-  id: string;
-  domain: string;
-  make: string | null;
-  model: string | null;
-  year: number | null;
-  part: string | null;
-  version: string;
-  title: string;
-  author_name: string;
-  author_years_experience: number | null;
-  steps: SkillStep[];
-  source_brain_id: string | null;
-  status: "private" | "in_review" | "published";
-  reviewer_id: string | null;
-  published_at: string | null;
-}
-
-function toSupabaseRow(skill: SkillEntry): SupabaseSkillRow {
-  return {
-    id: skill.id,
-    domain: skill.domain,
-    make: skill.make ?? null,
-    model: skill.model ?? null,
-    year: skill.year ?? null,
-    part: skill.part ?? null,
-    version: skill.version,
-    title: skill.title,
-    author_name: skill.authorName,
-    author_years_experience: skill.authorYearsExperience ?? null,
-    steps: skill.steps,
-    source_brain_id: skill.sourceBrainId ?? null,
-    status: skill.status,
-    reviewer_id: skill.reviewerId ?? null,
-    published_at: skill.publishedAt ? new Date(skill.publishedAt).toISOString() : null,
-  };
-}
+/** No trusted moderator, identity bridge or publication receipt is verified. */
+export function skillPublishingAvailable(): boolean { return false; }
 
 export interface PublicSkillSearchResult {
   id: string;
@@ -128,7 +88,6 @@ export interface PublicSkillSearchResult {
 export function useSkills() {
   const queryClient = useQueryClient();
   const queryKey = ["skills"];
-  const publicQueryKey = ["skills", "public"];
   const { toast } = useToast();
 
   /** Local skills (own + cached). */
@@ -232,71 +191,13 @@ export function useSkills() {
     },
   });
 
-  /**
-   * Approve and publish a skill. Changes status from 'in_review' →
-   * 'published', sets publishedAt + reviewerId, AND upserts the skill
-   * to Supabase so other users can find it via /api/v1/search/skills.
-   *
-   * Only callable by moderators (the UI must gate this — the hook
-   * itself doesn't check moderator status).
-   */
+  /** Fail closed until server authorization and publication receipts exist. */
   const approveAndPublish = useMutation({
-    mutationFn: async (input: {
-      skillId: string;
-      reviewerId: string;
-    }): Promise<SkillEntry> => {
-      const existing = await idb.get<SkillEntry>(STORE, input.skillId);
-      if (!existing) throw new Error("Skill not found");
-      if (existing.status !== "in_review") {
-        throw new Error(`Skill is ${existing.status} — only in_review skills can be approved.`);
-      }
-      const updated: SkillEntry = {
-        ...existing,
-        status: "published",
-        reviewerId: input.reviewerId,
-        publishedAt: Date.now(),
-      };
-      await idb.put(STORE, updated);
-
-      // Sync to Supabase so other users can find this skill in real time.
-      // Best-effort: if the API call fails, the skill is still published
-      // locally and will sync on next app boot via a background job.
-      // NOTE: when VITE_API_BASE_URL is empty the URL is same-origin
-      // relative ("/api/v1/skills") — same as api-client.ts — so this
-      // ALWAYS runs in production behind the reverse proxy.
-      try {
-        const token = await getAuthToken().catch(() => null);
-        const response = await fetch(`${env.apiBaseUrl}/api/v1/skills`, {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
-          },
-          body: JSON.stringify(toSupabaseRow(updated)),
-        });
-        if (!response.ok) {
-          console.warn(`Skill sync to Supabase failed: ${response.status}`);
-        }
-      } catch (err) {
-        console.warn("Skill sync to Supabase failed (network):", err);
-      }
-
-      return updated;
-    },
-    onSuccess: (skill) => {
-      void queryClient.invalidateQueries({ queryKey });
-      void queryClient.invalidateQueries({ queryKey: publicQueryKey });
-      toast({
-        title: "Skill published",
-        description: `"${skill.title}" is now public and searchable by other users building brains.`,
-      });
+    mutationFn: async (_input: { skillId: string; reviewerId: string }): Promise<SkillEntry> => {
+      throw new Error("Skill publishing is temporarily unavailable");
     },
     onError: (err: Error) => {
-      toast({
-        title: "Could not publish",
-        description: err.message,
-        variant: "destructive",
-      });
+      toast({ title: "Could not publish", description: err.message, variant: "destructive" });
     },
   });
 
@@ -316,9 +217,8 @@ export function useSkills() {
       part?: string;
       limit?: number;
     }): Promise<PublicSkillSearchResult[]> => {
-      // Server-first search (same-origin when VITE_API_BASE_URL is empty,
-      // exactly like api-client.ts). Falls back to local IDB results when
-      // the server is unreachable so the UI still works offline.
+      // A cached "published" status does not prove current visibility.
+      // On outage, report unavailable rather than expose unverified records.
       const params = new URLSearchParams({ q: input.query });
       if (input.domain) params.set("domain", input.domain);
       if (input.make) params.set("make", input.make);
@@ -334,28 +234,8 @@ export function useSkills() {
         }
         const data = await response.json();
         return Array.isArray(data.results) ? data.results : [];
-      } catch (err) {
-        console.warn("Public skill search fell back to local results:", err);
-        const local = await idb.getAll<SkillEntry>(STORE);
-        const q = input.query.toLowerCase();
-        return local
-          .filter((s) => s.status === "published")
-          .filter((s) => !q || s.title.toLowerCase().includes(q) || s.domain.toLowerCase().includes(q))
-          .slice(0, input.limit ?? 20)
-          .map((s) => ({
-            id: s.id,
-            title: s.title,
-            domain: s.domain,
-            make: s.make ?? null,
-            model: s.model ?? null,
-            year: s.year ?? null,
-            part: s.part ?? null,
-            version: s.version,
-            author_name: s.authorName,
-            author_years_experience: s.authorYearsExperience ?? null,
-            status: s.status,
-            source_brain_id: s.sourceBrainId ?? null,
-          }));
+      } catch {
+        throw new Error("Skill search is temporarily unavailable");
       }
     },
   });

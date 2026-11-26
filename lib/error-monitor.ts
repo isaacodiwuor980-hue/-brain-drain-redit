@@ -49,21 +49,9 @@ function report(input: Partial<ErrorReport> & { message: string }) {
     }
   }
 
-  if (env.isProd) {
-    // In production, forward to the API's error endpoint when available.
-    // Fire-and-forget with sendBeacon so it does not delay page unload.
-    try {
-      const payload = JSON.stringify(reportData);
-      if (typeof navigator !== "undefined" && navigator.sendBeacon) {
-        navigator.sendBeacon(
-          `${env.apiBaseUrl}/api/client-errors`,
-          new Blob([payload], { type: "application/json" }),
-        );
-      }
-    } catch {
-      // best-effort
-    }
-  } else {
+  // Do not transmit unreviewed messages, URLs or stacks: they may contain
+  // private content. Local listeners/queue and development console remain.
+  if (!env.isProd) {
     console.error("[error-monitor]", reportData.message, reportData.stack);
   }
 }

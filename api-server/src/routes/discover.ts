@@ -1,4 +1,4 @@
-import { Router, type IRouter } from "express";
+import { Router, type IRouter, type RequestHandler } from "express";
 import { supabase, SupabaseError } from "../lib/supabase";
 import { requireAuth } from "../middleware/auth";
 import { logger } from "../lib/logger";
@@ -123,7 +123,15 @@ router.get("/discover/follower-count", requireAuth, async (req, res) => {
 /**
  * POST /api/discover/follow — follow a user. Body: { userId }
  */
-router.post("/discover/follow", requireAuth, async (req, res) => {
+// Mounted route is fail-closed until follow identity and database permissions
+// are verified end-to-end. Direct DB/privileged and old clients are unaffected.
+router.post("/discover/follow", requireAuth, (_req, res) => {
+  res.setHeader("Cache-Control", "no-store");
+  res.status(503).json({ error: "Follow service unavailable" });
+});
+
+/** Historical implementation retained for audit; never mount as a route. */
+export const legacyFollowHandlerForAudit: RequestHandler = async (req, res) => {
   const auth = req.auth;
   if (!auth) {
     res.status(401).json({ error: "Authentication required" });
@@ -143,11 +151,8 @@ router.post("/discover/follow", requireAuth, async (req, res) => {
     return;
   }
   try {
-    // B-6 fix: previously the inner try/catch swallowed ALL insert failures
-    // (including Supabase outages and network errors) and returned 204, so
-    // the client believed the follow succeeded when it silently didn't.
-    // Now we only swallow the specific "table missing" case (PGRST205 /
-    // 404) — every other error propagates as 502 so the client can retry.
+    // A missing table is an unavailable feature, not a successful follow.
+    // Other storage errors propagate as retryable failures.
     try {
       await supabase.insert(
         "user_follows",
@@ -155,24 +160,24 @@ router.post("/discover/follow", requireAuth, async (req, res) => {
         "resolution=merge-duplicates",
       );
     } catch (insertErr) {
-      // Distinguish "table not deployed yet" (graceful 204 — feature unavailable)
-      // from "Supabase is down / network error" (502 — client should retry).
+      // Distinguish unavailable follow storage from a general upstream error.
       const isTableMissing =
         insertErr instanceof SupabaseError &&
         (insertErr.status === 404 || /PGRST205|Could not find/.test(String(insertErr.body || "")));
       if (isTableMissing) {
-        logger.warn({ targetUserId }, "user_follows table not deployed — follow silently ignored");
-        res.status(204).end();
+        logger.warn({}, "Follow storage unavailable");
+        res.status(503).json({ error: "Follow service unavailable" });
         return;
       }
       throw insertErr;
     }
     res.status(204).end();
-  } catch (err) {
-    logger.warn({ err }, "Follow user failed");
+  } catch {
+    // Upstream errors may contain account identifiers or request data.
+    logger.warn({}, "Follow user failed");
     res.status(502).json({ error: "Could not follow user" });
   }
-});
+};
 
 /**
  * GET /api/discover/search-users?q=... — Phase 4 (Username Search).

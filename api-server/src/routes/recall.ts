@@ -25,8 +25,17 @@ import { Router, type IRouter } from "express";
 import { z } from "zod";
 import { supabase, SupabaseError } from "../lib/supabase";
 import { requireAuth } from "../middleware/auth";
+import { requireMappedIdentity } from "../middleware/identity-map";
 
 const router: IRouter = Router();
+router.use("/recall", (_req, res, next) => { res.setHeader("Cache-Control", "no-store"); next(); }, requireAuth, requireMappedIdentity);
+
+function parseLimit(value: unknown, fallback: number, maximum: number): number | null {
+  if (value === undefined) return fallback;
+  if (typeof value !== "string" || !/^[1-9][0-9]*$/.test(value)) return null;
+  const parsed = Number(value);
+  return Number.isSafeInteger(parsed) && parsed <= maximum ? parsed : null;
+}
 
 const RecordSchema = z.object({
   brainId: z.string().uuid().optional(),
@@ -86,10 +95,10 @@ function computeNextState(prev: Sm2State, quality: number): Sm2State {
 
 /**
  * POST /api/recall
- * Record a recall event. The server computes the SM-2 next state to
- * prevent client-side tampering with scheduling.
+ * Record a recall event. The next state is calculated server-side, but the
+ * previous state is caller-supplied and is not an authoritative history.
  */
-router.post("/recall", requireAuth, async (req, res) => {
+router.post("/recall", async (req, res) => {
   const parsed = RecordSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "Invalid recall event", details: parsed.error.flatten() });
@@ -107,11 +116,16 @@ router.post("/recall", requireAuth, async (req, res) => {
     easeFactor: parsed.data.sm2StateBefore?.easeFactor ?? DEFAULT_SM2_STATE.easeFactor,
   };
   const next = computeNextState(prev, parsed.data.quality);
-  const nextRecallAt = new Date(Date.now() + next.intervalDays * 86_400_000).toISOString();
+  const nextTimestamp = Date.now() + next.intervalDays * 86_400_000;
+  if (!Number.isSafeInteger(next.repetition) || !Number.isSafeInteger(next.intervalDays) ||
+      !Number.isFinite(next.easeFactor) || !Number.isFinite(nextTimestamp) || nextTimestamp > 8_640_000_000_000_000) {
+    res.status(400).json({ error: "Invalid recall schedule" }); return;
+  }
+  const nextRecallAt = new Date(nextTimestamp).toISOString();
 
   try {
     await supabase.insert("recall_events", {
-      user_id: req.auth!.uid,
+      user_id: req.mappedUserId!,
       brain_id: parsed.data.brainId || null,
       topic_id: parsed.data.topicId || null,
       quality: parsed.data.quality,
@@ -127,7 +141,7 @@ router.post("/recall", requireAuth, async (req, res) => {
     });
   } catch (error) {
     if (error instanceof SupabaseError) {
-      req.log?.error?.({ err: error }, "Recall record failed");
+      req.log?.error?.({ status: error.status }, "Recall record failed");
       res.status(502).json({ error: "Storage unavailable" });
       return;
     }
@@ -139,32 +153,37 @@ router.post("/recall", requireAuth, async (req, res) => {
  * GET /api/recall/due
  * Get items due for recall (next_recall_at <= now), ordered by soonest first.
  */
-router.get("/recall/due", requireAuth, async (req, res) => {
+router.get("/recall/due", async (req, res) => {
   if (!supabase.isConfigured()) {
     res.status(503).json({ error: "Storage not configured" });
     return;
   }
 
-  const limit = Math.min(Number(req.query.limit) || 20, 100);
+  const limit = parseLimit(req.query.limit, 20, 100);
+  if (limit === null) { res.status(400).json({ error: "Invalid limit" }); return; }
 
   try {
     // PostgREST filter: next_recall_at=lte.<iso_now>
     const nowIso = new Date().toISOString();
     const rows = await supabase.get<{
       id: string;
+      user_id: string;
       brain_id: string | null;
       topic_id: string | null;
       next_recall_at: string;
     }>("recall_events", {
-      select: "id,brain_id,topic_id,next_recall_at",
+      select: "id,user_id,brain_id,topic_id,next_recall_at",
       filters: {
-        user_id: `eq.${req.auth!.uid}`,
+        user_id: `eq.${req.mappedUserId!}`,
         next_recall_at: `lte.${nowIso}`,
       },
       order: { column: "next_recall_at", ascending: true },
       limit,
     });
 
+    if (rows.some(row => typeof row.user_id !== "string" || row.user_id.toLowerCase() !== req.mappedUserId!.toLowerCase())) {
+      res.status(502).json({ error: "Storage unavailable" }); return;
+    }
     res.json({
       due: rows.map((r) => ({
         id: r.id,
@@ -175,7 +194,7 @@ router.get("/recall/due", requireAuth, async (req, res) => {
     });
   } catch (error) {
     if (error instanceof SupabaseError) {
-      req.log?.error?.({ err: error }, "Recall due fetch failed");
+      req.log?.error?.({ status: error.status }, "Recall due fetch failed");
       res.status(502).json({ error: "Storage unavailable" });
       return;
     }
@@ -187,17 +206,19 @@ router.get("/recall/due", requireAuth, async (req, res) => {
  * GET /api/recall/history
  * Get recent recall events for the caller.
  */
-router.get("/recall/history", requireAuth, async (req, res) => {
+router.get("/recall/history", async (req, res) => {
   if (!supabase.isConfigured()) {
     res.status(503).json({ error: "Storage not configured" });
     return;
   }
 
-  const limit = Math.min(Number(req.query.limit) || 50, 200);
+  const limit = parseLimit(req.query.limit, 50, 200);
+  if (limit === null) { res.status(400).json({ error: "Invalid limit" }); return; }
 
   try {
     const rows = await supabase.get<{
       id: string;
+      user_id: string;
       brain_id: string | null;
       topic_id: string | null;
       quality: number;
@@ -205,12 +226,15 @@ router.get("/recall/history", requireAuth, async (req, res) => {
       next_recall_at: string;
       recalled_at: string;
     }>("recall_events", {
-      select: "id,brain_id,topic_id,quality,sm2_state_after,next_recall_at,recalled_at",
-      filters: { user_id: `eq.${req.auth!.uid}` },
+      select: "id,user_id,brain_id,topic_id,quality,sm2_state_after,next_recall_at,recalled_at",
+      filters: { user_id: `eq.${req.mappedUserId!}` },
       order: { column: "recalled_at", ascending: false },
       limit,
     });
 
+    if (rows.some(row => typeof row.user_id !== "string" || row.user_id.toLowerCase() !== req.mappedUserId!.toLowerCase())) {
+      res.status(502).json({ error: "Storage unavailable" }); return;
+    }
     res.json({
       history: rows.map((r) => ({
         id: r.id,
@@ -224,7 +248,7 @@ router.get("/recall/history", requireAuth, async (req, res) => {
     });
   } catch (error) {
     if (error instanceof SupabaseError) {
-      req.log?.error?.({ err: error }, "Recall history fetch failed");
+      req.log?.error?.({ status: error.status }, "Recall history fetch failed");
       res.status(502).json({ error: "Storage unavailable" });
       return;
     }

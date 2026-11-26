@@ -42,9 +42,22 @@ export const BrainCard = memo(function BrainCard({ brain, onClick, onFork, onUpd
     <div
       className="h-full transition-transform duration-200 ease-out will-change-transform hover:-translate-y-1 hover:scale-[1.01] active:scale-[0.98]"
     >
+      {/* A11Y/CLICK AUDIT: the card was a div with onClick — unreachable by
+          keyboard and invisible to screen readers, so the ONLY way into a
+          brain's detail view was a mouse. It is now a real button-ish
+          control: focusable, activatable with Enter/Space, labelled. */}
       <Card
-        className="h-full bg-card hover:border-primary/50 transition-colors border-border shadow-sm flex flex-col cursor-pointer relative group"
+        role="button"
+        tabIndex={0}
+        aria-label={`Open brain: ${brain.title}`}
+        className="h-full bg-card hover:border-primary/50 transition-colors border-border shadow-sm flex flex-col cursor-pointer relative group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
         onClick={onClick}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            onClick();
+          }
+        }}
       >
         <CardHeader className="pb-3 flex-none">
           {/* Tags + type + visibility badges */}

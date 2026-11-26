@@ -1,7 +1,8 @@
-import { Router, type IRouter } from "express";
+import { Router, type IRouter, type RequestHandler } from "express";
 import { z } from "zod";
 import { supabase, SupabaseError } from "../lib/supabase";
 import { optionalAuth } from "../middleware/auth";
+import { isFeedCursor, isFeedCursorTimestamp, type FeedCursor } from "../../../lib/feed-cursor";
 
 const router: IRouter = Router();
 
@@ -18,13 +19,17 @@ const FeedQuerySchema = z.object({
     .optional(),
   limit: z.coerce.number().int().min(1).max(50).default(20),
   offset: z.coerce.number().int().min(0).default(0),
-});
+  cursorCreatedAt: z.string().refine(isFeedCursorTimestamp).optional(),
+  cursorId: z.string().regex(/^[A-Za-z0-9_-]{1,120}$/).optional(),
+}).refine(data => (data.cursorCreatedAt === undefined) === (data.cursorId === undefined) &&
+  (data.cursorId === undefined || data.offset === 0));
 
 interface PostRow {
   id: string;
   user_id: string;
   topic_id: string;
   content: string;
+  tags: string[] | null;
   post_type: string;
   event: unknown;
   media_urls: string[] | null;
@@ -36,23 +41,12 @@ interface PostRow {
   author: { display_name: string; avatar_url: string | null } | null;
 }
 
-interface ReactionRow {
-  target_id: string;
-  reaction_type: string;
-  user_id: string;
-}
-
-/**
- * Cache entry for one feed page: base posts WITHOUT per-user reactions
- * (myReaction is computed per-request on top), the reactions index, and
- * freshness metadata. Module-level so both the request handler and the
- * SWR background refresher share the shape.
- */
+/** Shared cache stores aggregate repost counts only, never voter identities. */
 interface CachedFeed {
   posts: Array<Record<string, unknown>>;
   hasMore: boolean;
-  reactionsByPost: Record<string, Array<{ target_id: string; reaction_type: string; user_id: string }>>;
-  cachedAt: number;
+  repostsByPost: Record<string, number>;
+  nextCursor: FeedCursor | null;
 }
 
 /**
@@ -70,228 +64,115 @@ function normalizePostType(raw: string | null | undefined): "post" | "question" 
   return "post";
 }
 
-router.get("/feed", optionalAuth, async (req, res) => {
+/** Attach repost totals without returning individual reactions.
+ * Vote totals are deliberately not exposed; this does not restrict direct DB
+ * access or other routes. Verify linked brains per response.
+ * Until ownership mapping is proven, even an author's private brain is omitted.
+ */
+async function renderFeedPosts(entry: CachedFeed) {
+  const ids = [...new Set(entry.posts.map(row => row.brainId).filter((id): id is string =>
+    typeof id === "string" && /^[A-Za-z0-9_-]{1,120}$/.test(id)))];
+  const publicIds = new Set<string>();
+  if (ids.length) {
+    try {
+      const rows = await supabase.get<{id: string; is_public: boolean}>("brains", {
+        select: "id,is_public", filters: { id: `in.(${ids.map(id => `"${id}"`).join(",")})`, is_public: "eq.true" }, limit: ids.length,
+      });
+      for (const row of rows) if (row && row.is_public === true && ids.includes(row.id)) publicIds.add(row.id);
+    } catch {
+      // Missing metadata or an upstream failure means no links can be proven public.
+    }
+  }
+  return entry.posts.map((row) => {
+    return {
+      ...row,
+      brainId: typeof row.brainId === "string" && publicIds.has(row.brainId) ? row.brainId : null,
+      reactions: {
+        repost: ((row as { repostCount?: number }).repostCount ?? 0) + (entry.repostsByPost[(row as { id: string }).id] ?? 0),
+      },
+    };
+  });
+}
+
+// A flag cannot establish feed authorization, graph provenance, blocks or
+// moderation. This route stays disabled even if the flag is turned on.
+router.get("/feed/following-v2", (_req, res) => {
+  res.setHeader("Cache-Control", "no-store");
+  res.status(503).json({ error: "Following feed temporarily unavailable" });
+});
+
+/** Unmounted prototype for synthetic testing only; not a privacy boundary. */
+export const followingV2HandlerForTests: RequestHandler = async (req, res) => {
+    const parsed = FeedQuerySchema.safeParse(req.query);
+    if (!parsed.success) { res.status(400).json({ error: "Invalid feed query" }); return; }
+    try {
+      const following = await supabase.get<{ following_id: string }>("follows", {
+        select: "following_id", filters: { follower_id: `eq.${req.mappedUserId}` }, limit: 501,
+      });
+      // Do not silently return an incomplete graph; replace with a server-side
+      // paginated join before raising this cap. Deployment must verify that the
+      // PostgREST row limit is at least 501, or truncation remains possible.
+      if (following.length > 500) { res.status(503).json({ error: "Following graph exceeds supported size" }); return; }
+      const ids = following.map(row => row.following_id);
+      if (ids.some(id => typeof id !== "string" || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id))) {
+        res.status(502).json({ error: "Feed data source unavailable" }); return;
+      }
+      if (ids.length === 0) { res.json({ posts: [], hasMore: false, source: "following" }); return; }
+      const { topic, limit, offset, cursorId, cursorCreatedAt } = parsed.data;
+      const cursor = cursorId && cursorCreatedAt ? {id:cursorId,createdAt:cursorCreatedAt} : null;
+      const page = await fetchFeedPage("following", topic, limit, offset, ids, false, cursor);
+      res.json({ posts: await renderFeedPosts(page), hasMore: page.hasMore, nextCursor: page.nextCursor, source: "following" });
+    } catch {
+      // Do not return or log upstream payloads which may contain user data.
+      res.status(502).json({ error: "Feed data source unavailable" });
+    }
+};
+
+router.get("/feed", (_req, res, next) => { res.setHeader("Cache-Control", "no-store"); next(); }, optionalAuth, async (req, res) => {
   const parsed = FeedQuerySchema.safeParse(req.query);
   if (!parsed.success) {
     res.status(400).json({ error: "Invalid feed query" });
     return;
   }
-  const { mode, topic, limit, offset } = parsed.data;
-  const currentUserId = req.auth?.uid;
+  const { mode, topic, limit, offset, cursorId, cursorCreatedAt } = parsed.data;
+  const cursor = cursorId && cursorCreatedAt ? {id:cursorId,createdAt:cursorCreatedAt} : null;
 
-  // If Supabase is not configured, the API runs in degraded/local mode.
+  // The legacy follow graph stores text subjects while posts are UUID-owned.
+  // No verified binding or graph provenance exists, so neither a guessed join
+  // nor a shared cache is safe. Do not silently present an empty feed as valid.
+  if (mode === "following") {
+    res.status(503).json({ error: "Following feed is unavailable while account identity is being verified" });
+    return;
+  }
+
   if (!supabase.isConfigured()) {
     res.json({ posts: [], hasMore: false, source: "degraded" });
     return;
   }
 
-  // B3 FOLLOWING FIX: "following" previously returned the exact same rows as
-  // "foryou" (mode was never applied) — the tab was a dead control. Resolve
-  // the caller's follow graph from user_follows. Guests (and users whose
-  // follows table isn't deployed yet) get an honest empty page, matching the
-  // graceful 204 path in discover.ts POST /follow.
-  let followeeIds: string[] | null = null;
-  if (mode === "following") {
-    if (!currentUserId) {
-      res.json({ posts: [], hasMore: false, source: "following" });
-      return;
-    }
-    try {
-      const followRows = await supabase.get<{ followee_id: string }>("user_follows", {
-        select: "followee_id",
-        filters: { follower_id: `eq.${currentUserId}` },
-        limit: 1000,
-      });
-      followeeIds = followRows.map((r) => r.followee_id);
-    } catch (err) {
-      // Distinguish "table not deployed" (graceful empty) from a real outage
-      // (502) — same contract as discover.ts's follow insert.
-      if (
-        err instanceof SupabaseError &&
-        (err.status === 404 || /PGRST205|Could not find/i.test(String(err.body ?? "")))
-      ) {
-        followeeIds = [];
-      } else {
-        throw err;
-      }
-    }
-    if (followeeIds.length === 0) {
-      res.json({ posts: [], hasMore: false, source: "following" });
-      return;
-    }
-  }
-
-  // In-memory cache for the feed. Keyed by (mode, topic, limit, offset).
-  // Posts don't change frequently, so a 30-second TTL gives a good balance
-  // between freshness and Supabase round-trip cost (each uncached call is
-  // ~500-1000ms due to two REST queries; cached calls are <5ms).
-  // The cache stores the base rows + reactions; per-user myReaction is
-  // computed on top of the cached data, so it stays personalized.
-  //
-  // B-11 fix: the map is bounded with a simple LRU-eviction policy
-  // (oldest entry dropped when capacity exceeded). Without this, an attacker
-  // could exhaust memory by varying the offset parameter across requests.
-  const FEED_CACHE_TTL_MS = 30_000; // 30 seconds — considered "fresh"
-  // PERF (stale-while-revalidate): entries up to this age are served
-  // INSTANTLY while a background refresh updates the cache for the next
-  // request. Measured cold-cache latency: 514-948ms (two sequential
-  // Supabase round trips); HIT: ~1ms. With SWR, only ONE visitor per
-  // refresh window pays the cold cost — everyone else gets ~1ms. Feed data
-  // being ≤ FEED_CACHE_STALE_MAX_MS old is an acceptable trade-off for a
-  // social feed (reactions update client-side optimistically anyway).
-  const FEED_CACHE_STALE_MAX_MS = 5 * 60_000; // 5 minutes
-  const FEED_CACHE_MAX_ENTRIES = 128; // bounded LRU capacity
-  type FeedCacheMap = Map<string, CachedFeed>;
-  const feedCache: FeedCacheMap =
-    (router as unknown as { __feedCache?: FeedCacheMap }).__feedCache ?? new Map<string, CachedFeed>();
-  (router as unknown as { __feedCache?: FeedCacheMap }).__feedCache = feedCache;
-
-  // LRU touch: re-insert moves the entry to the end (newest position).
-  // Map iteration order is insertion order, so the first entry is the oldest.
-  function feedCacheTouch(map: FeedCacheMap, key: string, value: CachedFeed) {
-    if (map.has(key)) map.delete(key);
-    map.set(key, value);
-    while (map.size > FEED_CACHE_MAX_ENTRIES) {
-      const oldestKey = map.keys().next().value;
-      if (oldestKey === undefined) break;
-      map.delete(oldestKey);
-    }
-  }
-
-  const cacheKey = `${mode}:${topic || ""}:${limit}:${offset}`;
-  const cached = feedCache.get(cacheKey);
-  const cacheAge = cached ? Date.now() - cached.cachedAt : Infinity;
-
-  // Background refresh dedup: only ONE in-flight refresh per cacheKey,
-  // shared across requests (module-level on the router like the cache).
-  type InflightSet = Set<string>;
-  const refreshInFlight: InflightSet =
-    (router as unknown as { __feedRefreshInFlight?: InflightSet }).__feedRefreshInFlight ?? new Set<string>();
-  (router as unknown as { __feedRefreshInFlight?: InflightSet }).__feedRefreshInFlight = refreshInFlight;
-
-  /** Fire-and-forget background refresh of one cache entry (SWR path). */
-  function triggerBackgroundRefresh(key: string, refreshMode: string, refreshTopic: string | undefined, refreshLimit: number, refreshOffset: number, log: { warn?: (o: unknown, m: string) => void } | undefined) {
-    if (refreshInFlight.has(key)) return; // dedupe
-    refreshInFlight.add(key);
-    void (async () => {
-      const fresh = await fetchFeedPage(refreshMode, refreshTopic, refreshLimit, refreshOffset);
-      feedCacheTouch(feedCache, key, fresh);
-    })()
-      .catch((err) => {
-        // Stale data stays served on refresh failure — log and move on.
-        log?.warn?.({ err }, "Feed background refresh failed — serving stale");
-      })
-      .finally(() => {
-        refreshInFlight.delete(key);
-      });
-  }
-
-  /** Render a per-user response from a cached feed entry (HIT + STALE paths). */
-  function renderFromCache(entry: CachedFeed, header: "HIT" | "STALE") {
-    const posts = entry.posts.map((row) => {
-      const postReactions = entry.reactionsByPost[(row as { id: string }).id] || [];
-      const upvotes = postReactions.filter((r) => r.reaction_type === "upvote").length;
-      const downvotes = postReactions.filter((r) => r.reaction_type === "downvote").length;
-      const reposts = postReactions.filter((r) => r.reaction_type === "repost").length;
-      const myReaction = currentUserId
-        ? postReactions.find((r) => r.user_id === currentUserId)?.reaction_type
-        : undefined;
-      // B-2 fix: cached rows store repostCount (camelCase, see cache fill
-      // below). Parentheses + the correct property name fix both the
-      // precedence bug and the snake_case lookup bug.
-      const baseRepostCount = (row as { repostCount?: number }).repostCount ?? 0;
-      return {
-        ...(row as object),
-        reactions: {
-          upvote: upvotes,
-          downvote: downvotes,
-          repost: baseRepostCount + reposts,
-        },
-        userReactions:
-          myReaction && currentUserId
-            ? { [myReaction]: [currentUserId] }
-            : undefined,
-      };
-    });
-    res.set("X-Feed-Cache", header);
-    res.json({
-      posts,
-      hasMore: entry.hasMore,
-      source: mode,
-    });
-  }
+  // Do not serve old post bodies after deletion or a visibility change. A
+  // no-store header also prevents compliant intermediaries from caching them.
 
   try {
-    // B3: per-user followee filtering can't use the shared cross-user cache
-    // (keyed only by mode/topic/limit/offset) — following pages fetch live.
-    if (mode !== "following" && cached && cacheAge < FEED_CACHE_TTL_MS) {
-      renderFromCache(cached, "HIT");
-      return;
-    }
-
-    if (mode !== "following" && cached && cacheAge < FEED_CACHE_STALE_MAX_MS) {
-      // PERF: stale-while-revalidate — serve instantly, refresh in background.
-      renderFromCache(cached, "STALE");
-      triggerBackgroundRefresh(cacheKey, mode, topic, limit, offset, req.log);
-      return;
-    }
-
-    const filters: Record<string, string> = {};
-    if (topic) filters.topic_id = `eq.${topic}`;
-
-    // Live path (cold cache): fetch posts + reactions, fill the cache,
-    // respond. Shared logic lives in fetchFeedPage so the SWR background
-    // refresher uses the exact same code.
-    const fresh = await fetchFeedPage(mode, topic, limit, offset, followeeIds);
-    feedCacheTouch(feedCache, cacheKey, fresh);
-
-    // Per-user rendering identical to renderFromCache, but here we have the
-    // live rows (with currentUserId reactions applied the same way).
-    const posts = fresh.posts.map((row) => {
-      const postReactions = fresh.reactionsByPost[(row as { id: string }).id] || [];
-      const upvotes = postReactions.filter((r) => r.reaction_type === "upvote").length;
-      const downvotes = postReactions.filter((r) => r.reaction_type === "downvote").length;
-      const reposts = postReactions.filter((r) => r.reaction_type === "repost").length;
-      const myReaction = currentUserId
-        ? postReactions.find((r) => r.user_id === currentUserId)?.reaction_type
-        : undefined;
-
-      return {
-        ...(row as object),
-        reactions: {
-          upvote: upvotes,
-          downvote: downvotes,
-          repost: ((row as { repostCount?: number }).repostCount ?? 0) + reposts,
-        },
-        userReactions:
-          myReaction && currentUserId
-            ? { [myReaction]: [currentUserId] }
-            : undefined,
-      };
-    });
-
-    res.set("X-Feed-Cache", "MISS");
-    res.json({
-      posts,
-      hasMore: fresh.hasMore,
-      source: mode,
-    });
+    const fresh = await fetchFeedPage(mode, topic, limit, offset, null, true, cursor);
+    const posts = await renderFeedPosts(fresh);
+    res.header("X-Feed-Cache", "MISS");
+    res.json({ posts, hasMore: fresh.hasMore, nextCursor: fresh.nextCursor, source: mode });
   } catch (error) {
     if (error instanceof SupabaseError) {
-      req.log?.error?.({ err: error, status: error.status }, "Feed query failed");
+      req.log?.error?.({ status: error.status }, "Feed query failed");
       res.status(502).json({ error: "Feed data source unavailable" });
       return;
     }
-    throw error;
+    req.log?.error?.({}, "Feed query failed");
+    res.status(502).json({ error: "Feed data source unavailable" });
   }
 });
 
 /**
  * Fetch one page of the feed from Supabase: posts (with topic + author
- * embedded), then reactions for those posts. Returns the cache-shaped
- * entry (base posts WITHOUT per-user reactions + reactionsByPost index +
- * hasMore + cachedAt). Used by both the live request path and the
- * stale-while-revalidate background refresher.
+ * embedded), then repost-only counts for those posts. Returns a cache-shaped
+ * entry with no voter identities. The response is not stored in a shared cache.
  */
 async function fetchFeedPage(
   mode: string,
@@ -299,48 +180,65 @@ async function fetchFeedPage(
   limit: number,
   offset: number,
   followeeIds: string[] | null = null,
+  includeTags = true,
+  cursor: FeedCursor | null = null,
 ): Promise<CachedFeed> {
   const filters: Record<string, string> = {};
   if (topic) filters.topic_id = `eq.${topic}`;
+  if (cursor) {
+    // Both fields have already passed strict validation; do not interpolate
+    // arbitrary user strings into PostgREST expression syntax.
+    filters.or = `(created_at.lt."${cursor.createdAt}",and(created_at.eq."${cursor.createdAt}",id.gt."${cursor.id}"))`;
+  }
   // B3: when rendering the Following feed, restrict to the caller's follow
   // graph (PostgREST in.() filter). null = no restriction (For You).
   if (followeeIds) {
     filters.user_id = `in.(${followeeIds.map((id) => `"${id}"`).join(",")})`;
   }
 
-  // For you/following return newest first and let the client
-  // apply local personalization signals.
+  // Return newest first; live TSRG ranking and behavioral personalization
+  // remain disabled until their security and privacy gates are verified.
   const rows = await supabase.get<PostRow>("posts", {
     select: `
-      id,user_id,topic_id,content,post_type,event,media_urls,brain_id,
+      id,user_id,topic_id,content,${includeTags ? "tags," : ""}post_type,event,media_urls,brain_id,
       repost_count,created_at,comment_count,
       topic:topics(name),
       author:profiles(display_name,avatar_url)
     `,
     filters,
-    order: { column: "created_at", ascending: false },
+    order: [{ column: "created_at", ascending: false }, { column: "id", ascending: true }],
     limit: limit + 1,
     offset,
   });
 
   const page = rows.slice(0, limit);
   const postIds = page.map((r) => r.id);
+  const hasMore = rows.length > limit;
+  const last = page[page.length - 1];
+  const nextCursor = hasMore && last ? {id:last.id,createdAt:last.created_at} : null;
+  if (hasMore && !isFeedCursor(nextCursor)) throw new SupabaseError("Invalid feed cursor", 502);
+  // Database contents can be malformed or supplied by other writers. Never
+  // interpolate unchecked values into a PostgREST in-list filter.
+  if (postIds.some(id => typeof id !== "string" || !/^[A-Za-z0-9_-]{1,120}$/.test(id))) {
+    throw new SupabaseError("Invalid feed data", 502);
+  }
 
-  let reactionsByPost: Record<string, ReactionRow[]> = {};
+  const repostsByPost: Record<string, number> = {};
   if (postIds.length > 0) {
-    const allReactions = await supabase.get<ReactionRow>("reactions", {
+    const reposts = await supabase.get<{target_id: string; reaction_type: string}>("reactions", {
+      select: "target_id,reaction_type",
       filters: {
         target_type: "eq.post",
         target_id: `in.(${postIds.map((id) => `"${id}"`).join(",")})`,
+        reaction_type: "eq.repost",
       },
     });
-    reactionsByPost = allReactions.reduce(
-      (acc, r) => {
-        (acc[r.target_id] ||= []).push(r);
-        return acc;
-      },
-      {} as Record<string, ReactionRow[]>,
-    );
+    // Validate again even if a mock or upstream violates the requested filter.
+    for (const row of reposts) {
+      if (row.reaction_type === "repost" && postIds.includes(row.target_id)) {
+        repostsByPost[row.target_id] = (repostsByPost[row.target_id] ?? 0) + 1;
+      }
+    }
   }
 
   return {
@@ -349,6 +247,7 @@ async function fetchFeedPage(
       userId: row.user_id,
       topicId: row.topic_id,
       content: row.content,
+      tags: row.tags ?? [],
       postType: normalizePostType(row.post_type),
       event: row.event,
       mediaUrls: row.media_urls || [],
@@ -360,11 +259,9 @@ async function fetchFeedPage(
       authorAvatar: row.author?.avatar_url,
       topicName: row.topic?.name,
     })),
-    hasMore: rows.length > limit,
-    reactionsByPost: Object.fromEntries(
-      Object.entries(reactionsByPost).map(([k, v]) => [k, v.map((r) => ({ target_id: r.target_id, reaction_type: r.reaction_type, user_id: r.user_id }))])
-    ),
-    cachedAt: Date.now(),
+    hasMore,
+    repostsByPost,
+    nextCursor,
   };
 }
 

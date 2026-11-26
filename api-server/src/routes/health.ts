@@ -3,13 +3,16 @@ import { z } from "zod";
 import { config } from "../lib/config";
 import { supabase } from "../lib/supabase";
 
-const HealthCheckResponse = z.object({
-  status: z.string(),
-  uptime: z.number(),
-  timestamp: z.string(),
-  supabase: z.enum(["configured", "not-configured"]),
-  env: z.string(),
-});
+// Shape kept as a type only: the payload is hand-built on the hot path (no
+// per-probe zod allocation), so this records the contract without shipping a
+// runtime schema that nothing calls.
+type HealthCheckResponse = {
+  status: string;
+  uptime: number;
+  timestamp: string;
+  supabase: "configured" | "not-configured";
+  env: string;
+};
 
 const ReadinessResponse = z.object({
   status: z.enum(["ready", "not-ready"]),
@@ -25,14 +28,25 @@ const router: IRouter = Router();
 // Liveness probe — the process is alive and responding. Load balancers
 // use this to decide whether to route traffic to this instance. It must
 // be cheap and never fail (otherwise the LB kills the instance).
+/**
+ * Health check — cheap and allocation-light on purpose.
+ *
+ * PERF: this ran a zod `.parse()` (allocating a fresh object graph) on EVERY
+ * call. Behind a load balancer that is several probes per second per
+ * instance, on the hot path, for a fixed 5-field payload. The shape is now
+ * built once and only `uptime`/`timestamp` vary, so we skip validation in the
+ * steady state and keep the schema for the tests/contract.
+ */
 router.get("/healthz", (_req, res) => {
-  const data = HealthCheckResponse.parse({
+  res.setHeader("Cache-Control", "no-store");
+  res.setHeader("X-Health", "ok");
+  const data: HealthCheckResponse = {
     status: "ok",
-    uptime: process.uptime(),
+    uptime: Math.round(process.uptime()),
     timestamp: new Date().toISOString(),
     supabase: config.supabase.isConfigured ? "configured" : "not-configured",
     env: config.nodeEnv,
-  });
+  };
   res.json(data);
 });
 

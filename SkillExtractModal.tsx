@@ -29,7 +29,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useSkills } from "@/hooks/use-skills";
+import { skillPublishingAvailable, useSkills } from "@/hooks/use-skills";
 import { useHabits } from "@/hooks/use-habits";
 import { useAuth } from "@/components/auth/AuthContext";
 import { userIdOr, displayNameOr } from "@/lib/user-data";
@@ -199,6 +199,10 @@ export function SkillExtractModal({ brain, nodes, mode, isOpen, onClose }: Skill
 
   // ── Publish (skill) ──
   const publishSkill = async () => {
+    if (!skillPublishingAvailable()) {
+      setError("Skill publishing is temporarily unavailable. Your existing data is unchanged.");
+      return;
+    }
     setIsPublishing(true);
     setError(null);
     try {

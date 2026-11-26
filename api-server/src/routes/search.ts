@@ -46,25 +46,18 @@ router.get("/v1/search/skills", async (req, res) => {
 
   const { q, domain, make, model, year, part, layers, limit } = parsed.data;
 
-  // If Supabase isn't configured, return the contract + empty results so
-  // the client can fall back to local IDB search.
+  // An outage or missing configuration is not a verified empty result.
   if (!supabase.isConfigured()) {
-    res.json({
-      query: q,
-      filters: { domain, make, model, year, part },
-      layers,
-      results: [],
-      resultCount: 0,
-      note: "Supabase not configured. Server-side search unavailable — use the client-side IDB search fallback.",
-      generatedAt: new Date().toISOString(),
-    });
+    res.set("Cache-Control", "no-store").status(503).json({ error: "Skill search is temporarily unavailable." });
     return;
   }
 
   try {
     // ── Layer 1: Rule filters (SQL WHERE on Skill ID fields) ──────────
     // These narrow the candidate set before the ranked layers run.
-    const filters: Record<string, string> = {};
+    // This route is public and the service-role client bypasses RLS.
+    // Never request unpublished skills from the database.
+    const filters: Record<string, string> = { status: "eq.published" };
     if (domain) filters.domain = `eq.${domain.toUpperCase()}`;
     if (make) filters.make = `eq.${make.toUpperCase()}`;
     if (model) filters.model = `eq.${model.toUpperCase()}`;
@@ -78,7 +71,7 @@ router.get("/v1/search/skills", async (req, res) => {
     // Supabase) but its result was discarded — doubling the Supabase quota
     // usage on every keyword search and adding a wasted network round-trip.
     // Now we build the query options ONCE and call supabase.get ONCE.
-    const baseSelect = "id,title,domain,make,model,year,part,version,author_name,author_years_experience,status,source_brain_id";
+    const baseSelect = "id,title,domain,make,model,year,part,version,author_name,author_years_experience,status";
     const queryFilters: Record<string, string> = { ...filters };
     if (q && layers !== "rule_only") {
       // FTS on title — this is the BM25-style keyword layer.
@@ -100,19 +93,9 @@ router.get("/v1/search/skills", async (req, res) => {
     let keywordResults: SkillRow[] = [];
     try {
       keywordResults = await supabase.get<SkillRow>("skills", queryOptions);
-    } catch (err) {
-      // Supabase returned an error (e.g. skills table missing — PGRST205).
-      // Log + return empty results so the client can fall back to IDB.
-      logger.warn({ err }, "Skill keyword search failed — returning empty results");
-      res.json({
-        query: q,
-        filters: { domain, make, model, year, part },
-        layers,
-        results: [],
-        resultCount: 0,
-        note: "Skill search unavailable — the skills table may not exist in Supabase yet. Run migration 0002_search.sql to enable.",
-        generatedAt: new Date().toISOString(),
-      });
+    } catch {
+      logger.warn("Skill keyword search unavailable");
+      res.set("Cache-Control", "no-store").status(503).json({ error: "Skill search is temporarily unavailable." });
       return;
     }
 
@@ -131,12 +114,14 @@ router.get("/v1/search/skills", async (req, res) => {
     const seen = new Set<string>();
     const merged: (SkillRow & { _layer: "semantic" | "keyword" })[] = [];
     for (const r of semanticResults) {
+      if (r.status !== "published") continue;
       if (!seen.has(r.id)) {
         seen.add(r.id);
         merged.push({ ...r, _layer: "semantic" });
       }
     }
     for (const r of keywordResults) {
+      if (r.status !== "published") continue;
       if (!seen.has(r.id)) {
         seen.add(r.id);
         merged.push({ ...r, _layer: "keyword" });
@@ -156,7 +141,6 @@ router.get("/v1/search/skills", async (req, res) => {
       authorName: r.author_name,
       authorYearsExperience: r.author_years_experience,
       status: r.status,
-      sourceBrainId: r.source_brain_id,
       matchLayer: r._layer,
     }));
 
@@ -173,8 +157,8 @@ router.get("/v1/search/skills", async (req, res) => {
       },
       generatedAt: new Date().toISOString(),
     });
-  } catch (error) {
-    logger.error({ err: error }, "Skill search failed");
+  } catch {
+    logger.error("Skill search failed");
     res.status(500).json({ error: "Search failed" });
   }
 });

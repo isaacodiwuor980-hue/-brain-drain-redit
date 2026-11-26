@@ -1,0 +1,6 @@
+-- REVIEW ONLY; intentionally not executable. Disabling or dropping these
+-- proposed triggers removes privacy protection. Links detached during a
+-- visibility change cannot be restored from this rollback; restoring old data
+-- may reveal a private brain and can violate later privacy choices. Require an
+-- explicitly approved plan, verified backups, lock/side-effect review, and a
+-- replacement protection before any rollback. This has not been run live.

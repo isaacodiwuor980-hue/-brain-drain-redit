@@ -1,0 +1,5 @@
+-- REVIEW ONLY: intentionally not an executable rollback.
+-- Stop all points consumers and preserve ledger, requests, stakes and wallets.
+-- Dropping these objects destroys point history or balances; require explicit
+-- approval, a tested backup/restore, and a reconciled account-deletion policy.
+-- No live action is authorized by this comment.

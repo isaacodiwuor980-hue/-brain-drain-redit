@@ -19,7 +19,7 @@ import {
   MessageSquare,
   StickyNote,
 } from "lucide-react";
-import { Brain, getPostDownvoteCount, getPostUpvoteCount, Post } from "@/lib/types";
+import { Brain, Post } from "@/lib/types";
 import { sanitizeHtml } from "@/lib/sanitize-html";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -40,6 +40,11 @@ import { useReputation } from "@/hooks/use-reputation";
 import { useSocial } from "@/hooks/use-social";
 import { useCommunities } from "@/hooks/use-communities";
 import { useMessages } from "@/hooks/use-messages";
+import { useOnlineStatus } from "@/hooks/use-online-status";
+import { votingAvailable } from "@/lib/vote-availability";
+
+// Duplicate-post/Room and direct-message delivery are not verified.
+const UNSAFE_POST_SHARING_ENABLED = false;
 
 // PERF-002: confetti is dynamically imported only when a CELEBRATION (4%) or
 // JACKPOT (1%) vote fires. Previously it was a static import, which put 227
@@ -81,6 +86,8 @@ export function PostCard({
   const [shareToRecipient, setShareToRecipient] = useState(""); // follower username
 
   const { toast } = useToast();
+  const offline = useOnlineStatus() === "offline";
+  const votesEnabled = votingAvailable();
   const [, setLocation] = useLocation();
   const currentUserId = "me";
   const { profile, updateProfile } = useProfile();
@@ -89,12 +96,12 @@ export function PostCard({
   const { addPost } = useSocial();
   const { communities } = useCommunities();
   const { addConversation, addMessage } = useMessages();
-  const isUpvoted = Boolean(
+  const isUpvoted = votesEnabled && Boolean(
     post.userReactions?.upvote?.includes(currentUserId) ||
     post.userReactions?.like?.includes(currentUserId) ||
     post.userReactions?.love?.includes(currentUserId),
   );
-  const isDownvoted = post.userReactions?.downvote?.includes(currentUserId) || false;
+  const isDownvoted = votesEnabled && (post.userReactions?.downvote?.includes(currentUserId) || false);
 
   const isBookmarked = profile?.bookmarkedPostIds?.includes(post.id) || false;
 
@@ -233,7 +240,7 @@ export function PostCard({
         if (!reports.includes(post.id)) {
           reports.push(post.id);
           localStorage.setItem("brainDrain_reportedPosts", JSON.stringify(reports));
-          toast({ title: "Post reported", description: "Thank you. Our team will review this content." });
+          toast({ title: "Saved on this device", description: "This report was not sent to a moderation team." });
         } else {
           toast({ title: "Already reported", description: "You've already reported this post." });
         }
@@ -245,6 +252,7 @@ export function PostCard({
 
   // Task 4a: "Share as post" = real repost on the user's own feed (visible to followers).
   const handleShareAsPost = async () => {
+    if (!UNSAFE_POST_SHARING_ENABLED) return;
     triggerHaptic("medium");
     try {
       const repost: Post = {
@@ -274,6 +282,7 @@ export function PostCard({
 
   // Task 4b: "Share to" = send to a circle/community OR directly to a follower (DM).
   const handleShareToCircle = async (communityId: string, communityName: string) => {
+    if (!UNSAFE_POST_SHARING_ENABLED) return;
     triggerHaptic("medium");
     try {
       const shared: Post = {
@@ -306,6 +315,7 @@ export function PostCard({
   };
 
   const handleShareToFollower = async () => {
+    if (!UNSAFE_POST_SHARING_ENABLED) return;
     const recipient = shareToRecipient.trim();
     if (!recipient) {
       toast({ title: "Enter a username", description: "Type the follower you want to send this post to.", variant: "destructive" });
@@ -343,8 +353,12 @@ export function PostCard({
       ? (profile.bookmarkedPostIds || []).filter(id => id !== post.id)
       : [...(profile.bookmarkedPostIds || []), post.id];
       
-    await updateProfile({ ...profile, bookmarkedPostIds: newBookmarkedPostIds });
-    toast({ title: isBookmarked ? "Post removed from bookmarks" : "Post bookmarked" });
+    try {
+      await updateProfile({ ...profile, bookmarkedPostIds: newBookmarkedPostIds });
+      toast({ title: isBookmarked ? "Post removed from bookmarks" : "Post bookmarked" });
+    } catch {
+      toast({ title: "Bookmark not saved", description: "Please try again.", variant: "destructive" });
+    }
   };
 
   const handleRunBrain = async (e: React.MouseEvent) => {
@@ -635,7 +649,8 @@ export function PostCard({
               <Button
                 variant="ghost"
                 size="sm"
-                aria-label="Upvote" aria-pressed={isUpvoted}
+                aria-label={!votesEnabled ? "Voting temporarily unavailable" : offline ? "Upvote requires internet" : "Upvote"} aria-pressed={isUpvoted}
+                disabled={!votesEnabled || offline} title={!votesEnabled ? "Voting temporarily unavailable" : offline ? "Connect to vote" : undefined}
                 className={`gap-1.5 h-8 px-2.5 rounded-full transition-all duration-150 cursor-pointer active:scale-[0.92] touch-manipulation ${isUpvoted ? "text-rose-500 bg-rose-500/10" : "text-muted-foreground hover:text-rose-500 hover:bg-rose-500/10"}`}
                 onClick={(e) => {
                   // APEX-OMEGA LEVER 1: variable reward on ACTIVATING upvote only.
@@ -646,13 +661,13 @@ export function PostCard({
                 }}
               >
                 <ArrowBigUp className={`w-4 h-4 ${isUpvoted ? "fill-current" : ""}`} />
-                <span className="text-[13px] font-normal tabular-nums">{getPostUpvoteCount(post)}</span>
               </Button>
 
               <Button
                 variant="ghost"
                 size="sm"
-                aria-label="Downvote" aria-pressed={isDownvoted}
+                aria-label={!votesEnabled ? "Voting temporarily unavailable" : offline ? "Downvote requires internet" : "Downvote"} aria-pressed={isDownvoted}
+                disabled={!votesEnabled || offline} title={!votesEnabled ? "Voting temporarily unavailable" : offline ? "Connect to vote" : undefined}
                 className={`gap-1.5 h-8 px-2.5 rounded-full transition-all duration-150 cursor-pointer active:scale-[0.92] touch-manipulation ${isDownvoted ? "text-red-400 bg-red-400/10" : "text-muted-foreground hover:text-red-400 hover:bg-red-400/10"}`}
                 onClick={() => {
                   triggerHaptic("light");
@@ -660,7 +675,6 @@ export function PostCard({
                 }}
               >
                 <ArrowBigDown className={`w-4 h-4 ${isDownvoted ? "fill-current" : ""}`} />
-                <span className="text-[13px] font-normal tabular-nums">{getPostDownvoteCount(post)}</span>
               </Button>
 
               {/* If it is a Question post, provide direct "Answer" action button */}
@@ -702,7 +716,8 @@ export function PostCard({
               <Button
                 variant="ghost"
                 size="sm"
-                aria-label={`Repost · ${post.repostCount || post.reactions?.repost || 0}`}
+                aria-label={!votesEnabled ? "Reposting temporarily unavailable" : offline ? "Repost requires internet" : `Repost · ${post.repostCount || post.reactions?.repost || 0}`}
+                disabled={!votesEnabled || offline} title={!votesEnabled ? "Reposting temporarily unavailable" : offline ? "Connect to repost" : undefined}
                 className="gap-1.5 h-8 px-2.5 rounded-full transition-all duration-150 cursor-pointer active:scale-[0.92] touch-manipulation text-muted-foreground hover:text-emerald-500 hover:bg-emerald-500/10"
                 onClick={() => {
                   triggerHaptic("medium");
@@ -740,10 +755,10 @@ export function PostCard({
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="rounded-xl border-border/50">
-                  <DropdownMenuItem onClick={() => void handleShareAsPost()}>
+                  <DropdownMenuItem disabled={!UNSAFE_POST_SHARING_ENABLED} onClick={() => void handleShareAsPost()}>
                     <Share className="w-4 h-4 mr-2" /> Share as post
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => { triggerHaptic("selection"); setIsShareToOpen(true); }}>
+                  <DropdownMenuItem disabled={!UNSAFE_POST_SHARING_ENABLED} onClick={() => { triggerHaptic("selection"); setIsShareToOpen(true); }}>
                     <Send className="w-4 h-4 mr-2" /> Share to…
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => setIsSaveModalOpen(true)}>

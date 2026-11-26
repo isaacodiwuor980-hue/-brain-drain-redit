@@ -1,9 +1,7 @@
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useMemo, useRef } from "react";
 import { Link, useLocation } from "wouter";
 import { ArrowLeft, Settings, MessageSquare, Network, Flame, Target, Trophy, Award, Activity, Brain, BookOpen, Compass, Star, Smile, BellOff, Calendar, Filter, Search, AtSign, QrCode, Link as LinkIcon, ExternalLink, UserPlus, Share2, Camera } from "lucide-react";
 import { useProfile } from "@/hooks/use-profile";
-import { useAuth } from "@/components/auth/AuthContext";
-import { userIdOr, LEGACY_USER_ID } from "@/lib/user-data";
 import { useReputation } from "@/hooks/use-reputation";
 import { useMissions } from "@/hooks/use-missions";
 import { Button } from "@/components/ui/button";
@@ -17,13 +15,11 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { ContributionHeatmap, type DayData, type ActivityItem } from "@/profile/ContributionHeatmap";
 import { EditProfileModal } from "@/profile/EditProfileModal";
 import { ProfileJourneyChart } from "@/profile/ProfileJourneyChart";
 import { LeaderboardModal } from "@/profile/LeaderboardModal";
 import { ProfileNote } from "@/profile/ProfileNote";
-import { idb } from "@/lib/db";
-import { Post, Brain as BrainType, CircleCheckIn, UserProfile } from "@/lib/types";
+import { UserProfile } from "@/lib/types";
 
 function getLevelTitle(level: number) {
   if (level <= 5) return "Initiate";
@@ -34,25 +30,8 @@ function getLevelTitle(level: number) {
   return "Legend";
 }
 
-// Mock contribution data generator
-const generateContributionData = () => {
-  const weeks = [];
-  for (let i = 0; i < 52; i++) {
-    const days = [];
-    for (let j = 0; j < 7; j++) {
-      const level = Math.floor(Math.random() * 5); // 0-4
-      days.push({ level, date: new Date(Date.now() - (365 - (i * 7 + j)) * 24 * 60 * 60 * 1000) });
-    }
-    weeks.push(days);
-  }
-  return weeks;
-};
-
 export function ProfilePage() {
   const { profile, isLoading: profileLoading, updateProfile } = useProfile();
-  // Phase 2: real user ID — used to filter activity items.
-  const { user } = useAuth();
-  const currentUserId = userIdOr(user);
   const { reputation, xpEvents, isLoading: repLoading } = useReputation();
   const { missions, isLoading: missionsLoading } = useMissions();
   const { toast } = useToast();
@@ -74,10 +53,15 @@ export function ProfilePage() {
     const reader = new FileReader();
     reader.onload = async () => {
       const dataUrl = reader.result as string;
-      if (kind === "avatar") {
-        await updateProfile({ ...profile!,avatarUrl: dataUrl });
-      } else {
-        await updateProfile({ ...profile!, coverUrl: dataUrl });
+      try {
+        if (!profile) throw new Error("Your profile is not available yet.");
+        if (kind === "avatar") {
+          await updateProfile({ ...profile, avatarUrl: dataUrl });
+        } else {
+          await updateProfile({ ...profile, coverUrl: dataUrl });
+        }
+      } catch {
+        toast({ title: "Image not saved", description: "Could not save your profile image. Please try again.", variant: "destructive" });
       }
     };
     reader.readAsDataURL(file);
@@ -87,81 +71,10 @@ export function ProfilePage() {
   const [statusEmoji, setStatusEmoji] = useState("😎");
   const [statusMessage, setStatusMessage] = useState("Building things");
   const [activitySearch, setActivitySearch] = useState("");
-  const [contributionData, setContributionData] = useState<DayData[][]>(generateContributionData());
-  const [totalContributions, setTotalContributions] = useState(0);
-  const [selectedDayData, setSelectedDayData] = useState<DayData | null>(null);
 
   const searchParams = new URLSearchParams(window.location.search);
   const targetUserId = searchParams.get("userId");
   const isCurrentUser = !targetUserId || targetUserId === "me" || (profile && targetUserId === profile.id);
-
-  useEffect(() => {
-    async function fetchActivity() {
-      try {
-        const [posts, brains, checkins] = await Promise.all([
-          idb.getAll<Post>("posts"),
-          idb.getAll<BrainType>("brains"),
-          idb.getAll<CircleCheckIn>("checkins")
-        ]);
-
-        const activityMap: Record<string, { count: number, items: ActivityItem[] }> = {};
-        let total = 0;
-        // Phase 2: when viewing own profile, match items by either the
-        // real user ID OR the legacy "me" (for backward compat with
-        // records created before Phase 2).
-        const uId = isCurrentUser ? currentUserId : targetUserId;
-        const isOwnItem = (item: ActivityItem) => {
-          if (!isCurrentUser) return item.userId === uId;
-          return item.userId === currentUserId || item.userId === LEGACY_USER_ID;
-        };
-
-        const countItem = (type: "post" | "brain" | "checkin", item: ActivityItem) => {
-          if (!isOwnItem(item)) return; 
-          const d = new Date(item.createdAt || Date.now());
-          const key = d.toISOString().split("T")[0];
-          if (!activityMap[key]) {
-            activityMap[key] = { count: 0, items: [] };
-          }
-          activityMap[key].count++;
-          activityMap[key].items.push({ type, ...item });
-          total++;
-        };
-
-        posts.forEach((p) => countItem('post', p));
-        brains.forEach((b) => countItem('brain', b));
-        checkins.forEach((c) => countItem('checkin', c));
-
-        const weeks = [];
-        const now = new Date();
-        now.setHours(0, 0, 0, 0);
-        const dayOfWeek = now.getDay();
-        const endOfWeek = new Date(now.getTime() + (6 - dayOfWeek) * 24 * 60 * 60 * 1000);
-        const startDate = new Date(endOfWeek.getTime() - 363 * 24 * 60 * 60 * 1000);
-        
-        for (let i = 0; i < 52; i++) {
-          const days = [];
-          for (let j = 0; j < 7; j++) {
-            const pastDate = new Date(startDate.getTime() + (i * 7 + j) * 24 * 60 * 60 * 1000);
-            const key = pastDate.toISOString().split("T")[0];
-            const data = activityMap[key] || { count: 0, items: [] };
-            const count = data.count;
-            let level = 0;
-            if (count >= 4) level = 4;
-            else if (count >= 3) level = 3;
-            else if (count >= 2) level = 2;
-            else if (count >= 1) level = 1;
-            
-            days.push({ level, date: pastDate, count, items: data.items });
-          }
-          weeks.push(days);
-        }
-        setContributionData(weeks);
-        setTotalContributions(total);
-      } catch { /* activity graph is best-effort */ }
-    }
-    fetchActivity();
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- fetchActivity is defined inside the effect; the only external drivers are targetUserId/isCurrentUser (listed). Internal helpers close over those + best-effort state.
-  }, [targetUserId, isCurrentUser]);
 
   // BUG FIX (React error #310 — "Rendered more hooks than during the previous
   // render"): the early return for the loading state was previously ABOVE
@@ -590,52 +503,10 @@ export function ProfilePage() {
           </DialogContent>
         </Dialog>
 
-        {/* Contribution Heatmap */}
+        {/* Shared browser records have no verified account ownership. */}
         <div className="bg-card border rounded-[16px] p-6 mb-8 shadow-sm">
-          <div className="flex justify-between items-center mb-4">
-            <h3 className="font-semibold text-lg flex items-center gap-2"><Calendar className="w-4 h-4 text-primary" /> Evolution Activity</h3>
-            <span className="text-sm text-muted-foreground">{totalContributions} actions in the last year</span>
-          </div>
-          <ContributionHeatmap 
-            data={contributionData} 
-            selectedDate={selectedDayData?.date}
-            onDayClick={(day) => setSelectedDayData(day)} 
-          />
-          {selectedDayData && (
-            <div className="mt-6 pt-6 border-t animate-in fade-in duration-300">
-              <h4 className="font-medium flex justify-between items-center mb-4">
-                <span>Evolution on {selectedDayData.date.toLocaleDateString()}</span>
-                <span className="text-sm text-muted-foreground">{selectedDayData.count} actions</span>
-              </h4>
-              
-              {selectedDayData.items && selectedDayData.items.length > 0 ? (
-                <div className="space-y-3 max-h-60 overflow-y-auto pr-2">
-                  {selectedDayData.items.map((item: ActivityItem, idx: number) => (
-                    <div key={idx} className="bg-muted/30 border rounded-[16px] p-3 text-sm flex gap-3 items-start">
-                      <div className="mt-0.5 opacity-70">
-                        {item.type === 'post' && <MessageSquare className="w-4 h-4 text-blue-500" />}
-                        {item.type === 'brain' && <Brain className="w-4 h-4 text-purple-500" />}
-                        {item.type === 'checkin' && <Target className="w-4 h-4 text-emerald-500" />}
-                      </div>
-                      <div className="flex-1">
-                        <p className="font-medium capitalize mb-0.5">{item.type}</p>
-                        <p className="text-muted-foreground line-clamp-2">
-                          {item.title || item.content || item.name || "No description"}
-                        </p>
-                      </div>
-                      <span className="text-xs text-muted-foreground whitespace-nowrap">
-                        {new Date(item.createdAt as number).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-4 text-muted-foreground text-sm bg-muted/20 rounded-[16px]">
-                  No activity recorded on this day.
-                </div>
-              )}
-            </div>
-          )}
+          <h3 className="font-semibold text-lg flex items-center gap-2"><Calendar className="w-4 h-4 text-primary" /> Evolution Activity</h3>
+          <p role="status" className="text-sm text-muted-foreground mt-3">Activity is temporarily unavailable while account ownership and visibility are verified. Existing device data has not been deleted.</p>
         </div>
 
         {/* Reputation Panel */}

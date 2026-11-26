@@ -124,9 +124,9 @@ export function useCommunities() {
   // member directory / cloud sync and is out of scope for Phases 1–7.
   const { mutateAsync: setRole, isPending: isSettingRole } = useMutation({
     mutationFn: async ({ communityId, role }: { communityId: string; role: NonNullable<Community["role"]> }) => {
-      const community = await idb.get<Community>(STORE, communityId);
-      if (!community) throw new Error("Room not found");
-      await idb.put(STORE, { ...community, role });
+      // Unscoped local membership is not proof of permission to assign roles.
+      void communityId; void role;
+      throw new Error("Room role changes are paused pending authorization review.");
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: [STORE] }),
   });
@@ -142,9 +142,9 @@ export function useCommunities() {
   // Writes the `charter` field on the Community record (mission + scope).
   const { mutateAsync: updateCharter } = useMutation({
     mutationFn: async ({ communityId, mission, scope }: { communityId: string; mission: string; scope: string }) => {
-      const community = await idb.get<Community>(STORE, communityId);
-      if (!community) throw new Error("Room not found");
-      await idb.put(STORE, { ...community, charter: { mission, scope } });
+      // Unverified local roles cannot authorize Room administration.
+      void communityId; void mission; void scope;
+      throw new Error("Room charter changes are paused pending authorization review.");
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: [STORE] }),
   });

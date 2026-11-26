@@ -23,6 +23,7 @@ interface DecodedToken {
     exp: number;
     auth_time?: number;
     email?: string;
+    email_verified?: boolean;
     name?: string;
     picture?: string;
     firebase?: {
@@ -37,9 +38,15 @@ interface DecodedToken {
 export interface VerifiedAuth {
   uid: string;
   email?: string;
+  emailVerified?: boolean;
   displayName?: string;
   photoURL?: string;
+  /** Verified Firebase auth_time in Unix seconds, when present and valid. */
+  authTime?: number;
 }
+
+// Distinguish provider failures from malformed, attacker-controlled token data.
+export class FirebaseAuthUpstreamError extends Error {}
 
 interface CachedKey {
   key: CryptoKey;
@@ -93,36 +100,29 @@ async function fetchPublicKey(kid: string): Promise<CryptoKey> {
     return cached.key;
   }
 
-  const response = await fetch(FIREBASE_JWKS_URL);
-  if (!response.ok) {
-    throw new Error(`Failed to fetch Firebase public keys: ${response.status}`);
-  }
-
-  const maxAge = parseCacheControlMaxAge(
-    response.headers.get("cache-control"),
-  );
-  const { keys } = (await response.json()) as {
-    keys: Array<JsonWebKey & { kid: string }>;
-  };
-
-  for (const jwk of keys) {
-    if (!jwk.kid) continue;
-    const publicKey = await crypto.subtle.importKey(
-      "jwk",
-      jwk,
-      { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
-      false,
-      ["verify"],
-    );
-    keyCache.set(jwk.kid, {
-      key: publicKey,
-      expiresAt: Date.now() + maxAge * 1000,
-    });
+  try {
+    const response = await fetch(FIREBASE_JWKS_URL);
+    if (!response.ok) throw new Error("JWKS response unavailable");
+    const maxAge = parseCacheControlMaxAge(response.headers.get("cache-control"));
+    const { keys } = (await response.json()) as { keys: Array<JsonWebKey & { kid: string }> };
+    for (const jwk of keys) {
+      if (!jwk.kid) continue;
+      const publicKey = await crypto.subtle.importKey(
+        "jwk", jwk, { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" }, false, ["verify"],
+      );
+      keyCache.set(jwk.kid, { key: publicKey, expiresAt: Date.now() + maxAge * 1000 });
+    }
+  } catch {
+    // Never propagate network responses, URLs, or untrusted token fields.
+    throw new FirebaseAuthUpstreamError("Firebase public keys unavailable");
   }
 
   const next = keyCache.get(kid);
-  if (!next) {
-    throw new Error(`Firebase public key not found for kid: ${kid}`);
+  // A successful refresh that omits this kid must not resurrect an expired
+  // cached key. In particular, rotation may remove a compromised key.
+  if (!next || next.expiresAt <= Date.now()) {
+    keyCache.delete(kid);
+    throw new Error("Firebase public key not found");
   }
   return next.key;
 }
@@ -149,10 +149,16 @@ function verifyClaims(decoded: DecodedToken): VerifiedAuth {
     throw new Error("Token issuer does not match the Firebase project");
   }
 
-  if (!payload.sub || typeof payload.sub !== "string") {
-    throw new Error("Token has no subject");
+  if (typeof payload.sub !== "string" || payload.sub.length === 0 || payload.sub.length > 128) {
+    throw new Error("Token has invalid subject");
   }
 
+  // Arithmetic comparisons against undefined, strings or NaN can silently
+  // pass. Require numeric integer timestamps before enforcing their bounds.
+  if (!Number.isSafeInteger(payload.exp) || payload.exp <= 0 ||
+      !Number.isSafeInteger(payload.iat) || payload.iat <= 0) {
+    throw new Error("Token has invalid timestamps");
+  }
   if (payload.exp + ALLOWED_CLOCK_SKEW_MS / 1000 < now) {
     throw new Error("Token has expired");
   }
@@ -164,8 +170,14 @@ function verifyClaims(decoded: DecodedToken): VerifiedAuth {
   return {
     uid: payload.sub,
     email: payload.email,
+    emailVerified: payload.email_verified === true,
     displayName: payload.name,
     photoURL: payload.picture,
+    // Missing/malformed freshness does not change legacy authentication, but
+    // cannot authorize a sensitive action that requires recent sign-in.
+    ...(typeof payload.auth_time === "number" && Number.isSafeInteger(payload.auth_time) &&
+        payload.auth_time > 0 && payload.auth_time <= now && payload.auth_time <= payload.iat
+      ? { authTime: payload.auth_time } : {}),
   };
 }
 

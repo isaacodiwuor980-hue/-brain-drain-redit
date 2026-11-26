@@ -111,14 +111,14 @@ export function OnboardingFlow({ onComplete, onSkip }: OnboardingFlowProps) {
     } catch (err) {
       setPhase("step");
       const msg = err instanceof ApiError
-        ? `Could not save (${err.status}). Please try again.`
+        ? (err.status === 503 ? "Onboarding updates are temporarily unavailable. Your entries remain in this window only; do not close it if you need to keep them." : `Could not save (${err.status}). Please try again.`)
         : "Network error. Please try again.";
       toast({ title: "Save failed", description: msg, variant: "destructive" });
     }
   }, [state, toast, onComplete]);
 
   // ----- Render -----------------------------------------------------------
-  if (phase === "loading" || !state) {
+  if (phase === "loading") {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
         <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -133,6 +133,10 @@ export function OnboardingFlow({ onComplete, onSkip }: OnboardingFlowProps) {
         <Button onClick={() => window.location.reload()}>Retry</Button>
       </div>
     );
+  }
+
+  if (!state) {
+    return <p role="status">Onboarding state is unavailable.</p>;
   }
 
   const currentIndex = STEP_INDEX[state.currentStep];
@@ -392,7 +396,7 @@ function ExpertsStep({ scratch, setScratch, phase, onBack, onNext }: ExpertsStep
   return (
     <Card>
       <CardContent className="p-6 space-y-4">
-        <h2 className="text-xl font-bold">Become a verified expert</h2>
+        <h2 className="text-xl font-bold">Apply to the expert directory</h2>
         <p className="text-sm text-muted-foreground">
           If you have professional credentials (ORCID, license, etc.), you can
           apply to be listed in our expert directory and mentor others.

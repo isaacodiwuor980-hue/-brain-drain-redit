@@ -1,0 +1,95 @@
+# Live schema: limited read-only snapshot
+
+**VERIFIED by read-only connector queries:** The connected project is now named BRAIN DRAIN REDIT. Supabase reported database, database-user, REST and auth health checks healthy. These status checks do not establish application correctness, data completeness or a backup. No user rows, user content, passwords or API keys were read. No database write or migration was performed.
+
+## Migration history
+
+`supabase_migrations.schema_migrations` returned these eight recorded migration names and versions:
+
+| Version | Name |
+|---|---|
+| 20261105081821 | 01_security_and_rls_fixes |
+| 20261105081844 | 02_data_integrity_and_missing_objects |
+| 20261105081903 | 03_counters_notifications_search |
+| 20261105081918 | 04_performance_indexes |
+| 20261105081946 | 05_rpc_api_layer |
+| 20261105082111 | 06_diagnostics_retention_and_fixes |
+| 20261105082128 | 07_fix_diagnostics_fk_index_detection |
+| 20261105082142 | 08_remaining_fk_indexes |
+
+These names/versions do not correspond to the repository's `0001`–`0011` filenames. This does not establish that those SQL statements were never executed manually. Do not blindly apply, rewrite, or reapply migrations; actual object definitions and historical deployment must be reconciled first.
+
+## Relevant public schema observations
+
+- `posts.id` and `posts.topic_id` are text; `posts.user_id` is UUID with a foreign key to `auth.users`. `posts.tags` is absent from the selected complete column list. Branch feed code requests `tags` and repository migration `0010` would add it; current compatibility has not been tested against the live API.
+- `reactions.user_id` is UUID with a foreign key to `auth.users`. Reaction uniqueness includes reaction type, so the constraint alone permits both upvote and downvote for the same user/target. This does not prove conflicting rows exist. The separate legacy REST writes are not a proven atomic update. No tier/source columns appeared in the selected complete column list.
+- `follows` exists and uses UUID `follower_id` and `following_id`; `user_follows` does not exist. Branch Following feed currently queries `user_follows` and `followee_id`. Real app behavior has not been tested and must not be inferred from mocked tests.
+- `topic_followers` and `user_topic_affinity` exist, with UUID user IDs. The latter has score and timestamps; its meaning, provenance and retention have not been verified and should not be treated as expertise.
+- `user_identity_map`, `server_feature_flags`, `tiered_post_votes`, and `topic_authority_grants` are absent in public. Catalog lookup for `save_brain_atomic`, `set_post_reaction_atomic`, `toggle_post_reaction_atomic`, `set_tiered_post_vote`, and `preview_post_reaction` returned no public functions with those names. Branch brain, topic follow and personality routes expect identity mapping; brain save also expects the RPC. Without reviewed prerequisites these changes could fail closed or fail against this schema; no live route was exercised.
+- Relevant indexes exist on posts (including creation, topic/creation, user), follows, reactions and topic followers. Their suitability under real workload is unverified. Relevant row-security flags are enabled, but policy names/roles alone do not establish safe effective access; grants, policy expressions, service-role paths and real two-user tests remain to be audited. `profiles` contains personal-detail fields and has a policy named “profiles are readable by everyone”; effective field exposure requires review, not an assumption.
+- Selected trigger metadata showed follow count/notification, reaction notification/repost count, topic-follow count and updated-at triggers. Trigger bodies and side effects were not inspected. Installed extensions include pg_trgm and pgcrypto; vector was not listed.
+
+## Limitations
+
+The initial broad columns response was truncated. The targeted feed-related column query and targeted table-existence checks were complete; this is not a complete schema snapshot. Policy expressions, grants, all functions, trigger bodies, runtime behavior, data counts, account mapping coverage, backups, and migration SQL history beyond recorded names are unverified. The API is apparently reachable for metadata; this is not proof data is intact or all services work. Avoid displaying secrets, identifiers or content during follow-up.
+
+## Release consequence
+
+Do not merge or deploy PR #3 based solely on its green checks. It changes user-facing routes that depend on missing objects, and merging main may trigger configured deployment integrations. Before any change to a real database: establish backups, review existing definitions and deployment dependencies, design a safe forward-only plan, test against an isolated database, and obtain explicit approval. Preserve existing user data. Use `FEED_DESIGN.md` and `FEED_PROGRESS_LOG.md` for the broader feed blockers.
+
+## Later read-only feed metadata check
+
+**VERIFIED from catalog metadata, 2026-11-16:** `posts`, `brains`, `topics`, and `reactions` have RLS enabled but not forced, and are owned by `postgres`. The `service_role` has BYPASSRLS and SELECT on posts, brains and reactions; `anon` and `authenticated` also have SELECT. The visible `posts` SELECT policy is `true` for anon/authenticated, while the brains SELECT policy is `is_public = true OR author_id = auth.uid()`. Thus a public post's `brain_id` can reveal a private brain identifier; the feed's service-role access also cannot rely on RLS for per-user filtering. This is a schema/configuration finding, not evidence that such an experimental post exists or that any personal records were read. Effective access must still be verified under real restricted roles and through all paths.
+
+The later complete columns query lists `posts.tags`, contrary to the earlier snapshot above. The source and timing of this schema change are unknown; no migration was applied by this session. Refresh and reconcile deployment/migration history instead of assuming the old observation remains current. `user_identity_map`, feature flags, interest preferences/topics, experimental account events/preferences, tiered votes and authority grants were absent in this targeted check. Missing tables do not prove every possible source of signals is absent. No content, user rows, key values, database writes or deployments were involved.
+
+## Later read-only metadata recheck — 2026-11-16
+
+The connected project's provider metadata reported `ACTIVE_HEALTHY`; read-only health checks for `db` and `rest` returned healthy. This is not a backup, restore or application test. The provider listed the same eight migration names/versions shown above; this does not rule out manual SQL or establish equivalence to repository files.
+
+A targeted catalog-only `pg_class`/`pg_namespace` query for selected objects returned `brains`, `follows`, `posts`, `reactions`, `skills`, **and `user_follows`** as public tables, with RLS enabled but not forced and owner `postgres`. The earlier snapshot said `user_follows` was absent. This is an unexpected difference; its source, columns, policies, grants, data provenance and compatibility are unknown. The selected query did not find `user_identity_map`, `server_feature_flags`, `tiered_post_votes`, or `topic_authority_grants` as ordinary or partitioned public tables. It does not establish whether other kinds of objects exist under those names. **Stopped live inspection on the unexpected schema difference; no automatic repair or further live query.** An authorized operator should reconcile the change history and current definitions without exposing personal rows before a reviewed forward migration is proposed. No user records, secrets, migration writes, deployments, or flags were accessed or changed in this recheck.
+
+## Authorized metadata-only reconciliation check
+
+The owner authorized a metadata-only recheck and integration of main into the working branch, not a PR merge, deployment, data inspection, migration or other live write. Project listing returned the same target as healthy; the migration list again contained the eight timestamped 20261105 versions above. A targeted catalog query returned both `follows` and `user_follows` as ordinary postgres-owned tables, each with RLS enabled but not forced. `follows` has UUID `follower_id` / `following_id`, while `user_follows` has **text** `follower_id` / `followee_id`; both have timestamp `created_at`. `posts.tags` is `text[]`. These observations explain neither why earlier existence/column results differed nor whether identities/rows in the two tables correspond. Do not infer a mapping, merge rows or select one as authoritative.
+
+Policy metadata names `user_follows owner` for authenticated ALL, plus public read/owner write policy names on `follows` and `posts`. Table privilege metadata reported SELECT/INSERT/UPDATE/DELETE grants to anon, authenticated and service_role for all three tables; service_role has BYPASSRLS, while anon/authenticated do not. Grants alone are not effective permissions: RLS policy expressions, column privileges, functions, triggers and runtime roles were not established by these results. No user rows, credentials, policy expressions or content were retrieved. The unexpected differing identity types reinforce the stop: no further live inspection or mutation pending reconciliation of provenance and authorized review. Recovery and exact forward SQL remain unverified; do not run repository migrations blindly.
+
+## Authorized policy and constraint review
+
+The owner authorized further metadata-only inspection, directed that unknown ownership be retained for review, and chose review of exact live SQL and risks before each live stage. Deployment remains skipped. Selected catalog results again show eight recorded 20261105 migration versions; `follows` uses UUID follower/following with primary key, self-follow check and foreign keys to `auth.users` (ON DELETE CASCADE), while `user_follows` uses text follower/followee with only a composite primary-key constraint in this targeted constraint query. Selected `posts.user_id` is non-null UUID, `posts.brain_id` nullable text and `posts.tags` non-null text array. The selected identity/feature tables and five named functions did not appear in the targeted catalog results. These observations do not explain prior drift or prove manual migration history, identity ownership, content or actual behavior.
+
+Selected RLS policy expressions: `follows` SELECT is `true` for anon/authenticated; authenticated INSERT requires `auth.uid() = follower_id`, and DELETE uses the same condition. `user_follows` has an authenticated ALL policy whose `USING` and `WITH CHECK` each permit **either** `follower_id` or `followee_id` equal to `auth.uid()::text`. With the previously observed table grants, this policy shape can permit the followed participant to act on a relationship as well as the follower; effective access depends on the complete role/privilege/function environment. The service role bypasses RLS. No rows, content, credentials, or live writes were accessed. Policy intent, migration provenance, direct/legacy clients and record mapping remain unresolved; do not silently join/copy the two tables or change policies without a reviewed exact plan and specific approval.
+
+### Follow-trigger metadata
+
+A further targeted metadata query found two non-internal triggers on `follows`: `follow_counts_sync` after insert/delete invokes `sync_follow_counts`, and `notify_follow_created` after insert invokes `notify_on_follow`. No non-internal trigger was returned for `user_follows`. Both named functions are postgres-owned SECURITY DEFINER with empty search_path, and their reported ACL includes PUBLIC, anon, authenticated and service_role EXECUTE. The function definitions update profile following/follower counts and insert a follow notification respectively; this is definition inspection, not execution or a claim of effective client-callability for trigger functions. A copy into `follows` may therefore create notifications and adjust counters; bulk deletion may adjust counters, so migration must account for side effects and drift. The search also returned `sync_topic_follower_count`; no identity-named function was returned by that targeted name search.
+
+## Personality-test RLS correction — applied live
+
+The owner subsequently authorized autonomous modification, deletion and creation to complete the work without further messages. A metadata inventory showed `public.personality_tests` had RLS disabled despite existing authenticated own-row SELECT and ALL policies. It contained `user_id uuid`; anon, authenticated, and service_role had table grants including TRUNCATE. No content was inspected.
+
+Applied the exact SQL stored at `supabase/live-reviewed/20261125230547_personality_tests_enable_rls.sql` using `create_migration`; it verifies the expected table, user_id type and two policy expressions before enabling RLS, and revokes TRUNCATE from PUBLIC, anon and authenticated (RLS itself does not govern TRUNCATE). It does not remove or edit rows, modify the policies, restrict service_role or protect privileged paths. Three PGlite synthetic tests passed before application. Migration API returned success (version null); subsequently the ledger showed `20261125230547 personality_tests_enable_rls`. A read-only postcheck reported RLS enabled/not forced, effective anon/authenticated TRUNCATE false and service_role TRUNCATE true. No live row tests, client integration, or production-data inspection were performed. Existing direct clients that previously relied on unrestricted access can lose access; service-role bypass and inherited/other privilege paths remain. Rollback would disable RLS and re-grant TRUNCATE but would restore unsafe exposure; it was not executed or validated.
+
+A follow-up metadata query found effective TRUNCATE privileges for both anon and authenticated on 35 other public tables. PostgreSQL TRUNCATE is not subject to RLS. This does not establish whether direct SQL is reachable by those roles, but it is an important unresolved privilege risk; no blanket privilege change has yet been applied. Review object dependencies, access paths and scoped compatibility before changing remaining privileges.
+
+## Further applied security migrations
+
+Following the owner's request to proceed autonomously, applied two additional guarded migrations on `reemwkxwtchqsjjmtjuh`, without reading or modifying rows:
+
+- `20261125231050 revoke_public_browser_truncate`, exact SQL `supabase/live-reviewed/20261125231050_revoke_public_browser_truncate.sql`: revoked TRUNCATE from PUBLIC, anon and authenticated on the 35 named existing tables, aborting the transaction on unexpected tables/owners or inherited effective access. A postcheck of all 36 public tables showed 0 with anon/authenticated TRUNCATE and 36 retaining service_role TRUNCATE. Synthetic tests cover retained rows/read/service privileges and rollback on an inherited grant. This may break direct SQL clients that previously truncated tables; it does not prevent DELETE, privileged functions, service-role access, or future-table default grants.
+- `20261125231121 user_follows_follower_write_policy`, exact SQL `supabase/live-reviewed/20261125231121_user_follows_follower_write_policy.sql`: guarded replacement of the broad authenticated ALL policy with participant SELECT and follower-only INSERT/DELETE. Read-only catalog postcheck returned the three expected policies and no UPDATE policy. Four synthetic tests cover participant reads, follower writes, denied followee writes and service-role bypass. Existing direct clients using UPDATE or upsert can fail; this does not secure service-role writers, reconcile identity or change existing follow records. Reverting to the previous ALL policy would restore the vulnerability.
+
+The connector returned success for both, and the migration ledger shows the versions above. Catalog checks are not end-to-end access tests. No deployment, PR merge, real-row test, content inspection, or data transfer was performed.
+
+### Selected public content metadata
+
+The current `skills.author_id` and `reviewer_id` columns are UUID; `steps` is jsonb and `source_brain_id` text. The inspected RLS policies allow published skills or owner to read, and owner writes; brains and brain_nodes policies allow public or owner reads. Posts have an unconditional public SELECT policy. This is metadata, not a test of effective access, nested skill/brain content, publication lifecycle, or service-role paths. The branch's skill API has been corrected to use a trusted UUID mapping for private ownership instead of assuming Firebase subjects equal UUIDs, but mapping provisioning is still absent and publication is still paused.
+
+### Identity mapping storage created (not provisioned)
+
+Under the owner's autonomous migration authorization, applied live `20261125232116 identity_map_storage`. Exact guarded SQL is in `supabase/live-reviewed/20261125232116_identity_map_storage.sql`. It creates an initially empty `user_identity_map` with unique Firebase subject and Supabase UUID, an auth-user foreign key, RLS, and service-role SELECT only; it creates no accounts or links. Synthetic PGlite tests cover uniqueness, invalid/missing IDs, cascading deletion, role privileges and existing-table drift. The migration API returned success and the ledger confirms the version. Catalog postcheck confirms RLS, postgres ownership, no anon/authenticated SELECT and service-role SELECT but no INSERT/UPDATE/DELETE. This is schema scaffolding only: no trustworthy provisioning or automatic sync exists yet. Service-role can read all links; other elevated roles and functions have not been comprehensively audited. No live data rows were queried or modified by this step.
+
+### Atomic brain-detail read migration
+
+Applied `20261125232907 brain_detail_snapshot`: exact SQL `supabase/live-reviewed/20261125232907_brain_detail_snapshot.sql`. It adds `public.read_brain_detail_v2(text,uuid)`, an invoker-security SQL function that selects an explicitly projected public-or-supplied-owner brain and nodes together in one statement snapshot. It does not modify rows. The caller must authenticate and supply a verified mapped UUID; a privileged caller can supply any UUID, so this is not an independent authorization boundary for service-role access. Catalog postcheck showed STABLE, SECURITY INVOKER, fixed search_path, EXECUTE denied to anon/authenticated and allowed to service_role. Three synthetic tests covered public/owner/other access, field projection and function grants. No real data was read or tested. Old clients and current deployment do not automatically use the function.

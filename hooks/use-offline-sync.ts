@@ -1,13 +1,30 @@
-import { useState, useEffect, useCallback } from "react";
-import { getOfflineQueue, QueuedAction, saveOfflineQueue } from "@/lib/offline-sync";
+import { useState, useEffect, useCallback, useRef } from "react";
+import {
+  getOfflineQueue,
+  getOfflineQueueStrict,
+  getDeadLetterQueueStrict,
+  actionsForOwner,
+  summarizeOwnedQueue,
+  getDeadLetterQueue,
+  partitionDueActions,
+  quarantineActions,
+  quarantineOutcome,
+  requiresManualSyncReview,
+  recordFailure,
+  reconcileSyncBatch,
+  saveOfflineQueue,
+  QueuedAction,
+} from "@/lib/offline-sync";
 import { useOnlineStatus } from "./use-online-status";
 import { triggerHaptic } from "@/lib/device";
 import { useToast } from "./use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 import { idb } from "@/lib/db";
 import { env } from "@/lib/env";
-import { getAuthToken } from "@/lib/auth-token";
-import { createPost, reactToPost } from "@/lib/api/feed";
+import { getAuthSession } from "@/lib/auth-token";
+import { validateOfflinePostReplay } from "@/lib/offline-post-replay";
+import { useAuth } from "@/components/auth/AuthContext";
+import { createPost, toCreatePostInput } from "@/lib/api/feed";
 import { saveBrain } from "@/lib/api/brains";
 import type { Post, Brain, Node } from "@/lib/types";
 
@@ -15,17 +32,28 @@ export function useOfflineSync() {
   const status = useOnlineStatus();
   const isOnline = status === "online";
   const [queue, setQueue] = useState<QueuedAction[]>(getOfflineQueue);
+  const [storageUnavailable, setStorageUnavailable] = useState(() => getOfflineQueueStrict() === null || getDeadLetterQueueStrict() === null);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [authRetryAt, setAuthRetryAt] = useState(0);
+  const syncingRef = useRef(false);
+  const { user } = useAuth();
+  const currentUserId = user?.uid;
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
   // Listen to queue changes
   useEffect(() => {
     const handleQueueChange = () => {
-      setQueue(getOfflineQueue());
+      const current = getOfflineQueueStrict();
+      setStorageUnavailable(current === null || getDeadLetterQueueStrict() === null);
+      if (current !== null) setQueue(current);
     };
     window.addEventListener("brainbuilder_queue_change", handleQueueChange);
-    return () => window.removeEventListener("brainbuilder_queue_change", handleQueueChange);
+    window.addEventListener("storage", handleQueueChange);
+    return () => {
+      window.removeEventListener("brainbuilder_queue_change", handleQueueChange);
+      window.removeEventListener("storage", handleQueueChange);
+    };
   }, []);
 
   /**
@@ -35,98 +63,146 @@ export function useOfflineSync() {
    * FAKE sync that silently discarded every queued action. Offline posts and
    * reactions were lost when the user came back online.
    *
-   * Now: replay each queued action by calling the corresponding API. Actions
-   * that succeed are removed from the queue. Actions that fail are kept with
-   * an incremented retryCount (max 5 retries before they're dropped to avoid
-   * an unbounded poison-queue). Actions with no server equivalent
-   * (add_comment, save_profile) are treated as auto-success (they're already
-   * saved in IDB and have no REST endpoint to sync to).
+   * Unsafe posts, brain edits and reaction toggles are held for manual review.
+   * Comment and profile actions are also held: their local/Firestore save
+   * status has not been verified, so a skip is not proof of persistence.
+   * Failed actions are retained for retry or moved to attention storage.
+   * Queue and quarantine storage are not atomic, and recovery UI is incomplete.
    */
   const syncNow = useCallback(async () => {
-    const currentQueue = getOfflineQueue();
-    if (currentQueue.length === 0 || !isOnline || isSyncing) return;
+    const currentQueue = getOfflineQueueStrict();
+    if (currentQueue === null || getDeadLetterQueueStrict() === null) {
+      setStorageUnavailable(true);
+      toast({ title: "Sync needs attention", description: "Recovery storage cannot be read. Do not clear browser data.", variant: "destructive" });
+      return;
+    }
+    if (currentQueue.length === 0 || !isOnline || syncingRef.current) return;
     if (!env.apiEnabled) {
-      // Local-only build (VITE_LOCAL_ONLY=1) — nothing to sync to. Clear the
-      // queue so it doesn't grow unbounded in local-only mode.
-      saveOfflineQueue([]);
-      setQueue([]);
+      // A local-only build cannot replay these actions. Preserve them for a
+      // later cloud-enabled session rather than silently discarding work.
       return;
     }
 
+    // Never replay a different user's work or legacy entries with no owner.
+    if (!currentUserId) return;
+    const { due } = partitionDueActions(actionsForOwner(currentQueue, currentUserId));
+    if (due.length === 0) return;
+    const session = await getAuthSession().catch(() => null);
+    if (!session?.token || session.uid !== currentUserId) {
+      setAuthRetryAt(Date.now() + 30_000);
+      return;
+    }
+    if (syncingRef.current) return;
+    syncingRef.current = true;
     setIsSyncing(true);
-    triggerHaptic("medium");
+    try {
+      triggerHaptic("medium");
 
-    const token = await getAuthToken().catch(() => null);
-    const succeeded: string[] = [];
-    const failed: QueuedAction[] = [];
-    let skipped = 0;
+      const succeeded: string[] = [];
+      const retries: QueuedAction[] = [];
+      const dead: QueuedAction[] = [];
+      let skipped = 0;
 
-    for (const action of currentQueue) {
-      try {
-        const result = await replayAction(action, token);
-        if (result === "skipped") {
-          skipped++;
-          succeeded.push(action.id); // remove from queue — no point retrying
-        } else {
-          succeeded.push(action.id);
+      // HARDENED: only replay actions whose jittered backoff has elapsed.
+      // Actions still waiting are carried over untouched — so a burst of
+      // failures can't spin the loop or hammer a struggling API.
+      for (const action of due) {
+        const active = await getAuthSession().catch(() => null);
+        if (!active?.token || active.uid !== currentUserId) {
+          setAuthRetryAt(Date.now() + 30_000);
+          break;
         }
-      } catch (err) {
-        // Keep the action for retry, but cap retries at 5 to avoid a
-        // poison-queue that never drains.
-        const retryCount = action.retryCount + 1;
-        if (retryCount >= 5) {
-          // Drop permanently — log but don't block the rest of the queue.
-          console.warn(`Offline action ${action.id} (${action.type}) dropped after 5 retries:`, err);
-          succeeded.push(action.id); // remove from queue
-        } else {
-          failed.push({ ...action, retryCount });
+        // Unsafe/ambiguous writes remain held until an account-scoped review
+        // flow and the required server-side concurrency protections exist.
+        if (requiresManualSyncReview(action)) { dead.push(action); continue; }
+        try {
+          const result = await replayAction(action, active.token, active.uid);
+          succeeded.push(action.id);
+          if (result === "skipped") skipped++;
+        } catch {
+          const { retry, dead: quarantined } = recordFailure(action);
+          if (quarantined) {
+            // Do not log request identifiers, payloads or upstream errors.
+            console.warn("An offline action needs attention after repeated failures.");
+            dead.push(quarantined);
+          } else if (retry) {
+            retries.push(retry);
+          }
         }
       }
+
+      // An enqueue may have happened during the network requests. Re-read the
+      // queue and only update entries that are still present by their unique id.
+      const latest = getOfflineQueueStrict();
+      if (latest === null || getDeadLetterQueueStrict() === null) {
+        setStorageUnavailable(true);
+        toast({ title: "Sync needs attention", description: "Recovery storage cannot be read. Do not clear browser data.", variant: "destructive" });
+        return;
+      }
+      const latestIds = new Set(latest.map((action) => action.id));
+      const stillDead = dead.filter((action) => latestIds.has(action.id));
+      const stored = quarantineActions(stillDead);
+      const {deadIds, held} = quarantineOutcome(stillDead, stored);
+      const nextQueue = reconcileSyncBatch(latest, succeeded, [...retries, ...held], deadIds);
+      if (!saveOfflineQueue(nextQueue)) {
+        setStorageUnavailable(true);
+        toast({ title: "Sync needs attention", description: "Recovery storage could not be updated. Do not clear browser data.", variant: "destructive" });
+        return;
+      }
+      setQueue(nextQueue);
+
+      // Do not show a prior account's sync outcome after an account switch.
+      const currentSession = await getAuthSession().catch(() => null);
+      if (!currentSession?.token || currentSession.uid !== currentUserId) return;
+      const syncedCount = succeeded.length - skipped;
+      const {pending:ownPending, attention:ownAttention} = summarizeOwnedQueue(nextQueue, getDeadLetterQueue(), currentUserId);
+
+      if (ownPending === 0 && ownAttention === 0) {
+        triggerHaptic("success");
+        toast({
+          title: "Sync complete",
+          description: `${syncedCount} offline item${syncedCount === 1 ? "" : "s"} synced${skipped > 0 ? ` (${skipped} remained local or required no replay)` : ""}.`,
+        });
+        void queryClient.invalidateQueries({ queryKey: ["posts"] });
+        void queryClient.invalidateQueries({ queryKey: ["profile"] });
+        void queryClient.invalidateQueries({ queryKey: ["missions"] });
+        void queryClient.invalidateQueries({ queryKey: ["brains"] });
+      } else {
+        triggerHaptic("warning");
+        toast({
+          title: "Sync partially complete",
+          description: !stored && stillDead.length
+            ? "Some items could not be moved to recovery storage and remain pending. Avoid clearing browser data."
+            : `${syncedCount} synced; ${ownPending} pending${ownAttention ? `, ${ownAttention} need attention` : ""}.`,
+          variant: "destructive",
+        });
+      }
+    } finally {
+      syncingRef.current = false;
+      setIsSyncing(false);
     }
-
-    // Rebuild the queue: keep only failed actions.
-    const remaining = currentQueue.filter((a) => !succeeded.includes(a.id));
-    // Merge with failed actions that have updated retryCounts.
-    const nextQueue = remaining.map(
-      (a) => failed.find((f) => f.id === a.id) || a,
-    );
-    saveOfflineQueue(nextQueue);
-    setQueue(nextQueue);
-
-    const syncedCount = succeeded.length - skipped;
-
-    if (failed.length === 0) {
-      triggerHaptic("success");
-      toast({
-        title: "All changes synced",
-        description: `${syncedCount} offline item${syncedCount === 1 ? "" : "s"} synced${skipped > 0 ? ` (${skipped} already saved locally)` : ""}.`,
-      });
-      void queryClient.invalidateQueries({ queryKey: ["posts"] });
-      void queryClient.invalidateQueries({ queryKey: ["profile"] });
-      void queryClient.invalidateQueries({ queryKey: ["missions"] });
-      void queryClient.invalidateQueries({ queryKey: ["brains"] });
-    } else {
-      triggerHaptic("warning");
-      toast({
-        title: "Sync partially complete",
-        description: `${syncedCount} synced, ${failed.length} will retry next time.`,
-        variant: "destructive",
-      });
-    }
-    setIsSyncing(false);
-  }, [isOnline, isSyncing, toast, queryClient]);
+  }, [isOnline, currentUserId, toast, queryClient]);
 
   // Auto-sync when coming back online
   useEffect(() => {
-    if (isOnline && queue.length > 0) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- legitimate external-trigger sync: auto-flush the offline queue when connectivity returns; refactoring to derived state would change behavior (syncNow drives IDB + network writes + toast side effects).
-      void syncNow();
-    }
-  }, [isOnline, queue.length, syncNow]);
+    if (!isOnline || isSyncing || !currentUserId || !env.apiEnabled) return;
+    // Held items require manual attention and must not schedule an overflowing
+    // browser timeout or be automatically replayed.
+    const eligible = actionsForOwner(queue, currentUserId).filter(action => action.nextAttemptAt !== Number.MAX_SAFE_INTEGER);
+    if (eligible.length === 0) return;
+    const nextAt = Math.min(...eligible.map((action) => action.nextAttemptAt ?? 0));
+    const delay = Math.max(0, nextAt - Date.now(), authRetryAt - Date.now());
+    const timer = window.setTimeout(() => { void syncNow(); }, delay);
+    return () => window.clearTimeout(timer);
+  }, [isOnline, isSyncing, queue, currentUserId, authRetryAt, syncNow]);
 
+  const summary = summarizeOwnedQueue(queue, getDeadLetterQueue(), currentUserId);
   return {
     isOnline,
-    pendingCount: queue.length,
+    storageUnavailable,
+    pendingCount: summary.pending,
+    /** Held and quarantined actions for the current account only. */
+    deadLetterCount: summary.attention,
     isSyncing,
     syncNow,
   };
@@ -140,42 +216,30 @@ export function useOfflineSync() {
 async function replayAction(
   action: QueuedAction,
   token: string | null,
+  activeUserId: string,
 ): Promise<"synced" | "skipped"> {
+  // Defense in depth if this function gains another caller; no currently held
+  // action is safe to replay merely because a client-side check was bypassed.
+  if (requiresManualSyncReview(action)) throw new Error("Offline action requires review");
   switch (action.type) {
     case "create_post": {
       // The queue payload only has { postId } — read the full post from IDB.
-      const postId = action.payload?.postId as string | undefined;
-      if (!postId) return "skipped";
-      const post = await idb.get<Post>("posts", postId);
-      if (!post) {
-        // Post was deleted locally before sync — nothing to send.
-        return "skipped";
-      }
+      const postId = action.payload?.postId;
+      if (typeof postId !== "string" || !postId || postId.length > 120) throw new Error("Offline post requires review");
+      // Storage errors and missing rows cannot establish an intentional deletion.
+      const post = validateOfflinePostReplay(action, await idb.getStrict<Post>("posts", postId), activeUserId);
+      const session = await getAuthSession();
+      if (!session?.token || session.uid !== activeUserId) throw new Error("Offline session changed");
       await createPost(
-        {
-          id: post.id,
-          topicId: post.topicId,
-          content: post.content,
-          postType: post.postType,
-          event: post.event,
-          mediaUrls: post.mediaUrls,
-          brainId: post.brainId,
-          createdAt: post.createdAt,
-        },
-        token,
+        toCreatePostInput(post),
+        session.token,
       );
       return "synced";
     }
 
-    case "post_reaction": {
-      const { postId, reactionType } = (action.payload || {}) as {
-        postId?: string;
-        reactionType?: "upvote" | "downvote" | "repost";
-      };
-      if (!postId || !reactionType) return "skipped";
-      await reactToPost(postId, reactionType, token);
-      return "synced";
-    }
+    case "post_reaction":
+      // Defense in depth if a future caller bypasses the review gate above.
+      throw new Error("Reaction requires review");
 
     case "update_brain": {
       // Payload should be { brain, nodes } matching UpsertBrainInput.
@@ -199,6 +263,6 @@ async function replayAction(
       return "skipped";
 
     default:
-      return "skipped";
+      throw new Error("Offline action requires review");
   }
 }

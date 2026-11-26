@@ -1,10 +1,12 @@
 import type { Post } from "../types";
 import { api, ApiError } from "../api-client";
+import { isFeedCursor, type FeedCursor } from "../feed-cursor";
 
 export interface FeedResponse {
   posts: CloudPost[];
   hasMore: boolean;
   source: string;
+  nextCursor?: FeedCursor | null;
 }
 
 /**
@@ -22,6 +24,7 @@ export interface FeedParams {
   topic?: string | null;
   limit?: number;
   offset?: number;
+  cursor?: FeedCursor | null;
   signal?: AbortSignal;
 }
 
@@ -48,12 +51,23 @@ export async function fetchFeed(params: FeedParams = {}): Promise<FeedResponse> 
   if (params.mode) query.set("mode", params.mode);
   if (params.topic) query.set("topic", params.topic);
   if (params.limit) query.set("limit", String(params.limit));
+  if (params.offset && params.cursor) throw new Error("Cannot combine feed offset and cursor");
   if (params.offset) query.set("offset", String(params.offset));
+  if (params.cursor) {
+    if (!isFeedCursor(params.cursor)) throw new Error("Invalid feed cursor");
+    query.set("cursorCreatedAt", params.cursor.createdAt);
+    query.set("cursorId", params.cursor.id);
+  }
   const qs = query.toString();
   const response = await api.get<FeedResponse>(`/api/feed${qs ? `?${qs}` : ""}`, {
     signal: params.signal,
+    cache: "no-store",
     retries: 1,
   });
+  if (!response || !Array.isArray(response.posts) || typeof response.hasMore !== "boolean" ||
+      (response.hasMore && !isFeedCursor(response.nextCursor))) {
+    throw new Error("Invalid feed pagination response");
+  }
   return normalizeFeedPosts(response);
 }
 
@@ -61,11 +75,30 @@ export interface CreatePostInput {
   id: string;
   topicId: string;
   content: string;
+  /** Client explicitly requests the only supported audience. */
+  audience: "public";
+  tags?: string[];
   postType?: "post" | "question" | "answer" | "note";
   event?: Post["event"];
   mediaUrls?: string[];
   brainId?: string;
   createdAt?: number;
+}
+
+/** Shared by immediate create and offline replay to avoid dropping fields. */
+export function toCreatePostInput(post: Post): CreatePostInput {
+  return {
+    id: post.id,
+    topicId: post.topicId,
+    content: post.content,
+    audience: "public",
+    tags: post.tags,
+    postType: post.postType,
+    event: post.event,
+    mediaUrls: post.mediaUrls,
+    brainId: post.brainId,
+    createdAt: post.createdAt,
+  };
 }
 
 /** Creates a post on the server. Requires a valid auth token. */

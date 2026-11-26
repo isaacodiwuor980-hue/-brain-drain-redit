@@ -251,19 +251,19 @@ export function CircleRootAdmin({ communityId, communityName }: Props) {
                   Steward and Curator can manage the charter and promote Deposits into the Library. Observer is read-only.
                 </p>
                 <p className="text-[11px] text-muted-foreground/70">
-                  Role assignment is local to this device (the role lives on your membership record). Cross-user member management requires the cloud-sync phase.
+                  Role and charter changes are paused until membership and permissions are verified. Displayed local roles are not proof of authorization.
                 </p>
                 <div className="flex flex-wrap gap-2">
-                  <Button variant="outline" size="sm" disabled={currentRole === "steward"} onClick={() => { void transferStewardship(communityId); toast({ title: "Stewardship claimed", description: "You are now the Room steward." }); }}>
+                  <Button variant="outline" size="sm" disabled onClick={() => { void transferStewardship(communityId); toast({ title: "Stewardship claimed", description: "You are now the Room steward." }); }}>
                     Claim Stewardship
                   </Button>
-                  <Button variant="outline" size="sm" disabled={currentRole === "curator"} onClick={() => { void promoteToCurator(communityId); toast({ title: "Role updated", description: "You are now a Curator." }); }}>
+                  <Button variant="outline" size="sm" disabled onClick={() => { void promoteToCurator(communityId); toast({ title: "Role updated", description: "You are now a Curator." }); }}>
                     Make Curator
                   </Button>
-                  <Button variant="outline" size="sm" disabled={currentRole === "contributor" || currentRole === "observer"} onClick={() => { void demoteToContributor(communityId); toast({ title: "Role updated", description: "You are now a Contributor." }); }}>
+                  <Button variant="outline" size="sm" disabled onClick={() => { void demoteToContributor(communityId); toast({ title: "Role updated", description: "You are now a Contributor." }); }}>
                     Make Contributor
                   </Button>
-                  <Button variant="outline" size="sm" disabled={currentRole === "observer"} onClick={() => { void makeObserver(communityId); toast({ title: "Role updated", description: "You are now an Observer (read-only)." }); }}>
+                  <Button variant="outline" size="sm" disabled onClick={() => { void makeObserver(communityId); toast({ title: "Role updated", description: "You are now an Observer (read-only)." }); }}>
                     Make Observer
                   </Button>
                 </div>
@@ -304,6 +304,7 @@ export function CircleRootAdmin({ communityId, communityName }: Props) {
                   />
                 </div>
                 <Button
+                  disabled
                   onClick={async () => {
                     try {
                       await updateCharter({ communityId, mission: missionDraft.trim(), scope: scopeDraft.trim() });

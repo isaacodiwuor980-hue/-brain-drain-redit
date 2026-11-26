@@ -78,7 +78,7 @@ async function fetchWithTimeout(
 interface QueryOptions {
   select?: string;
   filters?: Record<string, string | number | boolean | null>;
-  order?: { column: string; ascending?: boolean };
+  order?: { column: string; ascending?: boolean } | Array<{ column: string; ascending?: boolean }>;
   limit?: number;
   offset?: number;
   /** e.g. "exact" for upsert conflict resolution. */
@@ -96,8 +96,8 @@ function buildQuery(options: QueryOptions): string {
     }
   }
   if (options.order) {
-    const dir = options.order.ascending === false ? "desc" : "asc";
-    params.set("order", `${options.order.column}.${dir}`);
+    const orders = Array.isArray(options.order) ? options.order : [options.order];
+    if (orders.length) params.set("order", orders.map(({column, ascending}) => `${column}.${ascending === false ? "desc" : "asc"}`).join(","));
   }
   if (options.limit) params.set("limit", String(options.limit));
   if (options.offset) params.set("offset", String(options.offset));
@@ -188,6 +188,38 @@ export const supabase = {
         body.slice(0, 300),
       );
     }
+  },
+
+  /** Atomically update only matching rows and return their selected IDs. */
+  async updateMatchingIds<T>(table: string, match: Record<string, string>, changes: Partial<T>): Promise<string[]> {
+    const params = new URLSearchParams({ select: "id" });
+    for (const [key, value] of Object.entries(match)) params.set(key, `eq.${value}`);
+    const response = await fetchWithTimeout(`${baseUrl()}/${table}?${params}`, {
+      method: "PATCH", headers: headers({ Prefer: "return=representation" }), body: JSON.stringify(changes),
+    });
+    if (!response.ok) {
+      const body = await response.text().catch(() => "");
+      throw new SupabaseError(`Supabase UPDATE ${table} failed: ${response.status}`, response.status, body.slice(0, 300));
+    }
+    const rows: unknown = await response.json();
+    if (!Array.isArray(rows) || rows.some(row => !row || typeof row.id !== "string")) throw new Error("Unexpected update response");
+    return rows.map(row => row.id as string);
+  },
+
+  /** Delete only matching rows and return their selected IDs. */
+  async deleteMatchingIds(table: string, match: Record<string, string>): Promise<string[]> {
+    const params = new URLSearchParams({ select: "id" });
+    for (const [key, value] of Object.entries(match)) params.set(key, `eq.${value}`);
+    const response = await fetchWithTimeout(`${baseUrl()}/${table}?${params}`, {
+      method: "DELETE", headers: headers({ Prefer: "return=representation" }),
+    });
+    if (!response.ok) {
+      const body = await response.text().catch(() => "");
+      throw new SupabaseError(`Supabase DELETE ${table} failed: ${response.status}`, response.status, body.slice(0, 300));
+    }
+    const rows: unknown = await response.json();
+    if (!Array.isArray(rows) || rows.some(row => !row || typeof row.id !== "string")) throw new Error("Unexpected delete response");
+    return rows.map(row => row.id as string);
   },
 
   async delete(table: string, match: Record<string, string>): Promise<void> {

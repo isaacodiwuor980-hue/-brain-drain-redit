@@ -1,5 +1,5 @@
 import type { NextFunction, Request, Response } from "express";
-import { extractBearerToken, verifyFirebaseToken, type VerifiedAuth } from "../lib/firebase-auth";
+import { extractBearerToken, verifyFirebaseToken, FirebaseAuthUpstreamError, type VerifiedAuth } from "../lib/firebase-auth";
 import { logger } from "../lib/logger";
 
 // Augment Express Request with the authenticated user.
@@ -26,10 +26,10 @@ declare global {
  */
 function classifyAuthError(err: unknown): "auth" | "upstream" | "config" {
   const msg = err instanceof Error ? err.message : String(err);
-  // Upstream: JWKS fetch failed, network error, Google returned non-200.
-  if (/Failed to fetch Firebase public keys|fetch|network/i.test(msg)) return "upstream";
-  // Config: project ID unset, algorithm unsupported.
-  if (/Firebase project ID is not configured|Unsupported token algorithm/i.test(msg)) return "config";
+  // Classify failures at the provider boundary, never by untrusted token text.
+  if (err instanceof FirebaseAuthUpstreamError) return "upstream";
+  // Config: project ID unset, algorithm unsupported (legacy response status).
+  if (msg === "Firebase project ID is not configured" || msg.startsWith("Unsupported token algorithm:")) return "config";
   // Everything else is a client-side auth problem.
   return "auth";
 }
@@ -50,12 +50,13 @@ export async function requireAuth(
   } catch (err) {
     const kind = classifyAuthError(err);
     if (kind === "upstream") {
-      logger.warn({ err }, "Auth verification failed — upstream JWKS unavailable");
+      // Error messages can contain untrusted token fields or upstream details.
+      logger.warn({ kind }, "Auth verification failed — upstream JWKS unavailable");
       res.status(502).json({ error: "Authentication service temporarily unavailable" });
       return;
     }
     if (kind === "config") {
-      logger.error({ err }, "Auth verification failed — server misconfiguration");
+      logger.error({ kind }, "Auth verification failed — server misconfiguration");
       res.status(500).json({ error: "Authentication misconfigured" });
       return;
     }
@@ -86,7 +87,7 @@ export async function optionalAuth(
       // block the request (the caller proceeds as a guest).
       const kind = classifyAuthError(err);
       if (kind !== "auth") {
-        logger.warn({ err, kind }, "Optional auth verification failed — proceeding as guest");
+        logger.warn({ kind }, "Optional auth verification failed — proceeding as guest");
       }
       // Ignore invalid tokens for optional auth; the request proceeds as guest.
     }

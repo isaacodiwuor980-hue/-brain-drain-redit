@@ -1,0 +1,12 @@
+# Existing-account assessment — proposal only
+
+The owner chose an aggregate assessment without accessing personal content or altering existing accounts. No user-level data, identifiers, emails, tokens, passwords or personal content should be retrieved, copied, logged or sent to the assistant. No assessment query is authorized or executed by this document; the actual environment and accessible metadata must first be confirmed. Existing users must remain unlinked until an independently reviewed recovery and ownership-proof process is approved. A missing map is not evidence that a Firebase account is new.
+
+## Proposed safeguards
+
+- A designated operator should first confirm which projects and identity stores are in scope, that a supported read-only aggregate interface is available, and whether permissions and applicable policies allow the assessment. Use least privilege and query only the minimum aggregate numbers required, after a specific query and disclosure review. Do not use an aggregate request as a pretext for user-level export or sensitive joins. No credentials belong in chat.
+- Potential aggregate questions, subject to feasibility and approval: how many total accounts exist in each provider; how many mappings exist; how many mapping conflicts are reported by trusted uniqueness checks; how many new-flow provisioning attempts fail in synthetic testing. Do not imply that independently counted Firebase and Supabase accounts correspond to the same people. An absent mapping table, stale records, disabled accounts and migration discrepancies can invalidate these counts.
+- Suppress or combine small or sensitive groups under a reviewed disclosure policy; avoid demographic breakdowns, timestamps, subject-level identifiers and cross-provider linkage. Even an aggregate can leak information when groups are small, rare or repeatedly queried. Record only approved non-identifying totals and known limitations, not SQL output containing user records.
+- Design recovery separately: it must establish control of the relevant accounts using independently verified provider authentication or an approved review process, reject conflicts and takeover attempts, support appeals, and avoid linking on email. The owner selected new-account-only provisioning for now, so this is future work, not permission to change existing mappings.
+
+A positive count or reviewed identity design is not proof of actual ownership, security or full coverage. If safe aggregation or disclosure review is unavailable, do not run the assessment.

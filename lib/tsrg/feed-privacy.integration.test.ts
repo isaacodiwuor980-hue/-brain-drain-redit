@@ -1,0 +1,102 @@
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { PGlite } from "@electric-sql/pglite";
+import { readFile } from "node:fs/promises";
+let db: PGlite;
+const a = "00000000-0000-4000-8000-000000000001";
+const b = "00000000-0000-4000-8000-000000000002";
+beforeAll(async () => {
+  db = new PGlite();
+  await db.exec(`CREATE ROLE anon; CREATE ROLE authenticated; CREATE ROLE service_role;
+    CREATE SCHEMA auth; CREATE TABLE auth.users(id uuid PRIMARY KEY);
+    CREATE TABLE public.topics(id text PRIMARY KEY);
+    CREATE TABLE public.server_feature_flags(name text PRIMARY KEY, enabled boolean NOT NULL);
+    INSERT INTO public.server_feature_flags VALUES ('feed_interest_tracking_v2', true);
+    INSERT INTO auth.users VALUES ('${a}'), ('${b}'); INSERT INTO public.topics VALUES ('art'),('science');`);
+  await db.exec(await readFile("supabase/proposals/0013_feed_privacy.sql", "utf8"));
+}, 30000);
+beforeEach(async () => { await db.exec("DELETE FROM public.feed_interest_topics; DELETE FROM public.feed_personalization_preferences; UPDATE public.server_feature_flags SET enabled=true WHERE name='feed_interest_tracking_v2';"); });
+afterAll(async () => { await db?.close(); });
+async function setEnabled(uid: string, enabled: boolean) { return db.query("SELECT public.feed_set_personalization($1,$2)", [uid, enabled]); }
+async function epoch(uid: string): Promise<string> {
+  const result = await db.query<{ epoch: string }>("SELECT public.feed_interest_epoch($1)::text AS epoch", [uid]);
+  return result.rows[0].epoch;
+}
+async function write(uid: string, topic: string, score: number, generation?: string) { return (await db.query<{ accepted: boolean }>("SELECT public.feed_record_interest($1,$2,$3,$4) AS accepted", [uid, topic, score, generation ?? await epoch(uid)])).rows[0].accepted; }
+async function read(uid: string) { return (await db.query("SELECT topic_id,score::text FROM public.feed_read_interests($1) ORDER BY topic_id", [uid])).rows; }
+describe("local privacy SQL proposal, service-only and not wired", () => {
+  it("defaults to off and stores no interest until opted in", async () => {
+    expect(await write(a, "art", 0.9)).toBe(false);
+    expect(await read(a)).toEqual([]);
+    expect((await db.query("SELECT count(*)::int AS n FROM public.feed_interest_topics")).rows).toEqual([{n:0}]);
+  });
+  it("rejects enabling inside the transaction when the server switch is off or absent", async () => {
+    await db.exec("UPDATE public.server_feature_flags SET enabled=false WHERE name='feed_interest_tracking_v2'");
+    await expect(setEnabled(a, true)).rejects.toMatchObject({code:"42501"});
+    expect((await db.query("SELECT count(*)::int AS n FROM public.feed_personalization_preferences")).rows).toEqual([{n:0}]);
+    await setEnabled(a, false);
+    await db.exec("DELETE FROM public.server_feature_flags WHERE name='feed_interest_tracking_v2'");
+    await expect(setEnabled(a, true)).rejects.toMatchObject({code:"42501"});
+    await db.exec("INSERT INTO public.server_feature_flags VALUES ('feed_interest_tracking_v2', true)");
+  });
+  it("reads and clears only the requested account", async () => {
+    await setEnabled(a, true); await setEnabled(b, true);
+    expect(await write(a, "art", 0.9)).toBe(true); expect(await write(b, "science", 0.7)).toBe(true);
+    expect(await read(a)).toEqual([{topic_id:"art",score:"0.9000"}]);
+    await setEnabled(a, false);
+    expect(await read(a)).toEqual([]); expect(await write(a, "art", 0.8)).toBe(false);
+    expect(await read(b)).toEqual([{topic_id:"science",score:"0.7000"}]);
+    expect((await db.query("SELECT count(*)::int AS n FROM public.feed_interest_topics WHERE user_id=$1", [a])).rows).toEqual([{n:0}]);
+  });
+  it("does not use or collect proposed interests while the server switch is off", async () => {
+    await setEnabled(a, true); const generation = await epoch(a);
+    await write(a, "art", 0.8, generation);
+    await db.exec("UPDATE public.server_feature_flags SET enabled=false WHERE name='feed_interest_tracking_v2'");
+    expect(await read(a)).toEqual([]);
+    expect(await write(a, "science", 0.9, generation)).toBe(false);
+    await db.query("SELECT public.feed_clear_interests($1)", [a]);
+    await setEnabled(a, false);
+  });
+  it("does not return stale saved rows while the preference is off", async () => {
+    await setEnabled(a, true); await write(a, "art", 0.7);
+    // Simulate stale data created outside these cooperating functions.
+    await db.query("UPDATE public.feed_personalization_preferences SET enabled=false WHERE user_id=$1", [a]);
+    expect(await read(a)).toEqual([]);
+    expect(await write(a, "science", 0.9)).toBe(false);
+  });
+  it("can clear saved interests without changing the on/off setting", async () => {
+    await setEnabled(a, true); await write(a, "art", 0.7);
+    await db.query("SELECT public.feed_clear_interests($1)", [a]);
+    expect(await read(a)).toEqual([]); expect(await write(a, "science", 0.6)).toBe(true);
+  });
+  it("rejects events collected before clear or disable even after re-enable", async () => {
+    await setEnabled(a, true);
+    const beforeClear = await epoch(a);
+    await write(a, "art", 0.8, beforeClear);
+    await db.query("SELECT public.feed_clear_interests($1)", [a]);
+    expect(await write(a, "art", 0.8, beforeClear)).toBe(false);
+    const afterClear = await epoch(a);
+    expect(await write(a, "science", 0.6, afterClear)).toBe(true);
+    await setEnabled(a, false); await setEnabled(a, true);
+    expect(await write(a, "art", 0.8, afterClear)).toBe(false);
+    expect(await read(a)).toEqual([]);
+    expect(await write(a, "art", 0.9, await epoch(a))).toBe(true);
+  });
+  it("does not invalidate queued events when the setting remains enabled", async () => {
+    await setEnabled(a, true); const generation = await epoch(a);
+    await setEnabled(a, true);
+    expect(await write(a, "art", 0.5, generation)).toBe(true);
+  });
+  it("rejects malformed inputs and unknown topics without partial writes", async () => {
+    await setEnabled(a, true);
+    for (const score of [-1, 1.1]) await expect(write(a, "art", score)).rejects.toMatchObject({code:"22023"});
+    await expect(write(a, "unknown", 0.5)).rejects.toMatchObject({code:"23503"});
+    expect(await read(a)).toEqual([]);
+  });
+  it("denies direct table access and function execution to untrusted roles", async () => {
+    const rights = await db.query(`SELECT has_table_privilege('authenticated','public.feed_interest_topics','SELECT') AS read,
+      has_function_privilege('anon','public.feed_record_interest(uuid,text,numeric,bigint)','EXECUTE') AS anonymous,
+      has_function_privilege('authenticated','public.feed_set_personalization(uuid,boolean)','EXECUTE') AS authenticated,
+      has_function_privilege('service_role','public.feed_set_personalization(uuid,boolean)','EXECUTE') AS service`);
+    expect(rights.rows).toEqual([{read:false,anonymous:false,authenticated:false,service:true}]);
+  });
+});

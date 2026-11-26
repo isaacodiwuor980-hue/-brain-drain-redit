@@ -95,6 +95,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // guest profile).
   const unsubscribeRef = useRef<(() => void) | undefined>(undefined);
   const guestSessionActiveRef = useRef<boolean>(false);
+  // Invalidates asynchronous profile work whenever the authenticated session
+  // changes; a stale read must never populate a different user's profile.
+  const authGenerationRef = useRef(0);
+  const providerMountedRef = useRef(false);
   const [showOnboarding, setShowOnboarding] = useState<boolean>(() => {
     try {
       return !localStorage.getItem(ONBOARDED_KEY);
@@ -117,6 +121,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let isMounted = true;
+    providerMountedRef.current = true;
     let guestId: string | null = null;
     try {
       guestId = localStorage.getItem(GUEST_STORAGE_KEY);
@@ -136,15 +141,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } catch {
         // Local profile storage is best-effort.
       }
-      if (!isMounted || !guestSessionActive) return;
+      if (!isMounted || !guestSessionActive || !guestSessionActiveRef.current) return;
       setUser(guestUser);
       setProfile(guestProfile);
       setLoading(false);
     };
 
     const handleAuthFailure = (error: unknown) => {
+      if (!isMounted) return;
       console.error("Firebase auth initialization failed:", error);
-      if (guestId) {
+      if (guestId && guestSessionActiveRef.current) {
         guestSessionActive = true;
         void restoreGuestSession(guestId);
       } else if (isMounted) {
@@ -167,9 +173,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           services.auth,
           async (currentUser) => {
             if (!isMounted) return;
+            const generation = ++authGenerationRef.current;
+            const stillCurrent = () => isMounted && authGenerationRef.current === generation && services.auth.currentUser === currentUser;
 
             if (currentUser) {
               guestSessionActive = false;
+              guestSessionActiveRef.current = false;
               const appUser: AppUser = {
                 id: currentUser.uid,
                 uid: currentUser.uid,
@@ -178,11 +187,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 photoURL: currentUser.photoURL,
               };
               setUser(appUser);
+              setProfile(null);
+              setLoading(false);
 
               try {
                 const firestore = await getFirestoreServices();
+                if (!stillCurrent()) return;
                 const userDocRef = firestore.doc(firestore.db, "users", currentUser.uid);
                 const userDoc = await firestore.getDoc(userDocRef);
+                if (!stillCurrent()) return;
                 if (userDoc.exists()) {
                   setProfile(userDoc.data() as UserProfile);
                 } else {
@@ -196,9 +209,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                     followingCount: 0,
                   };
                   await firestore.setDoc(userDocRef, newProfile);
+                  if (!stillCurrent()) return;
                   setProfile(newProfile);
                 }
               } catch (error: unknown) {
+                if (!stillCurrent()) return;
                 console.error("Error fetching/creating profile:", error);
                 setProfile({
                   id: currentUser.uid,
@@ -209,10 +224,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                   followerCount: 0,
                   followingCount: 0,
                 });
-                toast({ title: "Profile Sync Issue", description: "Working with a local profile. Changes will sync when possible." });
+                toast({ title: "Profile Sync Issue", description: "Using a temporary profile. Changes may not be saved until the connection is restored." });
               }
-              if (isMounted) setLoading(false);
-            } else if (guestId) {
+              if (stillCurrent()) setLoading(false);
+            } else if (guestId && guestSessionActiveRef.current) {
               guestSessionActive = true;
               await restoreGuestSession(guestId);
             } else {
@@ -273,38 +288,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }, loadingFallbackMs);
     return () => {
       isMounted = false;
+      providerMountedRef.current = false;
+      authGenerationRef.current += 1;
       window.clearTimeout(loadingFallback);
       unsubscribeRef.current?.();
+      unsubscribeRef.current = undefined;
     };
   }, [toast]);
 
-  const signIn = async () => {
-    setSigningIn(true);
-    // Disable the guest session immediately so restoreGuestSession's
-    // async IDB read can't overwrite the real user after sign-in (B.8 fix).
-    guestSessionActiveRef.current = false;
-    try {
-      const services = await getFirebaseServices();
-      await services.signInWithPopup(services.auth, new services.GoogleAuthProvider());
-      try {
-        localStorage.removeItem(GUEST_STORAGE_KEY);
-      } catch {
-        // Ignore — best-effort cleanup of the guest marker.
-      }
-      // After a successful sign-in, set up onAuthStateChanged so we
-      // continue tracking the auth state (the mount effect skipped
-      // firebase init because the user was a guest). Without this,
-      // the user would be signed in but the AuthContext wouldn't
-      // observe future auth changes (sign-out, token refresh, etc.).
-      // We guard with `!unsubscribeRef.current` so we don't double-subscribe if
-      // the mount effect already set it up (e.g. user had no guest
-      // session and firebase init already ran).
-      if (!unsubscribeRef.current) {
-        const signInMounted = true;
+  const ensureAuthListener = (services: Awaited<ReturnType<typeof getFirebaseServices>>) => {
+    if (!providerMountedRef.current || unsubscribeRef.current) return;
+    {
         unsubscribeRef.current = services.onAuthStateChanged(
           services.auth,
           async (currentUser) => {
-            if (!signInMounted) return;
+            if (!providerMountedRef.current) return;
+            const generation = ++authGenerationRef.current;
+            const stillCurrent = () => providerMountedRef.current && authGenerationRef.current === generation && services.auth.currentUser === currentUser;
             if (currentUser) {
               const appUser: AppUser = {
                 id: currentUser.uid,
@@ -314,12 +314,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 photoURL: currentUser.photoURL,
               };
               setUser(appUser);
+              setProfile(null);
               try {
                 const firestore = await getFirestoreServices();
-                if (!signInMounted) return;
+                if (!stillCurrent()) return;
                 const userDocRef = firestore.doc(firestore.db, "users", currentUser.uid);
                 const userDoc = await firestore.getDoc(userDocRef);
-                if (!signInMounted) return;
+                if (!stillCurrent()) return;
                 if (userDoc.exists()) {
                   setProfile(userDoc.data() as UserProfile);
                 } else {
@@ -333,10 +334,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                     followingCount: 0,
                   };
                   await firestore.setDoc(userDocRef, newProfile);
-                  if (signInMounted) setProfile(newProfile);
+                  if (stillCurrent()) setProfile(newProfile);
                 }
               } catch {
-                if (signInMounted) {
+                if (stillCurrent()) {
                   setProfile({
                     id: currentUser.uid,
                     username: currentUser.email?.split("@")[0] || "builder",
@@ -361,7 +362,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             // refresh failure, network) are surfaced instead of silently
             // dropped (B.1 fix).
             console.error("onAuthStateChanged error:", error);
-            if (signInMounted) {
+            if (providerMountedRef.current) {
               toast({
                 title: "Authentication error",
                 description: "Your session may have expired. Please sign in again.",
@@ -371,6 +372,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           },
         );
       }
+  };
+
+  const signIn = async () => {
+    setSigningIn(true);
+    // Disable the guest session immediately so restoreGuestSession's
+    // async IDB read can't overwrite the real user after sign-in (B.8 fix).
+    guestSessionActiveRef.current = false;
+    try {
+      const services = await getFirebaseServices();
+      await services.signInWithPopup(services.auth, new services.GoogleAuthProvider());
+      try {
+        localStorage.removeItem(GUEST_STORAGE_KEY);
+      } catch {
+        // Ignore — best-effort cleanup of the guest marker.
+      }
+      // After a successful sign-in, set up onAuthStateChanged so we
+      // continue tracking the auth state (the mount effect skipped
+      // firebase init because the user was a guest). Without this,
+      // the user would be signed in but the AuthContext wouldn't
+      // observe future auth changes (sign-out, token refresh, etc.).
+      // We guard with `!unsubscribeRef.current` so we don't double-subscribe if
+      // the mount effect already set it up (e.g. user had no guest
+      // session and firebase init already ran).
+      ensureAuthListener(services);
     } catch (error: unknown) {
       console.error("Error signing in", error);
       const code = (error as { code?: string })?.code;
@@ -406,20 +431,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       // Subscribe to auth state changes if not already subscribed (same
       // rationale as the Google signIn — see comment there).
-      if (!unsubscribeRef.current) {
-        const signInMounted = true;
-        unsubscribeRef.current = services.onAuthStateChanged(services.auth, async (currentUser) => {
-          if (!signInMounted || !currentUser) return;
-          const appUser: AppUser = {
-            id: currentUser.uid,
-            uid: currentUser.uid,
-            displayName: currentUser.displayName,
-            email: currentUser.email,
-            photoURL: currentUser.photoURL,
-          };
-          setUser(appUser);
-        });
-      }
+      ensureAuthListener(services);
     } catch (error: unknown) {
       console.error("Email sign-in failed:", error);
       // Firebase error codes: auth/invalid-credential, auth/user-not-found,
@@ -462,20 +474,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Best-effort cleanup.
       }
       // The onAuthStateChanged listener will pick up the new user.
-      if (!unsubscribeRef.current) {
-        const signUpMounted = true;
-        unsubscribeRef.current = services.onAuthStateChanged(services.auth, async (currentUser) => {
-          if (!signUpMounted || !currentUser) return;
-          const appUser: AppUser = {
-            id: currentUser.uid,
-            uid: currentUser.uid,
-            displayName: currentUser.displayName || displayName.trim(),
-            email: currentUser.email,
-            photoURL: currentUser.photoURL,
-          };
-          setUser(appUser);
-        });
-      }
+      ensureAuthListener(services);
       toast({
         title: "Account created",
         description: `Welcome, ${displayName.trim()}! Your account is ready.`,
@@ -503,6 +502,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const continueAsGuest = async () => {
+    const generation = ++authGenerationRef.current;
     const guestId = `guest-${crypto.randomUUID().substring(0, 8)}`;
     try {
       localStorage.setItem(GUEST_STORAGE_KEY, guestId);
@@ -517,11 +517,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch (error: unknown) {
       console.error("Failed to persist guest profile", error);
     }
+    if (!providerMountedRef.current || authGenerationRef.current !== generation) return;
     setUser(guestUser);
     setProfile(guestProfile);
   };
 
   const logOut = async () => {
+    authGenerationRef.current += 1;
+    guestSessionActiveRef.current = false;
     try {
       try {
         localStorage.removeItem(GUEST_STORAGE_KEY);
@@ -545,7 +548,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(null);
       setProfile(null);
       setLoading(false);
-      // Reset the unsubscribe ref so a future signIn can re-subscribe.
+      // Unsubscribe before dropping the reference to avoid duplicate listeners.
+      unsubscribeRef.current?.();
       unsubscribeRef.current = undefined;
     } catch (error: unknown) {
       console.error("Error signing out", error);
@@ -555,20 +559,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const updateProfileData = async (data: Partial<UserProfile>) => {
-    if (!user || !profile) return;
+    if (!user || !profile) throw new Error("Your profile is not available yet. Please try again.");
     const updatedProfile = { ...profile, ...data };
+    const generation = authGenerationRef.current;
+    const stillCurrent = () => providerMountedRef.current && authGenerationRef.current === generation;
     try {
       if (isGuestUser(user)) {
-        await idb.put("profile", { ...updatedProfile, id: GUEST_PROFILE_ID });
+        await idb.putStrict("profile", { ...updatedProfile, id: GUEST_PROFILE_ID });
       } else {
         const firestore = await getFirestoreServices();
+        if (!stillCurrent()) throw new Error("Your session changed before the profile could be saved.");
         await firestore.setDoc(firestore.doc(firestore.db, "users", user.uid), updatedProfile, { merge: true });
       }
+      if (!stillCurrent()) throw new Error("Your session changed during the profile save; its result may be uncertain.");
       setProfile(updatedProfile);
     } catch (error: unknown) {
       console.error("Error updating profile", error);
-      const message = error instanceof Error ? error.message : String(error);
-      toast({ title: "Update Failed", description: message || "Could not update profile.", variant: "destructive" });
+      throw error;
     }
   };
 

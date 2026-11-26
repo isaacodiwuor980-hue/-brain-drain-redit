@@ -7,12 +7,8 @@ interface CommentThreadModalProps {
   onClose: () => void;
   postAuthorName: string;
   /**
-   * Optional — the post author's id. Forwarded to CommentThread so:
-   *  - the post author can pin one definitive reply per thread.
-   *  - confidential replies are visible to the post author.
-   * Defaults to "me" so the signed-in user is treated as the post author
-   * for any post they can write to (which, in this offline-first build,
-   * is every post they create).
+   * Optional post author id, forwarded for thread controls. Confidential
+   * replies are currently hidden from everyone, including the author.
    */
   postAuthorId?: string;
 }

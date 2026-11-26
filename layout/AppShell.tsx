@@ -1,4 +1,4 @@
-import { useState, useEffect, lazy, Suspense } from "react";
+import { useState, useEffect, useCallback, lazy, Suspense } from "react";
 import { Link, useLocation } from "wouter";
 import {
   Home,
@@ -25,8 +25,10 @@ import { ConnectionLoader } from "@/components/ui/connection-loader";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useOnlineStatus } from "@/hooks/use-online-status";
 import { useOfflineSync } from "@/hooks/use-offline-sync";
+import { SyncAttentionNotice } from "./SyncAttentionNotice";
 import { triggerHaptic } from "@/lib/device";
 import { CreateMenu } from "@/components/CreateMenu";
+import { isNavActive } from "@/lib/navigation";
 import { Loader2 } from "lucide-react";
 
 // The mobile bottom-sheet uses framer-motion; lazy-load it so the ~130kB
@@ -34,16 +36,14 @@ import { Loader2 } from "lucide-react";
 const MobileNavDrawer = lazy(() =>
   import("@/components/layout/MobileNavDrawer").then((m) => ({ default: m.MobileNavDrawer })),
 );
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+// PERF: the unsaved-changes AlertDialog is a radix primitive that was EAGERLY
+// imported here, which dragged the 141 KB `radix-lazy` chunk (44 KB gzip)
+// onto the first-paint critical path for every visitor — even though the
+// dialog can only appear after the user edits something and tries to leave.
+// Lazy-load it behind the same dirty-check that opens it.
+const UnsavedChangesDialog = lazy(() =>
+  import("@/components/layout/unsaved-changes-dialog").then((m) => ({ default: m.UnsavedChangesDialog })),
+);
 
 interface AppShellProps {
   children: React.ReactNode;
@@ -52,9 +52,10 @@ interface AppShellProps {
 export function AppShell({ children }: AppShellProps) {
   const [location, setLocation] = useLocation();
   const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState(false);
+  const closeMobileDrawer = useCallback(() => setIsMobileDrawerOpen(false), []);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const isOffline = useOnlineStatus() === "offline";
-  const { pendingCount, isSyncing } = useOfflineSync();
+  const { pendingCount, deadLetterCount, isSyncing, storageUnavailable } = useOfflineSync();
 
   // SAFETY NET: clear __isAppDirty on every route change. The dirty flag
   // is set by WizardModal/SettingsPage when the user has unsaved changes.
@@ -116,16 +117,38 @@ export function AppShell({ children }: AppShellProps) {
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
   }, []);
 
-  const handleLinkClick = (href: string, e: React.MouseEvent) => {
+  /**
+   * Shared "may I navigate away?" gate for both <Link> clicks and
+   * programmatic navigation. Returns true when navigation may proceed.
+   *
+   * BUG FIX (dead click targets): the right-hand Discover rail used
+   * `onClick={(e) => handleLinkClick(href, e)}` on plain <button>s, which
+   * never called setLocation — so "Quick search", every Popular Topic,
+   * every Suggested Network and every Active Contributor row did nothing
+   * when clicked (~11 dead controls on desktop). handleLinkClick now
+   * navigates itself; the <Link> path passes through the same gate.
+   */
+  const requestNavigation = (href: string, e?: React.MouseEvent): boolean => {
     triggerHaptic("selection");
     // Only block navigation if dirty AND the user is on a page with a
     // form (settings or wizard). This prevents the dirty flag from
     // blocking navigation on pages where it doesn't matter.
     if (window.__isAppDirty && (location === "/settings" || location === "/library")) {
-      e.preventDefault();
+      e?.preventDefault();
       setPendingHref(href);
       setIsConfirmOpen(true);
+      return false;
     }
+    return true;
+  };
+
+  const handleLinkClick = (href: string, e: React.MouseEvent) => {
+    requestNavigation(href, e);
+  };
+
+  /** Programmatic navigation for button-driven targets (no anchor to swallow). */
+  const navigate = (href: string) => {
+    if (requestNavigation(href)) setLocation(href);
   };
 
   /**
@@ -278,7 +301,7 @@ export function AppShell({ children }: AppShellProps) {
           {/* Primary & Secondary Nav - Compact, Short & Intact */}
           <nav className="flex-1 px-2.5 py-1.5 space-y-1 overflow-y-auto overflow-x-hidden scrollbar-none" aria-label="Primary">
             {[...primaryNav, ...secondaryNav].map((item) => {
-              const isActive = location === item.href;
+              const isActive = isNavActive(item.href, location);
               const linkContent = (
                 <Button
                   variant="ghost"
@@ -310,7 +333,7 @@ export function AppShell({ children }: AppShellProps) {
           {/* Account links pinned to the bottom - Compact and Short */}
           <nav className="px-2.5 pb-3 pt-1.5 space-y-1 border-t border-border/40" aria-label="Account">
             {accountNav.map((item) => {
-              const isActive = location === item.href;
+              const isActive = isNavActive(item.href, location);
               const linkContent = (
                 <Button
                   variant="ghost"
@@ -356,13 +379,13 @@ export function AppShell({ children }: AppShellProps) {
       </TooltipProvider>
 
       {/* Main Content */}
-      <a href="#main-content" className="skip-to-content">Skip to content</a>
       <main id="main-content" tabIndex={-1} className="flex-1 flex flex-col min-w-0 bg-background overflow-x-hidden outline-none pt-[env(safe-area-inset-top)] pb-[calc(5rem+env(safe-area-inset-bottom))] md:pt-0 md:pb-0">
+        <SyncAttentionNotice count={deadLetterCount} storageUnavailable={storageUnavailable} />
         {/* Mobile Top Bar — phone-only header with logo + create button.
             Desktop has its own sidebar; this gives phone users a recognizable
             top bar and pushes content below the iOS notch / Dynamic Island
             via the safe-area padding on <main>. */}
-        <div className="md:hidden sticky top-0 z-30 bg-background/90 backdrop-blur-xl border-b border-border/40 px-4 h-14 flex items-center justify-between">
+        <div className="md:hidden sticky top-[env(safe-area-inset-top)] z-30 bg-background/90 backdrop-blur-xl border-b border-border/40 px-4 h-14 flex items-center justify-between">
           <Link
             href="/"
             onClick={(e) => handleLinkClick("/", e)}
@@ -373,7 +396,7 @@ export function AppShell({ children }: AppShellProps) {
             <span className="text-base tracking-tight">Brain Drain</span>
           </Link>
           <div className="flex items-center gap-1">
-            <CreateMenu variant="compact" />
+            <CreateMenu variant="compact" placement="bottom" />
           </div>
         </div>
 
@@ -392,7 +415,7 @@ export function AppShell({ children }: AppShellProps) {
           </header>
         )}
 
-        <div className="flex-1 pb-20 md:pb-0 relative">
+        <div className="flex-1 relative">
           <div className="h-full">
             {children}
           </div>
@@ -403,7 +426,16 @@ export function AppShell({ children }: AppShellProps) {
       <aside aria-label="Discover" className="hidden xl:flex w-80 flex-col border-l border-border/50 bg-background sticky top-0 h-screen z-10 p-5 overflow-y-auto gap-5">
         {/* Quick Search Shortcut Launcher */}
         <button
-          onClick={(e) => handleLinkClick("/search", e)}
+          type="button"
+          onClick={() => {
+            triggerHaptic("selection");
+            // PHASE 3: open the command palette in place (search across
+            // brains/topics/pages) instead of dumping the user on an empty
+            // search page. The "/" and ⌘K shortcuts do the same.
+            window.dispatchEvent(new CustomEvent("bd:open-palette"));
+          }}
+          aria-keyshortcuts="Control+K Meta+K /"
+          aria-label="Quick search — Command K"
           className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-full bg-card/60 hover:bg-card border border-border/50 hover:border-border text-muted-foreground hover:text-foreground text-xs transition-all shadow-none group cursor-pointer"
         >
           <div className="flex items-center gap-2.5">
@@ -428,7 +460,7 @@ export function AppShell({ children }: AppShellProps) {
               ].map((topic) => (
                 <button
                   key={topic.name}
-                  onClick={(e) => handleLinkClick(`/search?q=${encodeURIComponent(topic.name)}`, e)}
+                  onClick={() => navigate(`/search?q=${encodeURIComponent(topic.name)}`)}
                   className="w-full text-left flex flex-col cursor-pointer hover:bg-muted/40 focus-visible:bg-muted/40 p-2.5 -mx-2.5 rounded-xl transition-all outline-none focus-visible:ring-2 focus-visible:ring-ring active:scale-[0.98]"
                 >
                   <span className="text-[11px] text-muted-foreground font-medium">Popular</span>
@@ -449,7 +481,7 @@ export function AppShell({ children }: AppShellProps) {
               ].map((brain, i) => (
                 <button
                   key={i}
-                  onClick={(e) => handleLinkClick("/library", e)}
+                  onClick={() => navigate("/library")}
                   className="w-full text-left flex items-center gap-3 cursor-pointer group hover:bg-muted/40 focus-visible:bg-muted/40 p-2 -mx-2 rounded-xl transition-all outline-none focus-visible:ring-2 focus-visible:ring-ring active:scale-[0.98]"
                 >
                   <div className={cn("w-9 h-9 rounded-xl flex items-center justify-center transition-colors shrink-0", brain.bg, brain.color)}>
@@ -474,7 +506,7 @@ export function AppShell({ children }: AppShellProps) {
               ].map((user, i) => (
                 <button
                   key={i}
-                  onClick={(e) => handleLinkClick(`/profile?userId=${encodeURIComponent(user.name)}`, e)}
+                  onClick={() => navigate(`/search?q=${encodeURIComponent(user.name)}`)}
                   className="w-full text-left flex items-center gap-3 cursor-pointer group hover:bg-muted/40 focus-visible:bg-muted/40 p-2 -mx-2 rounded-xl transition-all outline-none focus-visible:ring-2 focus-visible:ring-ring active:scale-[0.98]"
                 >
                   <div className="relative shrink-0">
@@ -499,7 +531,7 @@ export function AppShell({ children }: AppShellProps) {
         aria-label="Primary"
       >
         {bottomNavItems.map((item) => {
-          const isActive = location === item.href;
+          const isActive = isNavActive(item.href, location);
           return (
             <Link
               key={item.href}
@@ -508,11 +540,11 @@ export function AppShell({ children }: AppShellProps) {
               onTouchStart={() => prefetchRoute(item.href)}
               aria-current={isActive ? "page" : undefined}
               aria-label={item.label}
-              className="relative flex-1 flex items-center justify-center cursor-pointer"
+              className="relative min-w-0 flex-1 flex items-center justify-center cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
             >
               <div
                 className={cn(
-                  "flex flex-col items-center gap-0.5 px-3 py-1 transition-all duration-100 active:scale-90",
+                  "flex flex-col items-center gap-0.5 px-1 py-1 transition-colors duration-100",
                   isActive
                     ? "text-foreground font-bold"
                     : "text-muted-foreground hover:text-foreground",
@@ -525,22 +557,19 @@ export function AppShell({ children }: AppShellProps) {
           );
         })}
         <button
+          type="button"
           onClick={() => setIsMobileDrawerOpen(true)}
           aria-label="Open more navigation options"
-          aria-haspopup="menu"
+          aria-haspopup="dialog"
           aria-expanded={isMobileDrawerOpen}
-          className="relative flex-1 flex items-center justify-center text-muted-foreground hover:text-foreground cursor-pointer"
+          className={cn("relative min-w-0 flex-1 flex items-center justify-center cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring", drawerSections.some(section => section.items.some(item => isNavActive(item.href, location))) ? "text-foreground font-bold" : "text-muted-foreground hover:text-foreground")}
         >
-          <div className="flex flex-col items-center gap-0.5 px-3 py-1 transition-all duration-100 active:scale-90">
+          <div className="flex flex-col items-center gap-0.5 px-1 py-1 transition-colors duration-100">
             <MoreHorizontal className="w-5 h-5 stroke-[1.75]" aria-hidden />
             <span className="text-[10px] tracking-tight">More</span>
           </div>
         </button>
-
-        {/* FB-style Create slot — one-tap access to every create action
-            without hunting through pages. Fixed small flex-0 so the four
-            nav items keep equal spacing. */}
-        <div className="flex items-center justify-center pl-1">
+        <div className="flex shrink-0 items-center justify-center pl-1">
           <CreateMenu variant="compact" />
         </div>
       </nav>
@@ -550,7 +579,7 @@ export function AppShell({ children }: AppShellProps) {
         <button
           onClick={scrollToTop}
           aria-label="Scroll back to top"
-          className="fixed bottom-20 md:bottom-8 right-6 z-40 p-2.5 rounded-full bg-primary text-primary-foreground shadow-lg shadow-primary/20 hover:scale-105 active:scale-95 transition-all duration-200 cursor-pointer flex items-center justify-center animate-in fade-in zoom-in-90"
+          className="fixed bottom-[calc(4.5rem+env(safe-area-inset-bottom))] md:bottom-8 right-4 z-40 p-2.5 rounded-full bg-primary text-primary-foreground shadow-lg shadow-primary/20 hover:scale-105 active:scale-95 transition-all duration-200 cursor-pointer flex items-center justify-center animate-in fade-in zoom-in-90"
         >
           <ArrowUp className="w-4 h-4 stroke-[2.5]" />
         </button>
@@ -560,30 +589,25 @@ export function AppShell({ children }: AppShellProps) {
       <Suspense fallback={null}>
         <MobileNavDrawer
           open={isMobileDrawerOpen}
-          onClose={() => setIsMobileDrawerOpen(false)}
+          onClose={closeMobileDrawer}
           sections={drawerSections}
           currentPath={location}
           onLinkClick={handleLinkClick}
         />
       </Suspense>
 
-      {/* Navigation Interruption / Unsaved Edits Dialog */}
-      <AlertDialog open={isConfirmOpen} onOpenChange={setIsConfirmOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Discard Unsaved Changes?</AlertDialogTitle>
-            <AlertDialogDescription>
-              You have unsaved edits. If you navigate away, all your current progress or preferences will be permanently lost.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setIsConfirmOpen(false)}>Keep Editing</AlertDialogCancel>
-            <AlertDialogAction onClick={handleConfirmNavigation} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-              Discard Changes
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {/* Navigation Interruption / Unsaved Edits Dialog (lazy radix chunk).
+          Mounted only once the gate has actually fired, so the chunk is
+          fetched on demand instead of on first paint. */}
+      {isConfirmOpen && (
+        <Suspense fallback={null}>
+          <UnsavedChangesDialog
+            open={isConfirmOpen}
+            onOpenChange={setIsConfirmOpen}
+            onDiscard={handleConfirmNavigation}
+          />
+        </Suspense>
+      )}
       </div>
     </div>
   );

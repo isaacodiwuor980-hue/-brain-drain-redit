@@ -122,6 +122,10 @@ function writeLastRun(key: string, now: number): void {
   }
 }
 
+// Hard-disabled at each exported entry point. Not a runtime feature flag.
+// Legacy algorithms remain for analysis; reactivation requires review.
+function legacyMaintenanceAvailable(): boolean { return false; }
+
 /**
  * runPruning — soft-delete comments that have:
  *   - An absolute score of 0 (no net votes, no source links, no topic score)
@@ -132,6 +136,7 @@ function writeLastRun(key: string, now: number): void {
  * Runs on app boot if 24 hours have elapsed since the last pruning.
  */
 export async function runPruning(): Promise<void> {
+  if (!legacyMaintenanceAvailable()) return;
   const lastRun = readLastRun(PRUNING_KEY);
   if (Date.now() - lastRun < PRUNING_INTERVAL_MS) return;
 
@@ -192,6 +197,7 @@ export async function runPruning(): Promise<void> {
  * Runs on app boot if 30 days have elapsed since the last fossilization.
  */
 export async function runFossilization(): Promise<void> {
+  if (!legacyMaintenanceAvailable()) return;
   const lastRun = readLastRun(FOSSILIZATION_KEY);
   if (Date.now() - lastRun < FOSSILIZATION_INTERVAL_MS) return;
 
@@ -251,6 +257,7 @@ export async function runFossilization(): Promise<void> {
  * Volume 3 — that's a future enhancement, not a bug).
  */
 export async function runForkCheck(): Promise<void> {
+  if (!legacyMaintenanceAvailable()) return;
   const lastRun = readLastRun(FORK_KEY);
   if (Date.now() - lastRun < FORK_INTERVAL_MS) return;
 
@@ -309,6 +316,7 @@ export async function runForkCheck(): Promise<void> {
  * Runs on app boot if 90 days have elapsed since the last reactivation.
  */
 export async function runReactivation(): Promise<void> {
+  if (!legacyMaintenanceAvailable()) return;
   const lastRun = readLastRun(REACTIVATION_KEY);
   if (Date.now() - lastRun < REACTIVATION_INTERVAL_MS) return;
 
@@ -353,32 +361,11 @@ export async function runReactivation(): Promise<void> {
 }
 
 /**
- * runHiveMindMaintenance — single entry point called from App.tsx on
- * boot. Runs all 4 maintenance functions in sequence. Each function
- * is rate-limited by its own localStorage timestamp so calling on
- * every boot is safe — only runs when due.
- *
- * Errors in any single function don't block the others.
+ * Hard-disabled: automatic pruning, fossilization, point awards, forks and
+ * notifications have not been reviewed for consent, identity or data safety.
+ * Existing data and timers are untouched. Each legacy helper is independently
+ * hard-disabled too; this is not a safeguard for old builds or direct DB writes.
  */
 export async function runHiveMindMaintenance(): Promise<void> {
-  try {
-    await runPruning();
-  } catch (err) {
-    console.warn("runPruning failed:", err);
-  }
-  try {
-    await runFossilization();
-  } catch (err) {
-    console.warn("runFossilization failed:", err);
-  }
-  try {
-    await runForkCheck();
-  } catch (err) {
-    console.warn("runForkCheck failed:", err);
-  }
-  try {
-    await runReactivation();
-  } catch (err) {
-    console.warn("runReactivation failed:", err);
-  }
+  return;
 }

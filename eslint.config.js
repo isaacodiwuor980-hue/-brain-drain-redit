@@ -12,6 +12,7 @@ export default tseslint.config(
       "build/**",
       "node_modules/**",
       "coverage/**",
+      ".cache/**",
       "logs/**",
       "scripts/**",
       "tests/e2e/**", // Playwright specs — run by `npx playwright test`

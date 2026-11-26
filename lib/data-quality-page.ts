@@ -26,19 +26,19 @@ export function renderDataQualityPage(input: DataQualityPageInput): string {
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Data Quality Report · Brain Drain</title>
-<meta name="description" content="Public data quality dashboard for Brain Drain. Verification rates, confidence distributions, provenance integrity, and dispute resolution metrics." />
+<meta name="description" content="Brain Drain data quality concepts and implementation status; live metrics are not available." />
 <meta name="robots" content="index, follow" />
 <link rel="canonical" href="${origin}/data-quality" />
 <meta property="og:type" content="website" />
 <meta property="og:title" content="Brain Drain — Data Quality Report" />
-<meta property="og:description" content="Transparent data quality metrics for the world's most trusted source of human-verified knowledge." />
+<meta property="og:description" content="Brain Drain data quality concepts and implementation status." />
 <link rel="icon" href="/favicon.svg" />
 <script type="application/ld+json">
 ${JSON.stringify({
   "@context": "https://schema.org",
   "@type": "Dataset",
   "name": "Brain Drain Data Quality Report",
-  "description": "Public data quality dashboard showing verification rates, confidence distributions, provenance integrity, and dispute resolution metrics.",
+  "description": "Data quality concepts and implementation status; not live verification metrics.",
   "url": `${origin}/data-quality`,
   "datePublished": now,
   "dateModified": now,
@@ -104,7 +104,7 @@ ${JSON.stringify({
 
 <section class="card">
   <h2>Architecture capabilities</h2>
-  <p>Brain Drain is built on four data-quality pillars. Each is fully implemented and operational:</p>
+  <p>The following are design concepts, not verified platform-wide capabilities or live metrics. Implementation and deployment status vary.</p>
   <div class="stats">
     <div class="stat">
       <div class="num">SHA-256</div>
@@ -127,7 +127,7 @@ ${JSON.stringify({
 
 <section class="card">
   <h2>Provenance integrity</h2>
-  <p>Every record (drain entry, post, comment, brain node, brain will, verification record) gets a SHA-256 hash chained to the previous version. Any tampering with historical versions is detectable via <code>verifyChain()</code>.</p>
+  <p>A SHA-256 chain is a proposed provenance mechanism. Coverage across records, tamper detection, and deployment have not been verified.</p>
   <table>
     <thead>
       <tr><th>Record type</th><th>Hash algorithm</th><th>Chain structure</th><th>Verification</th></tr>
@@ -145,7 +145,7 @@ ${JSON.stringify({
 
 <section class="card">
   <h2>Confidence score formula (transparent)</h2>
-  <p>Every answer gets a 0-100 score computed from evidence. The formula is public and shown inline on every answer:</p>
+  <p>The following is a proposed formula, not evidence that every answer is scored or that scores verify accuracy:</p>
   <table>
     <thead>
       <tr><th>Component</th><th>Max points</th><th>How it's calculated</th></tr>
@@ -162,7 +162,7 @@ ${JSON.stringify({
 
 <section class="card">
   <h2>Data licensing</h2>
-  <p>Every record has an explicit, per-record license choice. AI labs must obtain API keys to access licensed data. Deceased experts' brains unlock according to their will (default: 12-month delay, then CC-BY-NC).</p>
+  <p>These are proposed licensing categories. Per-record consent, access controls and any legacy arrangements have not been verified as implemented.</p>
   <div>
     <span class="badge ok">CC0 (public domain)</span>
     <span class="badge ok">CC-BY (attribution)</span>
@@ -181,16 +181,16 @@ ${JSON.stringify({
     <tbody>
       <tr><td><code>/api/v1/verify/:userId</code></td><td>GET</td><td>Verification record (JSON)</td><td><span class="badge warn">Pending implementation</span></td></tr>
       <tr><td><code>/api/v1/provenance/:recordId</code></td><td>GET</td><td>Provenance chain (JSON)</td><td><span class="badge warn">Pending implementation</span></td></tr>
-      <tr><td><code>/api/v1/datasets</code></td><td>GET</td><td>Available datasets</td><td><span class="badge ok">Live</span></td></tr>
+      <tr><td><code>/api/v1/datasets</code></td><td>GET</td><td>Available datasets</td><td><span class="badge warn">Availability varies; not verified</span></td></tr>
       <tr><td><code>/api/v1/search?q=...</code></td><td>GET</td><td>Semantic search results</td><td><span class="badge warn">Contract published</span></td></tr>
-      <tr><td><code>/api/v1/search/skills</code></td><td>GET</td><td>Skills search (rule + FTS)</td><td><span class="badge ok">Live</span></td></tr>
+      <tr><td><code>/api/v1/search/skills</code></td><td>GET</td><td>Skills search (rule + FTS)</td><td><span class="badge warn">Availability varies; not verified</span></td></tr>
     </tbody>
   </table>
 </section>
 
 <footer>
   <p>This page is server-rendered and crawlable. Programmatic access: <code>GET /api/healthz</code> for liveness.</p>
-  <p>Brain Drain never claims 100% accuracy. We show evidence and confidence instead — every record's provenance, verification tier, and confidence breakdown is public.</p>
+  <p>Brain Drain does not guarantee accuracy. Provenance, verification, and confidence information are not available for every record.</p>
 </footer>
 </body>
 </html>`;
