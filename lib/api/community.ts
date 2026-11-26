@@ -54,7 +54,7 @@ export interface OnboardingState {
 }
 
 export const onboardingApi = {
-  get: () => api.get<OnboardingState>("/api/onboarding"),
+  get: () => authedApi.get<OnboardingState>("/api/onboarding", { cache: "no-store" }),
 
   start: () =>
     authedApi.post<{ ok: boolean; currentStep: OnboardingStep; existed: boolean }>("/api/onboarding/start"),
