@@ -31,12 +31,12 @@ describe("unmounted legacy behavior and ordinary feed in synthetic fixtures", ()
     expect(db.insert).toHaveBeenCalledOnce(); expect(db.rpc).not.toHaveBeenCalled();
     expect(db.getOne.mock.calls.every(call => call[0] !== "server_feature_flags")).toBe(true);
   });
-  it("continues to serve a degraded feed without flags or the database", async () => {
+  it("serves a degraded public feed while keeping following paused without a database", async () => {
     db.isConfigured.mockReturnValue(false);
-    for (const mode of ["foryou", "following"]) {
-      const res = await fetch(`${base}/api/feed?mode=${mode}`);
-      expect(res.status).toBe(200); expect(await res.json()).toMatchObject({ posts: [], hasMore: false });
-    }
+    const foryou = await fetch(`${base}/api/feed?mode=foryou`);
+    expect(foryou.status).toBe(200); expect(await foryou.json()).toMatchObject({ posts: [], hasMore: false });
+    const following = await fetch(`${base}/api/feed?mode=following`);
+    expect(following.status).toBe(503); expect(await following.json()).toMatchObject({ error: expect.stringContaining("unavailable") });
     expect(db.getOne).not.toHaveBeenCalled(); expect(db.rpc).not.toHaveBeenCalled();
   });
 });

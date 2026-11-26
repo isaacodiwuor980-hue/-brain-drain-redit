@@ -13,3 +13,9 @@ describe("live feed ranking containment", () => {
     expect(orderLiveFeed(posts, "following", true, 3).map(p => p.id)).toEqual(["newer", "older"]);
   });
 });
+
+it("uses the same deterministic chronological fallback and rejects malformed timestamps", () => {
+  const posts = [{id:"z",createdAt:10},{id:"broken",createdAt:NaN},{id:"a",createdAt:10},{id:"old",createdAt:1}] as Post[];
+  expect(orderLiveFeed(posts,"foryou",true,100).map(p=>p.id)).toEqual(["a","z","old"]);
+  expect(orderLiveFeed([...posts].reverse(),"following",false,100).map(p=>p.id)).toEqual(["a","z","old"]);
+});

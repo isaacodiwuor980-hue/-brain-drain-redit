@@ -23,3 +23,15 @@ describe("home feed chronological integration gate", () => {
     expect(source).not.toContain("rankRelatedTopics(");
   });
 });
+
+it("excludes malformed timestamps and refuses invalid limits without changing input", () => {
+  const input = [
+    {id:"invalid-nan", createdAt:NaN}, {id:"invalid-null", createdAt:null},
+    {id:"z", createdAt:10}, {id:"a", createdAt:10}, {id:"bad-infinite", createdAt:Infinity},
+    {id:"old", createdAt:1},
+  ] as unknown as Post[];
+  expect(selectChronologicalHomePosts(input, null, null, 5).map(p=>p.id)).toEqual(["a","z","old"]);
+  expect(selectChronologicalHomePosts(input, null, null, -1)).toEqual([]);
+  expect(selectChronologicalHomePosts(input, null, null, NaN)).toEqual([]);
+  expect(input).toHaveLength(6);
+});

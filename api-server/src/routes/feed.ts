@@ -64,7 +64,7 @@ function normalizePostType(raw: string | null | undefined): "post" | "question" 
 
 /** Attach repost totals without returning individual reactions.
  * Vote totals are deliberately not exposed; this does not restrict direct DB
- * access or other routes. The cache is shared; verify linked brains per response.
+ * access or other routes. Verify linked brains per response.
  * Until ownership mapping is proven, even an author's private brain is omitted.
  */
 async function renderFeedPosts(entry: CachedFeed) {
@@ -121,184 +121,50 @@ router.get("/feed/following-v2", (_req, res, next) => { res.setHeader("Cache-Con
     }
   });
 
-router.get("/feed", optionalAuth, async (req, res) => {
+router.get("/feed", (_req, res, next) => { res.setHeader("Cache-Control", "no-store"); next(); }, optionalAuth, async (req, res) => {
   const parsed = FeedQuerySchema.safeParse(req.query);
   if (!parsed.success) {
     res.status(400).json({ error: "Invalid feed query" });
     return;
   }
   const { mode, topic, limit, offset } = parsed.data;
-  const currentUserId = req.auth?.uid;
 
-  // If Supabase is not configured, the API runs in degraded/local mode.
+  // The legacy follow graph stores text subjects while posts are UUID-owned.
+  // No verified binding or graph provenance exists, so neither a guessed join
+  // nor a shared cache is safe. Do not silently present an empty feed as valid.
+  if (mode === "following") {
+    res.status(503).json({ error: "Following feed is unavailable while account identity is being verified" });
+    return;
+  }
+
   if (!supabase.isConfigured()) {
     res.json({ posts: [], hasMore: false, source: "degraded" });
     return;
   }
 
-  // B3 FOLLOWING FIX: "following" previously returned the exact same rows as
-  // "foryou" (mode was never applied) — the tab was a dead control. Resolve
-  // the caller's follow graph from user_follows. Guests (and users whose
-  // follows table isn't deployed yet) get an empty page. This legacy lookup
-  // is not compatible with the inspected live schema; follow writes fail closed.
-  let followeeIds: string[] | null = null;
-  if (mode === "following") {
-    if (!currentUserId) {
-      res.json({ posts: [], hasMore: false, source: "following" });
-      return;
-    }
-    try {
-      const followRows = await supabase.get<{ followee_id: string }>("user_follows", {
-        select: "followee_id",
-        filters: { follower_id: `eq.${currentUserId}` },
-        limit: 1000,
-      });
-      followeeIds = followRows.map((r) => r.followee_id);
-    } catch (err) {
-      // Distinguish "table not deployed" (graceful empty) from a real outage
-      // (502) — same contract as discover.ts's follow insert.
-      if (
-        err instanceof SupabaseError &&
-        (err.status === 404 || /PGRST205|Could not find/i.test(String(err.body ?? "")))
-      ) {
-        followeeIds = [];
-      } else {
-        req.log?.error?.({}, "Following feed lookup failed");
-        res.status(502).json({ error: "Feed data source unavailable" });
-        return;
-      }
-    }
-    if (followeeIds.length === 0) {
-      res.json({ posts: [], hasMore: false, source: "following" });
-      return;
-    }
-  }
-
-  // In-memory cache for the feed. Keyed by (mode, topic, limit, offset).
-  // Posts don't change frequently, so a 30-second TTL gives a good balance
-  // between freshness and Supabase round-trip cost (each uncached call is
-  // ~500-1000ms due to two REST queries; cached calls are <5ms).
-  // The shared cache stores no individual reaction identities.
-  //
-  // B-11 fix: the map is bounded with a simple LRU-eviction policy
-  // (oldest entry dropped when capacity exceeded). Without this, an attacker
-  // could exhaust memory by varying the offset parameter across requests.
-  const FEED_CACHE_TTL_MS = 30_000; // 30 seconds — considered "fresh"
-  // PERF (stale-while-revalidate): entries up to this age are served
-  // INSTANTLY while a background refresh updates the cache for the next
-  // request. Measured cold-cache latency: 514-948ms (two sequential
-  // Supabase round trips); HIT: ~1ms. With SWR, only ONE visitor per
-  // refresh window pays the cold cost — everyone else gets ~1ms. Feed data
-  // being ≤ FEED_CACHE_STALE_MAX_MS old is an acceptable trade-off for a
-  // social feed (reactions update client-side optimistically anyway).
-  const FEED_CACHE_STALE_MAX_MS = 5 * 60_000; // 5 minutes
-  const FEED_CACHE_MAX_ENTRIES = 128; // bounded LRU capacity
-  type FeedCacheMap = Map<string, CachedFeed>;
-  const feedCache: FeedCacheMap =
-    (router as unknown as { __feedCache?: FeedCacheMap }).__feedCache ?? new Map<string, CachedFeed>();
-  (router as unknown as { __feedCache?: FeedCacheMap }).__feedCache = feedCache;
-
-  // LRU touch: re-insert moves the entry to the end (newest position).
-  // Map iteration order is insertion order, so the first entry is the oldest.
-  function feedCacheTouch(map: FeedCacheMap, key: string, value: CachedFeed) {
-    if (map.has(key)) map.delete(key);
-    map.set(key, value);
-    while (map.size > FEED_CACHE_MAX_ENTRIES) {
-      const oldestKey = map.keys().next().value;
-      if (oldestKey === undefined) break;
-      map.delete(oldestKey);
-    }
-  }
-
-  const cacheKey = `${mode}:${topic || ""}:${limit}:${offset}`;
-  const cached = feedCache.get(cacheKey);
-  const cacheAge = cached ? Date.now() - cached.cachedAt : Infinity;
-
-  // Background refresh dedup: only ONE in-flight refresh per cacheKey,
-  // shared across requests (module-level on the router like the cache).
-  type InflightSet = Set<string>;
-  const refreshInFlight: InflightSet =
-    (router as unknown as { __feedRefreshInFlight?: InflightSet }).__feedRefreshInFlight ?? new Set<string>();
-  (router as unknown as { __feedRefreshInFlight?: InflightSet }).__feedRefreshInFlight = refreshInFlight;
-
-  /** Fire-and-forget background refresh of one cache entry (SWR path). */
-  function triggerBackgroundRefresh(key: string, refreshMode: string, refreshTopic: string | undefined, refreshLimit: number, refreshOffset: number, log: { warn?: (o: unknown, m: string) => void } | undefined) {
-    if (refreshInFlight.has(key)) return; // dedupe
-    refreshInFlight.add(key);
-    void (async () => {
-      const fresh = await fetchFeedPage(refreshMode, refreshTopic, refreshLimit, refreshOffset);
-      feedCacheTouch(feedCache, key, fresh);
-    })()
-      .catch(() => {
-        // Stale data stays served on refresh failure — log and move on.
-        log?.warn?.({}, "Feed background refresh failed — serving stale");
-      })
-      .finally(() => {
-        refreshInFlight.delete(key);
-      });
-  }
-
-  /** Render a response from a cached feed entry (HIT + STALE paths). */
-  async function renderFromCache(entry: CachedFeed, header: "HIT" | "STALE") {
-    const posts = await renderFeedPosts(entry);
-    // res.header (not res.set) so the value does not get appended to Vary,
-    // which caused cache fragmentation for compressed responses.
-    res.header("X-Feed-Cache", header);
-    res.json({
-      posts,
-      hasMore: entry.hasMore,
-      source: mode,
-    });
-  }
+  // Do not serve old post bodies after deletion or a visibility change. A
+  // no-store header also prevents compliant intermediaries from caching them.
 
   try {
-    // B3: per-user followee filtering can't use the shared cross-user cache
-    // (keyed only by mode/topic/limit/offset) — following pages fetch live.
-    if (mode !== "following" && cached && cacheAge < FEED_CACHE_TTL_MS) {
-      await renderFromCache(cached, "HIT");
-      return;
-    }
-
-    if (mode !== "following" && cached && cacheAge < FEED_CACHE_STALE_MAX_MS) {
-      // PERF: stale-while-revalidate — serve instantly, refresh in background.
-      await renderFromCache(cached, "STALE");
-      triggerBackgroundRefresh(cacheKey, mode, topic, limit, offset, req.log);
-      return;
-    }
-
-    const filters: Record<string, string> = {};
-    if (topic) filters.topic_id = `eq.${topic}`;
-
-    // Live path (cold cache): fetch posts + reactions, fill the cache,
-    // respond. Shared logic lives in fetchFeedPage so the SWR background
-    // refresher uses the exact same code.
-    const fresh = await fetchFeedPage(mode, topic, limit, offset, followeeIds);
-    if (mode !== "following") feedCacheTouch(feedCache, cacheKey, fresh);
-
-    // Render live rows with the same redactions as cached responses.
+    const fresh = await fetchFeedPage(mode, topic, limit, offset);
     const posts = await renderFeedPosts(fresh);
-
     res.header("X-Feed-Cache", "MISS");
-    res.json({
-      posts,
-      hasMore: fresh.hasMore,
-      source: mode,
-    });
+    res.json({ posts, hasMore: fresh.hasMore, source: mode });
   } catch (error) {
     if (error instanceof SupabaseError) {
       req.log?.error?.({ status: error.status }, "Feed query failed");
       res.status(502).json({ error: "Feed data source unavailable" });
       return;
     }
-    throw error;
+    req.log?.error?.({}, "Feed query failed");
+    res.status(502).json({ error: "Feed data source unavailable" });
   }
 });
 
 /**
  * Fetch one page of the feed from Supabase: posts (with topic + author
  * embedded), then repost-only counts for those posts. Returns a cache-shaped
- * entry with no voter identities. Used by both the live request path and the
- * stale-while-revalidate background refresher.
+ * entry with no voter identities. The response is not stored in a shared cache.
  */
 async function fetchFeedPage(
   mode: string,
@@ -316,8 +182,8 @@ async function fetchFeedPage(
     filters.user_id = `in.(${followeeIds.map((id) => `"${id}"`).join(",")})`;
   }
 
-  // For you/following return newest first and let the client
-  // apply local personalization signals.
+  // Return newest first; live TSRG ranking and behavioral personalization
+  // remain disabled until their security and privacy gates are verified.
   const rows = await supabase.get<PostRow>("posts", {
     select: `
       id,user_id,topic_id,content,${includeTags ? "tags," : ""}post_type,event,media_urls,brain_id,

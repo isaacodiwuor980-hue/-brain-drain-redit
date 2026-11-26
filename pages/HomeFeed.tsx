@@ -325,10 +325,10 @@ export function HomeFeed() {
           <div className="flex items-start gap-3">
             <div className="flex-1">
               <p className="text-sm font-medium text-foreground">
-                Couldn’t load the latest posts from the server.
+                {activeFeed === "following" ? "Following is temporarily unavailable." : "Couldn’t load the latest posts from the server."}
               </p>
               <p className="text-xs text-muted-foreground mt-0.5">
-                Saved posts are hidden until their visibility can be verified. Check your connection and retry.
+                {activeFeed === "following" ? "Account identity and follow relationships are being verified." : "Saved posts are hidden until their visibility can be verified. Check your connection and retry."}
               </p>
             </div>
             <button
@@ -525,17 +525,14 @@ export function HomeFeed() {
           </>
         ) : isFollowingEmpty ? (
           <div className="p-8 text-center">
-            {/* B3: Following empty view — honest empty state instead of
-                silently reusing For-You content. */}
+            {/* Do not present the paused feed as an empty follow graph. */}
             <div className="max-w-md mx-auto space-y-4">
               <div className="w-16 h-16 rounded-full bg-primary/10 text-primary flex items-center justify-center mx-auto">
                 <BrainCircuit className="w-8 h-8" />
               </div>
-              <h3 className="font-bold text-lg text-foreground">Following is quiet</h3>
+              <h3 className="font-bold text-lg text-foreground">Following is temporarily unavailable</h3>
               <p className="text-sm text-muted-foreground leading-relaxed">
-                {currentUserId
-                  ? "Posts from the people you follow will appear here. Follow more voices to fill this feed."
-                  : "Sign in and follow the thinkers you trust — their reasoning will collect here."}
+                The following feed is paused while account identity and follow relationships are verified.
               </p>
             </div>
           </div>

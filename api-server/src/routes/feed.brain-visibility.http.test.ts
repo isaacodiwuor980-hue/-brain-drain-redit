@@ -17,7 +17,7 @@ beforeEach(()=>{vi.clearAllMocks(); publicBrain=true;lookupFails=false;db.get.mo
 });});
 async function get(topic:string){const res=await fetch(`${base}/api/feed?topic=${topic}`);return {res,body:await res.json()};}
 describe("feed linked-brain privacy with mocked storage",()=>{
-  it("exposes only explicitly public linked brain IDs, rechecking on each cached response",async()=>{
+  it("exposes only explicitly public linked brain IDs, rechecking on each response",async()=>{
     const first=await get("visibility-a");
     expect(first.res.status).toBe(200); expect(first.res.headers.get("x-feed-cache")).toBe("MISS");
     expect(first.body.posts[0].brainId).toBe("synthetic-public");
@@ -25,7 +25,7 @@ describe("feed linked-brain privacy with mocked storage",()=>{
     expect(JSON.stringify(first.body)).not.toContain("synthetic-private");
     publicBrain=false;
     const second=await get("visibility-a");
-    expect(second.res.headers.get("x-feed-cache")).toBe("HIT");
+    expect(second.res.headers.get("x-feed-cache")).toBe("MISS");
     expect(second.body.posts.map((p:{brainId:string|null})=>p.brainId)).toEqual([null,null]);
   });
   it("does not trust malformed visibility metadata or unsafe IDs",async()=>{

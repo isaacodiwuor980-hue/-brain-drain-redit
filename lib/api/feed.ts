@@ -52,6 +52,7 @@ export async function fetchFeed(params: FeedParams = {}): Promise<FeedResponse> 
   const qs = query.toString();
   const response = await api.get<FeedResponse>(`/api/feed${qs ? `?${qs}` : ""}`, {
     signal: params.signal,
+    cache: "no-store",
     retries: 1,
   });
   return normalizeFeedPosts(response);
