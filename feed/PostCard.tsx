@@ -353,8 +353,12 @@ export function PostCard({
       ? (profile.bookmarkedPostIds || []).filter(id => id !== post.id)
       : [...(profile.bookmarkedPostIds || []), post.id];
       
-    await updateProfile({ ...profile, bookmarkedPostIds: newBookmarkedPostIds });
-    toast({ title: isBookmarked ? "Post removed from bookmarks" : "Post bookmarked" });
+    try {
+      await updateProfile({ ...profile, bookmarkedPostIds: newBookmarkedPostIds });
+      toast({ title: isBookmarked ? "Post removed from bookmarks" : "Post bookmarked" });
+    } catch {
+      toast({ title: "Bookmark not saved", description: "Please try again.", variant: "destructive" });
+    }
   };
 
   const handleRunBrain = async (e: React.MouseEvent) => {

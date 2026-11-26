@@ -74,10 +74,15 @@ export function ProfilePage() {
     const reader = new FileReader();
     reader.onload = async () => {
       const dataUrl = reader.result as string;
-      if (kind === "avatar") {
-        await updateProfile({ ...profile!,avatarUrl: dataUrl });
-      } else {
-        await updateProfile({ ...profile!, coverUrl: dataUrl });
+      try {
+        if (!profile) throw new Error("Your profile is not available yet.");
+        if (kind === "avatar") {
+          await updateProfile({ ...profile, avatarUrl: dataUrl });
+        } else {
+          await updateProfile({ ...profile, coverUrl: dataUrl });
+        }
+      } catch {
+        toast({ title: "Image not saved", description: "Could not save your profile image. Please try again.", variant: "destructive" });
       }
     };
     reader.readAsDataURL(file);

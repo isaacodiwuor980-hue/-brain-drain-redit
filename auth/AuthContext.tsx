@@ -224,7 +224,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                   followerCount: 0,
                   followingCount: 0,
                 });
-                toast({ title: "Profile Sync Issue", description: "Working with a local profile. Changes will sync when possible." });
+                toast({ title: "Profile Sync Issue", description: "Using a temporary profile. Changes may not be saved until the connection is restored." });
               }
               if (stillCurrent()) setLoading(false);
             } else if (guestId && guestSessionActiveRef.current) {
@@ -559,24 +559,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const updateProfileData = async (data: Partial<UserProfile>) => {
-    if (!user || !profile) return;
+    if (!user || !profile) throw new Error("Your profile is not available yet. Please try again.");
     const updatedProfile = { ...profile, ...data };
     const generation = authGenerationRef.current;
     const stillCurrent = () => providerMountedRef.current && authGenerationRef.current === generation;
     try {
       if (isGuestUser(user)) {
-        await idb.put("profile", { ...updatedProfile, id: GUEST_PROFILE_ID });
+        await idb.putStrict("profile", { ...updatedProfile, id: GUEST_PROFILE_ID });
       } else {
         const firestore = await getFirestoreServices();
-        if (!stillCurrent()) return;
+        if (!stillCurrent()) throw new Error("Your session changed before the profile could be saved.");
         await firestore.setDoc(firestore.doc(firestore.db, "users", user.uid), updatedProfile, { merge: true });
       }
-      if (stillCurrent()) setProfile(updatedProfile);
+      if (!stillCurrent()) throw new Error("Your session changed during the profile save; its result may be uncertain.");
+      setProfile(updatedProfile);
     } catch (error: unknown) {
-      if (!stillCurrent()) return;
       console.error("Error updating profile", error);
-      const message = error instanceof Error ? error.message : String(error);
-      toast({ title: "Update Failed", description: message || "Could not update profile.", variant: "destructive" });
+      throw error;
     }
   };
 

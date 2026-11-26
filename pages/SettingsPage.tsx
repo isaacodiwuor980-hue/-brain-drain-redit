@@ -167,19 +167,16 @@ export function SettingsPage() {
       // Persist profile fields through the auth layer (Firestore for signed-in
       // users, IndexedDB for guests). Privacy toggles are stored locally.
       await updateProfileData({ displayName: displayName.trim() || "Builder", bio });
-      try {
-        // Preserve legacy fields, including an earlier saved-off activity
-        // preference, until the separate activity control is explicitly set.
-        const previous = await idb.get<Record<string, unknown>>("settings", "privacy-settings");
-        await idb.put("settings", {
-          ...previous,
-          id: "privacy-settings",
-          notifications,
-          privateProfile,
-        });
-      } catch {
-        // Privacy preferences are best-effort; profile save is the priority.
-      }
+      // Preserve legacy fields, including an earlier saved-off activity
+      // preference, until the separate activity control is explicitly set.
+      // These are authoritative local preferences, not a disposable cache.
+      const previous = await idb.getStrict<Record<string, unknown>>("settings", "privacy-settings");
+      await idb.putStrict("settings", {
+        ...previous,
+        id: "privacy-settings",
+        notifications,
+        privateProfile,
+      });
       setSavedSettings(next);
       toast({
         title: "Settings saved",
@@ -189,7 +186,7 @@ export function SettingsPage() {
       console.error("Failed to save settings", error);
       toast({
         title: "Save failed",
-        description: "Could not save your settings. Please try again.",
+        description: "Some changes may not have been saved. Please try again.",
         variant: "destructive",
       });
     } finally {
