@@ -22,3 +22,10 @@ describe('feed freshness (mocked data)',()=>{
     expect((await second.json()).posts).toEqual([]);
   });
 });
+
+it('requests a deterministic secondary order for equal timestamps',async()=>{
+  fixture.get.mockResolvedValue([]);
+  const response=await fetch(`${base}/api/feed?topic=timestamp-ties`);
+  expect(response.status).toBe(200);
+  expect(fixture.get).toHaveBeenCalledWith('posts',expect.objectContaining({order:[{column:'created_at',ascending:false},{column:'id',ascending:true}]}));
+});

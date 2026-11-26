@@ -78,7 +78,7 @@ async function fetchWithTimeout(
 interface QueryOptions {
   select?: string;
   filters?: Record<string, string | number | boolean | null>;
-  order?: { column: string; ascending?: boolean };
+  order?: { column: string; ascending?: boolean } | Array<{ column: string; ascending?: boolean }>;
   limit?: number;
   offset?: number;
   /** e.g. "exact" for upsert conflict resolution. */
@@ -96,8 +96,8 @@ function buildQuery(options: QueryOptions): string {
     }
   }
   if (options.order) {
-    const dir = options.order.ascending === false ? "desc" : "asc";
-    params.set("order", `${options.order.column}.${dir}`);
+    const orders = Array.isArray(options.order) ? options.order : [options.order];
+    if (orders.length) params.set("order", orders.map(({column, ascending}) => `${column}.${ascending === false ? "desc" : "asc"}`).join(","));
   }
   if (options.limit) params.set("limit", String(options.limit));
   if (options.offset) params.set("offset", String(options.offset));

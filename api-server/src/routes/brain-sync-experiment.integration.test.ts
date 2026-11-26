@@ -47,7 +47,7 @@ describe('simulated two-device synchronization over experimental API',()=>{
       const operation='20000000-0000-4000-8000-000000000001';
       await saveLocalSyncEdit(local,'alice','second-brain',{id:'second-brain',title:'saved'});
       await stageLocalSyncWrite(local,'alice','second-brain',operation);
-      const session=async()=>({uid:'alice',token:'alice'});
+      const session=async()=>({uid:'alice',token:'alice',sessionGeneration:1});
       let loseResponse=true;
       const send:BrainSyncTransport=async(payload,token)=>{
         const res=await fetch(`${base}/api/experimental/brain-sync`,{method:'POST',headers:{authorization:`Bearer ${token}`,'content-type':'application/json'},body:JSON.stringify(payload)});

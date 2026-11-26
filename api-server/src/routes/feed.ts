@@ -192,7 +192,7 @@ async function fetchFeedPage(
       author:profiles(display_name,avatar_url)
     `,
     filters,
-    order: { column: "created_at", ascending: false },
+    order: [{ column: "created_at", ascending: false }, { column: "id", ascending: true }],
     limit: limit + 1,
     offset,
   });
