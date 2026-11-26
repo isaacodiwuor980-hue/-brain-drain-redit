@@ -1,5 +1,7 @@
 # P0 safety readiness ledger
 
+> Historical ledger: earlier dated entries below do not describe current branch state. See `FEED_PROGRESS_LOG.md` and `IDENTITY_VOTE_TSRG_MIGRATION_REQUIREMENTS.md` for current gates. No deployment or complete verification is implied.
+
 Status: **incomplete, not production-ready**. These are staging-only scaffolds; no database migration was applied to staging or production in this session. Existing API behavior is not protected by the new scaffolds until it is migrated and tested end-to-end.
 
 | Area | Evidence / remaining work |

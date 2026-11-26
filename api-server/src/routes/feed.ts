@@ -1,9 +1,7 @@
-import { Router, type IRouter } from "express";
+import { Router, type IRouter, type RequestHandler } from "express";
 import { z } from "zod";
 import { supabase, SupabaseError } from "../lib/supabase";
-import { optionalAuth, requireAuth } from "../middleware/auth";
-import { requireMappedIdentity } from "../middleware/identity-map";
-import { requireServerFeature } from "../middleware/server-feature-flag";
+import { optionalAuth } from "../middleware/auth";
 import { isFeedCursor, isFeedCursorTimestamp, type FeedCursor } from "../../../lib/feed-cursor";
 
 const router: IRouter = Router();
@@ -96,11 +94,15 @@ async function renderFeedPosts(entry: CachedFeed) {
   });
 }
 
-// Separate, default-off path: never switch the existing feed implicitly. The
-// flag and verified mapping must be provisioned before this can be exercised.
-// It deliberately does not use the shared feed cache.
-router.get("/feed/following-v2", (_req, res, next) => { res.setHeader("Cache-Control", "no-store"); next(); },
-  requireServerFeature("following_feed_v2"), requireAuth, requireMappedIdentity, async (req, res) => {
+// A flag cannot establish feed authorization, graph provenance, blocks or
+// moderation. This route stays disabled even if the flag is turned on.
+router.get("/feed/following-v2", (_req, res) => {
+  res.setHeader("Cache-Control", "no-store");
+  res.status(503).json({ error: "Following feed temporarily unavailable" });
+});
+
+/** Unmounted prototype for synthetic testing only; not a privacy boundary. */
+export const followingV2HandlerForTests: RequestHandler = async (req, res) => {
     const parsed = FeedQuerySchema.safeParse(req.query);
     if (!parsed.success) { res.status(400).json({ error: "Invalid feed query" }); return; }
     try {
@@ -124,7 +126,7 @@ router.get("/feed/following-v2", (_req, res, next) => { res.setHeader("Cache-Con
       // Do not return or log upstream payloads which may contain user data.
       res.status(502).json({ error: "Feed data source unavailable" });
     }
-  });
+};
 
 router.get("/feed", (_req, res, next) => { res.setHeader("Cache-Control", "no-store"); next(); }, optionalAuth, async (req, res) => {
   const parsed = FeedQuerySchema.safeParse(req.query);
