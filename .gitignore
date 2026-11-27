@@ -25,3 +25,6 @@ coverage/
 screenshots/
 backups/
 tool-results/
+
+# Arena runtime
+.arena/
