@@ -12,6 +12,12 @@ Whenever asked to solve a complex task, design architecture, or use `/arena`:
    `.skills/arena/strategies.json` for judging and strategy selection.
 3. Write all intermediate notes (brackets, match logs, scores, drafts) to
    `.arena/` — it is git-ignored, so nothing in it gets committed.
+4. **Sequential execution in this environment.** Because this environment
+   runs in a single browser sandbox without a CLI sub-agent spawning tool,
+   execute the Arena skill workflow (`.skills/arena/SKILL.md`,
+   `strategies.json`, `rubric.md`) sequentially by writing each competing
+   perspective, attack, defense, and judge score into `.arena/` markdown
+   files rather than treating missing sub-agent spawning tools as a blocker.
 
 ## Rule 2 — Maintain the PROGRESS.md checklist
 
