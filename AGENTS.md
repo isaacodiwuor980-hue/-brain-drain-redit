@@ -25,3 +25,17 @@ ongoing work:
 3. **Check it off** (`- [ ]` → `- [x]`) only after it passes.
 4. **Commit after every task** — one task, one commit that includes the
    completed work and the updated checklist entry.
+
+## Rule 3 — 100% Completion & Zero-Shortcuts Policy
+
+1. **Break work down first.** When told to "work on X", first break X into
+   complete, end-to-end subtasks in `PROGRESS.md` — covering UI, backend,
+   edge cases, error handling, and tests.
+2. **No shortcuts, no stubs.** Never leave `TODO`s, placeholders, mock data,
+   or half-built features behind.
+3. **Finish everything, sequentially.** Work through every unchecked item in
+   `PROGRESS.md` one at a time — testing, fixing bugs, checking off the item,
+   and committing after each step — until 100% of items are checked off and
+   the app builds and passes all tests with zero errors.
+4. **Done means done.** Do not claim "Done" until every item in `PROGRESS.md`
+   is `[x]`, `git status` is clean, and all commits are pushed.
