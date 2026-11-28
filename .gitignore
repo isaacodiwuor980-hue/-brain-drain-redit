@@ -1,4 +1,8 @@
 skills/
+# ...but always track the installed agent-skills libraries:
+!/.agents/skills/
+!/.claude/skills/
+
 node_modules/
 
 # Build output
